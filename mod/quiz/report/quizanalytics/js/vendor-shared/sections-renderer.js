@@ -29,6 +29,55 @@
 (function (global) {
     'use strict';
 
+    // A handful of keys/columns come through as raw Python identifiers
+    // (quiz_name, total_questions, invalid_rate, ...) since they double as
+    // dict keys/DataFrame column names on the Python side — this turns those
+    // into presentable labels for both the summary table and generic data
+    // tables, without needing to rename anything Python-side code depends on.
+    // Applying it to already-nice strings (e.g. "Quiz Name") is a no-op.
+    var LABEL_OVERRIDES = {
+        'id': 'ID', 'ids': 'IDs', 'prt': 'PRT', 'prts': 'PRTs',
+        'ted': 'TED', 'stack': 'STACK', 'url': 'URL',
+    };
+
+    function humanizeLabel(key) {
+        if (typeof key !== 'string' || !key) {
+            return key;
+        }
+        return key
+            .replace(/[_\-]+/g, ' ')
+            .trim()
+            .split(/\s+/)
+            .map(function (word) {
+                var override = LABEL_OVERRIDES[word.toLowerCase()];
+                if (override) {
+                    return override;
+                }
+                return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            })
+            .join(' ');
+    }
+
+    // Long tables (many student rows especially) get capped to a scrollable
+    // viewport instead of pushing the rest of the page down — same idea as
+    // the fixed-height, scrollable dataframe viewer in the Streamlit app this
+    // mirrors. Width is always scrollable too, independent of row count,
+    // since a wide table (e.g. Question Metrics' ~12 columns) can overflow
+    // its column even with only a handful of rows.
+    var SCROLL_ROW_THRESHOLD = 12;
+
+    function wrapScrollable(el, rowCount) {
+        var wrapper = document.createElement('div');
+        wrapper.style.overflowX = 'auto';
+        if (rowCount > SCROLL_ROW_THRESHOLD) {
+            wrapper.style.maxHeight = '420px';
+            wrapper.style.overflowY = 'auto';
+            wrapper.style.border = '1px solid #dee2e6';
+        }
+        wrapper.appendChild(el);
+        return wrapper;
+    }
+
     function renderSummaryTable(root, summary) {
         if (!root || !summary) {
             return;
@@ -37,7 +86,7 @@
         table.className = 'generaltable';
         Object.keys(summary).forEach(function (key) {
             var row = table.insertRow();
-            row.insertCell().textContent = key;
+            row.insertCell().textContent = humanizeLabel(key);
             var value = summary[key];
             row.insertCell().textContent = (value === null || value === undefined) ? '' : String(value);
         });
@@ -54,7 +103,7 @@
         var headRow = thead.insertRow();
         table.columns.forEach(function (col) {
             var th = document.createElement('th');
-            th.textContent = col;
+            th.textContent = humanizeLabel(col);
             headRow.appendChild(th);
         });
         var tbody = el.createTBody();
@@ -65,10 +114,18 @@
                 cell.innerHTML = (value === null || value === undefined) ? '' : String(value);
             });
         });
-        root.appendChild(el);
+        root.appendChild(wrapScrollable(el, table.rows.length));
     }
 
     var chartCounter = 0;
+
+    // A figure whose own layout sets a tall fixed height (e.g. the Student
+    // Performance Matrix heatmap, sized to 24px per student row — see
+    // question_charts.py::build_student_matrix_figure) gets capped to a
+    // scrollable viewport instead of stretching the page, matching the
+    // Streamlit app's own fixed-height chart containers.
+    var CHART_SCROLL_HEIGHT_THRESHOLD = 500;
+    var CHART_SCROLL_MAX_HEIGHT = 500;
 
     function renderChart(root, chart, prefix) {
         if (!chart || !chart.plotly_json) {
@@ -82,12 +139,28 @@
         var container = document.createElement('div');
         container.id = chart.id ? (prefix + '-chart-' + chart.id) : (prefix + '-chart-auto-' + (chartCounter++));
         container.style.marginBottom = '2rem';
-        root.appendChild(container);
-        // Pass the element itself, not container.id: sections are built in a
-        // detached wrapper div before being appended to the live document
-        // (see renderSection), so an ID-based document.getElementById()
-        // lookup here would return null and Plotly.newPlot would throw,
-        // silently aborting the rest of the section-rendering loop.
+
+        var declaredHeight = chart.plotly_json.layout && chart.plotly_json.layout.height;
+        if (declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD) {
+            var scrollWrapper = document.createElement('div');
+            scrollWrapper.style.maxHeight = CHART_SCROLL_MAX_HEIGHT + 'px';
+            scrollWrapper.style.overflowY = 'auto';
+            scrollWrapper.style.overflowX = 'auto';
+            scrollWrapper.style.border = '1px solid #dee2e6';
+            scrollWrapper.style.marginBottom = '2rem';
+            container.style.marginBottom = '0';
+            scrollWrapper.appendChild(container);
+            root.appendChild(scrollWrapper);
+        } else {
+            root.appendChild(container);
+        }
+
+        // Pass the element itself, not container.id: renderSection() appends
+        // its wrapper to the live document before populating it (so this
+        // container has real, laid-out dimensions for Plotly's "responsive"
+        // sizing to measure), but document.getElementById() would still be
+        // one more indirection than necessary — passing the element directly
+        // also sidesteps a null lookup if that ever regresses.
         global.Plotly.newPlot(container, chart.plotly_json.data, chart.plotly_json.layout, {
             responsive: true,
         });
@@ -112,6 +185,15 @@
         if (section.id) {
             wrapper.id = prefix + '-section-' + section.id;
         }
+        // Attached to the live document BEFORE being populated: a chart drawn
+        // into a still-detached container has no real layout width for
+        // Plotly's "responsive" sizing to measure (getBoundingClientRect()
+        // on a detached element is 0x0), so it falls back to Plotly's small
+        // default size and never grows to fill the page afterward — nothing
+        // re-triggers that measurement once the wrapper is later attached.
+        // This was the cause of charts rendering visibly narrower than their
+        // surrounding text.
+        root.appendChild(wrapper);
         if (section.title) {
             var heading = document.createElement('h4');
             heading.textContent = section.title;
@@ -133,7 +215,6 @@
         if (section.notes) {
             renderNotes(wrapper, section.notes);
         }
-        root.appendChild(wrapper);
         typesetMath(wrapper);
     }
 
@@ -242,6 +323,10 @@
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
         wrapper.id = prefix + '-section-student-drilldown';
+        // Attached before populating — renderSection() below draws charts
+        // into it, which need a live (attached) ancestor to size against;
+        // see the matching comment inside renderSection() for the full story.
+        root.appendChild(wrapper);
 
         var heading = document.createElement('h4');
         heading.textContent = 'Student drill-down: ' + (drilldown.student_name || drilldown.student_id || '');
@@ -251,7 +336,6 @@
             renderSection(wrapper, section, prefix);
         });
 
-        root.appendChild(wrapper);
         typesetMath(wrapper);
     }
 

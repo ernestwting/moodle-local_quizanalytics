@@ -15,7 +15,7 @@ $string['pluginname'] = 'Analytics';
 $string['quizanalytics:view'] = 'View course-level interactive quiz analytics';
 
 $string['pagetitle']            = 'Quiz analytics';
-$string['coursewideheading']    = 'Course-wide analytics';
+$string['coursewideheading']    = 'Course-Wide Analytics';
 $string['quizselectlabel']      = 'View a single quiz\'s analytics';
 $string['quizselectoption']     = 'All STACK quizzes (course-wide view)';
 $string['gobutton']             = 'View';
