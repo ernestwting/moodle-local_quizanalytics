@@ -83,7 +83,12 @@
         container.id = chart.id ? ('qa-chart-' + chart.id) : ('qa-chart-auto-' + (chartCounter++));
         container.style.marginBottom = '2rem';
         root.appendChild(container);
-        global.Plotly.newPlot(container.id, chart.plotly_json.data, chart.plotly_json.layout, {
+        // Pass the element itself, not container.id: sections are built in a
+        // detached wrapper div before being appended to the live document
+        // (see renderSection), so an ID-based document.getElementById()
+        // lookup here would return null and Plotly.newPlot would throw,
+        // silently aborting the rest of the section-rendering loop.
+        global.Plotly.newPlot(container, chart.plotly_json.data, chart.plotly_json.layout, {
             responsive: true,
         });
     }

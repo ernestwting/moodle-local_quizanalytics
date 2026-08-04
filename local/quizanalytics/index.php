@@ -62,6 +62,9 @@ echo html_writer::empty_tag('input', [
 ]);
 echo html_writer::end_tag('form');
 
+$colorblind = sections_renderer::resolve_colorblind_mode();
+echo sections_renderer::render_colorblind_toggle($colorblind);
+
 $client = new local_quizanalytics_api_client();
 $result = null;
 
@@ -91,7 +94,7 @@ if ($quizid) {
         exit;
     }
 
-    $result = $client->analyze($selectedquiz->name, $records);
+    $result = $client->analyze($selectedquiz->name, $records, $colorblind);
 } else {
     // --- Course-wide: cross-quiz comparison across every STACK quiz. ---
     echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3);
@@ -105,7 +108,7 @@ if ($quizid) {
         exit;
     }
 
-    $result = $client->analyze_course($course->fullname, $byquiz);
+    $result = $client->analyze_course($course->fullname, $byquiz, $colorblind);
 }
 
 if ($result === null) {

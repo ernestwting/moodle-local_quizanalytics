@@ -98,7 +98,10 @@ class sections_renderer {
             \set_user_preference('quiz_quizanalytics_colorblind', (bool) $param);
             return (bool) $param;
         }
-        return (bool) \get_user_preference('quiz_quizanalytics_colorblind', false);
+        // Note: Moodle's getter is the plural get_user_preferences(), despite
+        // the setter being the singular set_user_preference() above — a real
+        // asymmetry in core's own API, not a typo.
+        return (bool) \get_user_preferences('quiz_quizanalytics_colorblind', false);
     }
 
     /**

@@ -72,12 +72,14 @@ class local_quizanalytics_api_client {
      *
      * @param string $quizname
      * @param array  $records
+     * @param bool   $colorblindmode
      * @return array|null
      */
-    public function analyze(string $quizname, array $records): ?array {
+    public function analyze(string $quizname, array $records, bool $colorblindmode = false): ?array {
         return $this->post('/analyze', [
-            'quiz_name' => $quizname,
-            'records'   => $records,
+            'quiz_name'       => $quizname,
+            'records'         => $records,
+            'colorblind_mode' => $colorblindmode,
         ]);
     }
 
@@ -86,12 +88,14 @@ class local_quizanalytics_api_client {
      *
      * @param string $coursename
      * @param array  $quizzes [quiz_name => records[]]
+     * @param bool   $colorblindmode
      * @return array|null
      */
-    public function analyze_course(string $coursename, array $quizzes): ?array {
+    public function analyze_course(string $coursename, array $quizzes, bool $colorblindmode = false): ?array {
         return $this->post('/analyze-course', [
-            'course_name' => $coursename,
-            'quizzes'     => $quizzes,
+            'course_name'     => $coursename,
+            'quizzes'         => $quizzes,
+            'colorblind_mode' => $colorblindmode,
         ]);
     }
 }
