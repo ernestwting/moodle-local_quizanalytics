@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import functools
 import io
 import logging
@@ -36,12 +37,24 @@ _EXPORT_CAMERA_ZOOM_OUT = 1.25
 # locked-down deployment (e.g. a Streamlit Community Cloud instance the user can't
 # reboot or view server logs for) the generated PDF may be the only diagnostic output
 # actually reachable — a bare "check the app logs" is a dead end there.
-_last_rasterization_error: str | None = None
+#
+# A ContextVar rather than a plain module-level global: this service (unlike the
+# original single-user Streamlit app) can have multiple PDF requests rasterizing
+# concurrently in FastAPI's threadpool. A plain global would let one request's
+# rasterization error leak into a different, unrelated request's "chart image
+# unavailable" message — or get silently overwritten mid-request. Each call into
+# generate_pdf_report() gets its own isolated value: FastAPI dispatches each
+# request via a fresh copy of the ambient context (which never has this var set,
+# since it's only ever mutated from inside a request's own worker thread), so
+# concurrent requests can't see each other's writes even if the threadpool reuses
+# the same OS thread for both.
+_last_rasterization_error_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "_last_rasterization_error", default=None,
+)
 
 
 def _record_rasterization_error(exc: Exception) -> None:
-    global _last_rasterization_error
-    _last_rasterization_error = f"{type(exc).__name__}: {exc}"
+    _last_rasterization_error_var.set(f"{type(exc).__name__}: {exc}")
 
 
 def _ensure_chrome_available() -> None:
@@ -506,6 +519,12 @@ def generate_pdf_report(
         "notes": list[str]
       }
     """
+    # Explicit reset (belt-and-suspenders on top of the ContextVar's own
+    # per-dispatch isolation, see the var's docstring above) — makes this
+    # function's behavior independent of any assumption about how the
+    # caller's context was constructed.
+    _last_rasterization_error_var.set(None)
+
     buffer = io.BytesIO()
     doc = _ReportDocTemplate(
         buffer,
@@ -685,7 +704,8 @@ def generate_pdf_report(
             png_bytes = chart_png_cache.get(id(chart_source)) or _figure_to_png_bytes(chart_source)
             if not png_bytes:
                 if chart_title:
-                    reason = f" Reason: {_last_rasterization_error}" if _last_rasterization_error else ""
+                    last_error = _last_rasterization_error_var.get()
+                    reason = f" Reason: {last_error}" if last_error else ""
                     story.append(Paragraph(f"{chart_title} — chart image unavailable (rendering failed).{reason}", note_style))
                 continue
 
