@@ -108,7 +108,7 @@ if ($quizid) {
 
     // Same cache area (and same key format) quiz_quizanalytics's own
     // report.php uses for this exact request shape — visiting a quiz's
-    // Interactive Analytics tab and this course-level drill-down for the
+    // Question Analytics tab and this course-level drill-down for the
     // same quiz shares one cache entry rather than computing it twice.
     $qacache = cache::make('quiz_quizanalytics', 'questionanalysis');
     $qakey = quiz_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint, $colorblind);

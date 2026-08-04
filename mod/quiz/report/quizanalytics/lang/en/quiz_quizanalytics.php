@@ -8,22 +8,22 @@
 defined('MOODLE_INTERNAL') || die();
 
 // pluginname is what shows up as the tab label on the quiz results page —
-// "Grades | Responses | Statistics | Interactive Analytics" — and in the
+// "Grades | Responses | Statistics | Question Analytics" — and in the
 // Site Administration > Plugins > Quiz reports list.
-$string['pluginname'] = 'Interactive Analytics';
+$string['pluginname'] = 'Question Analytics';
 
 // Required by mod/quiz/lib.php's report tab/dropdown builder, which calls
 // get_string($report, 'quiz_' . $report) — i.e. a BARE key matching the
 // report's folder name exactly, no suffix. This is a different convention
 // from quizanalyticsreport below; both are needed.
-$string['quizanalytics'] = 'Interactive Analytics';
+$string['quizanalytics'] = 'Question Analytics';
 
 // Required by mod/quiz/settings.php, which builds the "Quiz reports" admin
 // list via get_string($report . 'report', 'quiz_' . $report) — every core
 // quiz report defines this pattern too (quiz_overview -> 'overviewreport',
 // quiz_statistics -> 'statisticsreport'). Without it, that get_string() call
 // fails while Moodle builds the Activity modules admin tree.
-$string['quizanalyticsreport'] = 'Interactive Analytics report';
+$string['quizanalyticsreport'] = 'Question Analytics report';
 
 $string['quizanalytics:view'] = 'View interactive quiz analytics';
 

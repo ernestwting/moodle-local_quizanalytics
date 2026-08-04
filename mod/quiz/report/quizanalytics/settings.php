@@ -3,7 +3,7 @@
  * Admin settings for quiz_quizanalytics.
  *
  * Because this file exists, Moodle automatically adds a settings page under
- * Site administration > Plugins > Quiz reports > Interactive Analytics.
+ * Site administration > Plugins > Quiz reports > Question Analytics.
  *
  * @package quiz_quizanalytics
  */

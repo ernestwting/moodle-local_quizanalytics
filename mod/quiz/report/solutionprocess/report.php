@@ -35,7 +35,7 @@ class quiz_solutionprocess_report extends quiz_default_report {
         require_capability('quiz/solutionprocess:view', $context);
 
         // Draws the quiz name header plus the Grades/Responses/Statistics/
-        // Interactive Analytics/Solution Process Visualization tab strip,
+        // Question Analytics/Solution Process Visualization tab strip,
         // with "solutionprocess" highlighted.
         $this->print_header_and_tabs($cm, $course, $quiz, 'solutionprocess');
 

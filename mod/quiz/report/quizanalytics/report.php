@@ -1,6 +1,6 @@
 <?php
 /**
- * The "Interactive Analytics" tab on mod_quiz's results page.
+ * The "Question Analytics" tab on mod_quiz's results page.
  *
  * Moodle's mod/quiz/report.php dispatcher finds this automatically because of
  * the folder name (report/quizanalytics) and the class name
@@ -35,7 +35,7 @@ class quiz_quizanalytics_report extends quiz_default_report {
         require_capability('quiz/quizanalytics:view', $context);
 
         // Draws the quiz name header plus the Grades/Responses/Statistics/
-        // Interactive Analytics tab strip, with "quizanalytics" highlighted.
+        // Question Analytics tab strip, with "quizanalytics" highlighted.
         $this->print_header_and_tabs($cm, $course, $quiz, 'quizanalytics');
 
         // --- 1. Cheap fingerprint of this quiz's finished attempts (one small ---
