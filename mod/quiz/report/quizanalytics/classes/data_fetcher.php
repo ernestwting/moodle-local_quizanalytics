@@ -82,7 +82,7 @@ class quiz_quizanalytics_data_fetcher {
                 // already knows how to read (parse_response_cell). VERIFY this
                 // against a real quiz on your Moodle version/qtype_stack version
                 // before trusting it in production — see the README note.
-                $row["question_{$qnum}_text"]    = $question->questiontext;
+                $row["question_{$qnum}_text"]    = self::render_stack_question_text($question);
                 $row["response_{$qnum}"]         = $quba->get_response_summary($slot) ?? '';
                 $row["right_answer_{$qnum}"]     = $quba->get_right_answer_summary($slot) ?? '';
                 $row["question_{$qnum}_mark"]    = $quba->get_question_mark($slot);
@@ -95,6 +95,48 @@ class quiz_quizanalytics_data_fetcher {
         }
 
         return $records;
+    }
+
+    /**
+     * $question->questiontext is the raw, author-written source — for STACK
+     * questions that still contains unresolved CAS placeholders (@expr@) and
+     * every language's [[lang code='xx']]...[[/lang]] block side by side,
+     * none of which get processed until the question is actually rendered
+     * through STACK's own CAS-text engine. This renders it the same way
+     * STACK's own question renderer would (CAS variables substituted,
+     * [[lang]] blocks resolved to only the current language), using the
+     * "out of context" processor STACK itself uses for report/summary
+     * generation (stack_question::get_question_summary() is the other
+     * caller of this exact pattern) since there's no live question_attempt
+     * here to render against.
+     *
+     * Falls back to the raw questiontext for non-STACK questions or if
+     * anything above goes wrong — a report showing unresolved placeholders
+     * is still more useful than one that fails outright for one bad question.
+     *
+     * @param question_definition $question
+     * @return string
+     */
+    protected static function render_stack_question_text(question_definition $question): string {
+        global $CFG;
+
+        if (!($question instanceof \qtype_stack_question) || empty($question->questiontextinstantiated)) {
+            return $question->questiontext;
+        }
+
+        try {
+            require_once($CFG->dirroot . '/question/type/stack/locallib.php');
+            $processor = new \castext2_qa_processor(new \stack_outofcontext_process());
+            $rendered = $question->questiontextinstantiated->get_rendered($processor);
+            if ($rendered !== null && $rendered !== '') {
+                return $rendered;
+            }
+        } catch (\Throwable $e) {
+            debugging('quiz_quizanalytics: could not render CAS question text for a STACK question: ' .
+                $e->getMessage(), DEBUG_DEVELOPER);
+        }
+
+        return $question->questiontext;
     }
 
     /**
