@@ -86,16 +86,28 @@ class local_quizanalytics_api_client {
     /**
      * Cross-quiz analysis, for the course-wide view.
      *
-     * @param string $coursename
-     * @param array  $quizzes [quiz_name => records[]]
-     * @param bool   $colorblindmode
+     * @param string      $coursename
+     * @param array       $quizzes   [quiz_name => records[]]
+     * @param bool        $colorblindmode
+     * @param string|null $gradetype One of "Highest Grade"/"Average Grade"/
+     *                    "Minimum Grade" — null lets the service apply its
+     *                    own default (Average Grade).
      * @return array|null
      */
-    public function analyze_course(string $coursename, array $quizzes, bool $colorblindmode = false): ?array {
-        return $this->post('/analyze-course', [
+    public function analyze_course(
+        string $coursename,
+        array $quizzes,
+        bool $colorblindmode = false,
+        ?string $gradetype = null
+    ): ?array {
+        $payload = [
             'course_name'     => $coursename,
             'quizzes'         => $quizzes,
             'colorblind_mode' => $colorblindmode,
-        ]);
+        ];
+        if ($gradetype !== null) {
+            $payload['grade_type'] = $gradetype;
+        }
+        return $this->post('/analyze-course', $payload);
     }
 }

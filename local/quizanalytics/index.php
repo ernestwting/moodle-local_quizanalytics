@@ -110,7 +110,41 @@ if ($quizid) {
         exit;
     }
 
-    $result = $client->analyze_course($course->fullname, $byquiz, $colorblind);
+    // --- Grade-type selector for the Attempts-vs-Grades scatter plot — a  ---
+    // --- plain GET-reload radio group, same convention as everywhere     ---
+    // --- else in this plugin family.                                    ---
+    $gradetypeoptions = [
+        'Highest Grade' => get_string('gradetypehighest', 'local_quizanalytics'),
+        'Average Grade' => get_string('gradetypeaverage', 'local_quizanalytics'),
+        'Minimum Grade' => get_string('gradetypeminimum', 'local_quizanalytics'),
+    ];
+    $gradetype = optional_param('gradetype', 'Average Grade', PARAM_RAW);
+    if (!array_key_exists($gradetype, $gradetypeoptions)) {
+        $gradetype = 'Average Grade';
+    }
+    $PAGE->url->param('gradetype', $gradetype);
+
+    echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-3']);
+    foreach ($PAGE->url->params() as $name => $value) {
+        if ($name === 'gradetype') {
+            continue;
+        }
+        echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
+    }
+    echo html_writer::tag('span', get_string('gradetypelabel', 'local_quizanalytics') . ' ');
+    foreach ($gradetypeoptions as $value => $label) {
+        $radioid = 'qw-gradetype-' . preg_replace('/[^a-z]/', '', strtolower($value));
+        echo html_writer::empty_tag('input', array_merge([
+            'type' => 'radio', 'name' => 'gradetype', 'value' => $value, 'id' => $radioid,
+        ], $gradetype === $value ? ['checked' => 'checked'] : []));
+        echo html_writer::label($label, $radioid, true, ['class' => 'mr-2 ml-1']);
+    }
+    echo ' ' . html_writer::empty_tag('input', [
+        'type' => 'submit', 'value' => get_string('gobutton', 'local_quizanalytics'), 'class' => 'btn btn-secondary btn-sm',
+    ]);
+    echo html_writer::end_tag('form');
+
+    $result = $client->analyze_course($course->fullname, $byquiz, $colorblind, $gradetype);
 }
 
 if ($result === null) {
@@ -124,9 +158,12 @@ if ($result === null) {
 // --- service's /analyze and /analyze-course responses. Vendored JS/CSS is  ---
 // --- echoed as raw tags rather than through $PAGE->requires(), same reason ---
 // --- as report.php: that path re-minifies already-minified vendor bundles  ---
-// --- and was confirmed to corrupt them.                                    ---
-echo sections_renderer::render_containers('qa');
-echo sections_renderer::render_vendor_and_payload('qa', $result);
+// --- and was confirmed to corrupt them. "qa" prefix for the per-quiz       ---
+// --- drill-down, "qw" (course-Wide) for the cross-quiz comparison — kept   ---
+// --- distinct so neither view's DOM ids can ever collide with the other.  ---
+$mainprefix = $quizid ? 'qa' : 'qw';
+echo sections_renderer::render_containers($mainprefix);
+echo sections_renderer::render_vendor_and_payload($mainprefix, $result);
 
 // --- Also embed Solution Process Visualization for the selected quiz, ---
 // --- reusing the exact same records already fetched above for the QA  ---

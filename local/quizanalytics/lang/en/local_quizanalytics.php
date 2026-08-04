@@ -20,6 +20,11 @@ $string['quizselectlabel']      = 'View a single quiz\'s analytics';
 $string['quizselectoption']     = 'All STACK quizzes (course-wide view)';
 $string['gobutton']             = 'View';
 
+$string['gradetypelabel']       = 'Compare attempts against:';
+$string['gradetypehighest']     = 'Highest Grade';
+$string['gradetypeaverage']     = 'Average Grade';
+$string['gradetypeminimum']     = 'Minimum Grade';
+
 $string['nostackquizzes']       = 'This course has no STACK quizzes yet, or none have finished attempts.';
 $string['noattempts']           = 'No finished attempts yet for this quiz. Analytics will appear once at least one student has completed it.';
 $string['nocourseattempts']     = 'None of this course\'s STACK quizzes have finished attempts yet.';

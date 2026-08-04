@@ -53,6 +53,9 @@ from analytics.quiz_metrics import (
     compute_quiz_stats,
     build_boxplot_figure,
     build_engagement_figure,
+    build_scatter_figure,
+    build_metric_trend_data,
+    build_line_graph_figure,
 )
 from analytics.prt_transitions import (
     count_question_parts,
@@ -87,9 +90,22 @@ class AnalyzeRequest(BaseModel):
     colorblind_mode: bool = False
 
 
+# Matches report_sections.py's _DEFAULT_QUIZ_STATS/_DEFAULT_QUIZ_METRICS/
+# _DEFAULT_GRADE_TYPE — used whenever the PHP side hasn't sent an explicit
+# selection yet (first page load), so the on-screen default matches what the
+# PDF report (Phase 4) would produce for the same unconfigured request.
+_DEFAULT_QUIZ_STATS = ["student_count", "attempt_rate", "mean_grade", "grade_variance", "mean_highest_grade", "attempt_count"]
+_DEFAULT_QUIZ_METRICS = ["student_count", "attempt_rate", "mean_grade", "grade_variance"]
+_DEFAULT_GRADE_TYPE = "Average Grade"
+
+
 class AnalyzeCourseRequest(BaseModel):
     course_name: str
     quizzes: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    colorblind_mode: bool = False
+    selected_stats: list[str] | None = None
+    selected_metrics: list[str] | None = None
+    grade_type: str = _DEFAULT_GRADE_TYPE
 
 
 class SolutionProcessMetaRequest(BaseModel):
@@ -365,9 +381,23 @@ def analyze(req: AnalyzeRequest) -> dict[str, Any]:
 
 @app.post("/analyze-course")
 def analyze_course(req: AnalyzeCourseRequest) -> dict[str, Any]:
-    """Cross-quiz analysis for a whole course — for the course-level entry
-    point described as a next step in the plugin README. Not yet called by
-    the PHP plugin included so far, but ready for it."""
+    """Cross-quiz Quiz Analysis for a whole course — called from
+    local_quizanalytics/index.php's course-wide branch (no ?quizid=
+    selected). Response shape (the same generic {summary, sections} contract
+    as /analyze and /solution-process):
+
+        {
+          "summary": {"course_name": str, "quizzes_analyzed": [...]},
+          "sections": [
+            {"id": "attempt-list", "title": "1. ...", "table": {...}},
+            {"id": "quiz-stats", "title": "2. ...", "table": {...}},
+            {"id": "boxplot", "title": "3. ...", "charts": [...]},
+            {"id": "engagement", "title": "4. ...", "charts": [...]},   # omitted if nothing plottable
+            {"id": "scatter", "title": "5. ...", "charts": [...], "notes": ["correlation: ..."]},  # omitted if nothing plottable
+            {"id": "trend", "title": "6. ...", "charts": [...]},
+          ],
+        }
+    """
     frames = []
     for quiz_name, records in req.quizzes.items():
         moodle_df = _records_to_moodle_df(records)
@@ -382,21 +412,74 @@ def analyze_course(req: AnalyzeCourseRequest) -> dict[str, Any]:
 
     combined = pd.concat(frames, ignore_index=True)
     attempt_frame = build_quiz_attempt_frame(combined)
-    stats_df = compute_quiz_stats(
-        attempt_frame,
-        selected_stats=["student_count", "mean_grade", "grade_variance", "attempt_count", "attempt_rate"],
-    )
 
-    figures = [
-        {"title": "Grade distribution by quiz", "plotly_json": _fig_to_json(build_boxplot_figure(attempt_frame))},
-    ]
-    engagement_fig = build_engagement_figure(attempt_frame)
+    selected_stats = req.selected_stats if req.selected_stats else _DEFAULT_QUIZ_STATS
+    selected_metrics = req.selected_metrics if req.selected_metrics else _DEFAULT_QUIZ_METRICS
+
+    stats_df = compute_quiz_stats(attempt_frame, selected_stats=selected_stats)
+
+    sections: list[dict[str, Any]] = []
+
+    sections.append({
+        "id": "attempt-list",
+        "title": "1. Merged List of Users and Files",
+        "caption": "Every parsed quiz attempt row, combined across every STACK quiz in the course.",
+        "table": _df_to_table(attempt_frame),
+    })
+
+    sections.append({
+        "id": "quiz-stats",
+        "title": "2. Summary of Quiz Stats",
+        "caption": "Aggregated statistics per quiz, combined across the course.",
+        "table": _df_to_table(stats_df),
+    })
+
+    box_fig = build_boxplot_figure(attempt_frame, colorblind_mode=req.colorblind_mode)
+    sections.append({
+        "id": "boxplot",
+        "title": "3. Quiz Grade Distribution (Box Plot)",
+        "caption": "Spread of grades per quiz, with mean grade overlay.",
+        "charts": [{"id": "boxplot-fig", "title": None, "plotly_json": _fig_to_json(box_fig)}],
+    })
+
+    engagement_fig = build_engagement_figure(attempt_frame, colorblind_mode=req.colorblind_mode)
     if engagement_fig is not None:
-        figures.append({"title": "Engagement over time", "plotly_json": _fig_to_json(engagement_fig)})
+        sections.append({
+            "id": "engagement",
+            "title": "4. Engagement Over Time",
+            "caption": "Density of quiz attempt start times per quiz, combined across the course.",
+            "charts": [{"id": "engagement-fig", "title": None, "plotly_json": _fig_to_json(engagement_fig)}],
+        })
+
+    scatter_result = build_scatter_figure(attempt_frame, req.grade_type, colorblind_mode=req.colorblind_mode)
+    if scatter_result is not None:
+        scatter_fig, correlation, y_label, _title = scatter_result
+        sections.append({
+            "id": "scatter",
+            "title": "5. Scatter Plot: Attempts vs Grades",
+            "caption": f"Correlation between number of attempts and quiz {y_label}: r = {correlation:.2f}",
+            "charts": [{"id": "scatter-fig", "title": None, "plotly_json": _fig_to_json(scatter_fig)}],
+        })
+
+    trend_data = build_metric_trend_data(attempt_frame, selected_metrics)
+    if not trend_data.empty:
+        trend_fig = build_line_graph_figure(trend_data, colorblind_mode=req.colorblind_mode)
+        sections.append({
+            "id": "trend",
+            "title": "6. Line Graph of Various Metrics",
+            "caption": "Trend of selected metrics across quizzes.",
+            "table": _df_to_table(trend_data),
+            "charts": [{"id": "trend-fig", "title": None, "plotly_json": _fig_to_json(trend_fig)}],
+        })
 
     return {
-        "summary": {"course_name": req.course_name, "quizzes_analyzed": stats_df.to_dict(orient="records")},
-        "figures": figures,
+        # quizzes_analyzed deliberately isn't duplicated in here — it's an
+        # array of per-quiz objects, and sections-renderer.js's summary
+        # table only handles scalar values (String() on an array of objects
+        # renders as useless "[object Object],..." text); the "2. Summary of
+        # Quiz Stats" section above already shows this same data properly.
+        "summary": {"course_name": req.course_name},
+        "sections": sections,
     }
 
 
