@@ -179,6 +179,37 @@
         root.appendChild(list);
     }
 
+    // Turns each row of the Cross-Attempt Comparison table into a link that
+    // reloads the current page with that student selected as the drill-down
+    // (?spvstudent=...) — same plain GET-reload convention as every other
+    // selector in this plugin family, so the result is still a cacheable
+    // URL, just reached with one click on a row instead of picking the
+    // student from the dropdown above and clicking Go. `studentIds` is
+    // section.row_student_ids from the API response, parallel to the
+    // table's own rows (see app.py's /solution-process route).
+    function makeCrossAttemptRowsClickable(sectionRoot, studentIds) {
+        var table = sectionRoot.querySelector('table');
+        if (!table || !table.tBodies.length) {
+            return;
+        }
+        var rows = table.tBodies[0].rows;
+        Array.prototype.forEach.call(rows, function (row, i) {
+            var studentId = studentIds[i];
+            var nameCell = row.cells[0]; // "Student Name" is always the first column here.
+            if (!studentId || !nameCell) {
+                return;
+            }
+            var url = new URL(global.location.href);
+            url.searchParams.set('spvstudent', studentId);
+
+            var link = document.createElement('a');
+            link.href = url.toString();
+            link.textContent = nameCell.textContent;
+            nameCell.textContent = '';
+            nameCell.appendChild(link);
+        });
+    }
+
     function renderSection(root, section, prefix) {
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
@@ -206,6 +237,9 @@
         }
         if (section.table) {
             renderDataTable(wrapper, section.table);
+            if (section.id === 'cross-attempt' && Array.isArray(section.row_student_ids)) {
+                makeCrossAttemptRowsClickable(wrapper, section.row_student_ids);
+            }
         }
         if (section.charts) {
             section.charts.forEach(function (chart) {

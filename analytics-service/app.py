@@ -633,10 +633,17 @@ def solution_process(req: SolutionProcessRequest) -> dict[str, Any]:
             "caption": (
                 f"{int(counts.get('Improved', 0))} improved, "
                 f"{int(counts.get('Flat', 0))} flat, {int(counts.get('Regressed', 0))} regressed "
-                "among students with 2+ attempts."
+                "among students with 2+ attempts. Click a student's name for their own "
+                "attempt-by-attempt drill-down."
             ),
             "table": _df_to_table(ranking_table),
             "charts": [{"id": "cross-attempt-fig", "title": None, "plotly_json": _fig_to_json(cross_fig)}],
+            # Parallel to table["rows"] (same row order — ranking_table is a
+            # renamed/subset view of `trends`, not a re-sorted copy) — lets
+            # the PHP/JS side turn each "Student Name" cell into a link that
+            # reloads this same page with that student's drill-down selected,
+            # without the API needing any notion of Moodle's URL structure.
+            "row_student_ids": trends["student_id"].tolist(),
         })
 
     student_drilldown = None
