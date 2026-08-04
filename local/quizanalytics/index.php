@@ -14,6 +14,7 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/api_client.php');
+require_once($CFG->dirroot . '/mod/quiz/report/quizanalytics/classes/cache_helper.php');
 require_once($CFG->dirroot . '/mod/quiz/report/solutionprocess/classes/api_client.php');
 require_once($CFG->dirroot . '/mod/quiz/report/solutionprocess/report.php');
 
@@ -89,26 +90,54 @@ if ($quizid) {
 
     echo $OUTPUT->heading($selectedquiz->name, 3);
 
-    $records = local_quizanalytics_data_fetcher::get_response_records_for_quiz($selectedquiz, $course);
-    if (empty($records)) {
+    // Cheap fingerprint first — a cache hit below skips the expensive
+    // per-attempt DB fetch entirely. $records is fetched lazily (at most
+    // once) since the Solution Process Visualization embed further down
+    // also needs it on its own cache miss.
+    $stats = quiz_quizanalytics_cache_helper::stats_for_quiz($selectedquiz);
+    if ($stats->count === 0) {
         echo $OUTPUT->notification(get_string('noattempts', 'local_quizanalytics'), 'notifymessage');
         echo $OUTPUT->footer();
         exit;
     }
 
-    $result = $client->analyze($selectedquiz->name, $records, $colorblind);
+    $records = null;
+    $fetchrecords = function () use (&$records, $selectedquiz, $course): array {
+        return $records ??= local_quizanalytics_data_fetcher::get_response_records_for_quiz($selectedquiz, $course);
+    };
+
+    // Same cache area (and same key format) quiz_quizanalytics's own
+    // report.php uses for this exact request shape — visiting a quiz's
+    // Interactive Analytics tab and this course-level drill-down for the
+    // same quiz shares one cache entry rather than computing it twice.
+    $qacache = cache::make('quiz_quizanalytics', 'questionanalysis');
+    $qakey = quiz_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint, $colorblind);
+    $result = $qacache->get($qakey);
+    if ($result === false) {
+        $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind);
+        if ($result !== null) {
+            $qacache->set($qakey, $result);
+        }
+    }
 } else {
     // --- Course-wide: cross-quiz comparison across every STACK quiz. ---
     echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3);
 
-    $byquiz = local_quizanalytics_data_fetcher::get_course_response_records($course, $stackquizzes);
-    $byquiz = array_filter($byquiz, fn($records) => !empty($records));
-
-    if (empty($byquiz)) {
+    // Cheap fingerprint across every STACK quiz in the course at once (the
+    // course-wide result depends on all of their attempts together) — the
+    // empty-course check below uses this instead of the expensive per-quiz
+    // fetch, and $byquiz itself is fetched lazily only on a cache miss.
+    $coursestats = quiz_quizanalytics_cache_helper::stats_for_quizzes($stackquizzes);
+    if ($coursestats->count === 0) {
         echo $OUTPUT->notification(get_string('nocourseattempts', 'local_quizanalytics'), 'notifymessage');
         echo $OUTPUT->footer();
         exit;
     }
+
+    $fetchbyquiz = function () use ($course, $stackquizzes): array {
+        $byquiz = local_quizanalytics_data_fetcher::get_course_response_records($course, $stackquizzes);
+        return array_filter($byquiz, fn($records) => !empty($records));
+    };
 
     // --- Grade-type selector for the Attempts-vs-Grades scatter plot — a  ---
     // --- plain GET-reload radio group, same convention as everywhere     ---
@@ -144,7 +173,15 @@ if ($quizid) {
     ]);
     echo html_writer::end_tag('form');
 
-    $result = $client->analyze_course($course->fullname, $byquiz, $colorblind, $gradetype);
+    $qwcache = cache::make('quiz_quizanalytics', 'quizanalysiscoursewide');
+    $qwkey = quiz_quizanalytics_cache_helper::build_key($courseid, $coursestats->fingerprint, $gradetype, $colorblind);
+    $result = $qwcache->get($qwkey);
+    if ($result === false) {
+        $result = $client->analyze_course($course->fullname, $fetchbyquiz(), $colorblind, $gradetype);
+        if ($result !== null) {
+            $qwcache->set($qwkey, $result);
+        }
+    }
 }
 
 if ($result === null) {
@@ -165,6 +202,29 @@ $mainprefix = $quizid ? 'qa' : 'qw';
 echo sections_renderer::render_containers($mainprefix);
 echo sections_renderer::render_vendor_and_payload($mainprefix, $result);
 
+// --- "Generate PDF Report" for whichever view is showing — Question       ---
+// --- Analysis for the per-quiz drill-down, Quiz Analysis for the         ---
+// --- course-wide view. pdf.php re-derives everything server-side rather  ---
+// --- than trusting a client-posted copy of $records/$byquiz.             ---
+echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
+if ($quizid) {
+    echo sections_renderer::render_pdf_form(
+        new moodle_url('/local/quizanalytics/pdf.php'),
+        ['id' => $courseid, 'kind' => 'question', 'quizid' => $quizid, 'colorblind' => $colorblind ? 1 : 0],
+        $client->report_sections('question'),
+        get_string('downloadpdfbutton', 'local_quizanalytics'),
+        'qa-pdf'
+    );
+} else {
+    echo sections_renderer::render_pdf_form(
+        new moodle_url('/local/quizanalytics/pdf.php'),
+        ['id' => $courseid, 'kind' => 'quiz', 'colorblind' => $colorblind ? 1 : 0],
+        $client->report_sections('quiz'),
+        get_string('downloadpdfbutton', 'local_quizanalytics'),
+        'qw-pdf'
+    );
+}
+
 // --- Also embed Solution Process Visualization for the selected quiz, ---
 // --- reusing the exact same records already fetched above for the QA  ---
 // --- call and the same selector-form/rendering code the standalone    ---
@@ -176,7 +236,20 @@ if ($quizid) {
     echo $OUTPUT->heading(get_string('pluginname', 'quiz_solutionprocess'), 3);
 
     $spvclient = new quiz_solutionprocess_api_client();
-    $spvmeta = $spvclient->meta($selectedquiz->name, $records);
+
+    // Same cache area (and key format) quiz_solutionprocess's own report.php
+    // uses for meta() — $fetchrecords() reuses the QA branch's lazy fetch
+    // above, so if the QA cache already hit, this can still avoid ever
+    // touching the database for this request.
+    $spvmetacache = cache::make('quiz_quizanalytics', 'solutionprocessmeta');
+    $spvmetakey = quiz_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint);
+    $spvmeta = $spvmetacache->get($spvmetakey);
+    if ($spvmeta === false) {
+        $spvmeta = $spvclient->meta($selectedquiz->name, $fetchrecords());
+        if ($spvmeta !== null) {
+            $spvmetacache->set($spvmetakey, $spvmeta);
+        }
+    }
 
     if ($spvmeta === null) {
         echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
@@ -225,10 +298,23 @@ if ($quizid) {
             $PAGE->url, $spvmeta, $spvquestion, $spvpartsforquestion, $spvpart, $spvstudentid
         );
 
-        $spvresult = $spvclient->analyze(
-            $selectedquiz->name, $records, $spvquestion, $spvpart,
-            $spvstudentid !== '' ? $spvstudentid : null, $colorblind
+        // Same cache area/key format as quiz_solutionprocess's own
+        // report.php for this (quiz, question, part, student, colorblind)
+        // selection.
+        $spvresultcache = cache::make('quiz_quizanalytics', 'solutionprocess');
+        $spvresultkey = quiz_quizanalytics_cache_helper::build_key(
+            $selectedquiz->id, $stats->fingerprint, $spvquestion, $spvpart, $spvstudentid, $colorblind
         );
+        $spvresult = $spvresultcache->get($spvresultkey);
+        if ($spvresult === false) {
+            $spvresult = $spvclient->analyze(
+                $selectedquiz->name, $fetchrecords(), $spvquestion, $spvpart,
+                $spvstudentid !== '' ? $spvstudentid : null, $colorblind
+            );
+            if ($spvresult !== null) {
+                $spvresultcache->set($spvresultkey, $spvresult);
+            }
+        }
 
         if ($spvresult === null) {
             echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
@@ -239,6 +325,22 @@ if ($quizid) {
             // just duplicate identical <script src> tags harmlessly, but
             // there's no reason to.
             echo sections_renderer::render_vendor_and_payload('spv', $spvresult, false);
+
+            echo $OUTPUT->heading(get_string('generatepdfheading', 'quiz_solutionprocess'), 3);
+            echo sections_renderer::render_pdf_form(
+                new moodle_url('/local/quizanalytics/pdf.php'),
+                [
+                    'id'          => $courseid,
+                    'kind'        => 'solutionprocess',
+                    'quizid'      => $quizid,
+                    'spvquestion' => $spvquestion,
+                    'spvpart'     => $spvpart,
+                    'colorblind'  => $colorblind ? 1 : 0,
+                ],
+                $spvclient->report_sections(),
+                get_string('downloadpdfbutton', 'quiz_solutionprocess'),
+                'spv-pdf'
+            );
         }
     }
 }

@@ -44,4 +44,12 @@ if ($hassiteconfig) {
         PARAM_INT
     ));
 
+    $settings->add(new admin_setting_configtext(
+        'local_quizanalytics/apipdftimeout',
+        get_string('apipdftimeout', 'local_quizanalytics'),
+        get_string('apipdftimeout_desc', 'local_quizanalytics'),
+        90,
+        PARAM_INT
+    ));
+
 }

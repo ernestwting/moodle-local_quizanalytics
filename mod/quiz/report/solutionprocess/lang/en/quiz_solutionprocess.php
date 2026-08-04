@@ -30,6 +30,8 @@ $string['apibaseurl']      = 'Analytics service base URL';
 $string['apibaseurl_desc'] = 'Internal base URL of the analytics microservice (no trailing path — /solution-process/meta and /solution-process are appended automatically). This should always point at localhost or a private/internal network address — never a public URL — since student response data is POSTed here in full.';
 $string['apitimeout']      = 'Analytics service timeout (seconds)';
 $string['apitimeout_desc'] = 'How long to wait for the analytics service before giving up.';
+$string['apipdftimeout']      = 'PDF export timeout (seconds)';
+$string['apipdftimeout_desc'] = 'How long to wait for a PDF report to be generated before giving up. PDF generation rasterizes every chart, so it takes noticeably longer than a normal page load.';
 
 $string['selectquestion'] = 'Question';
 $string['selectpart']     = 'Part';
@@ -38,3 +40,7 @@ $string['selectstudentnone'] = 'None';
 $string['gobutton']       = 'Go';
 
 $string['colorblindmode'] = 'Colorblind mode';
+
+$string['generatepdfheading'] = 'Generate PDF Report';
+$string['downloadpdfbutton']  = 'Download PDF';
+$string['pdferror']           = 'The PDF report could not be generated. Contact your Moodle administrator.';

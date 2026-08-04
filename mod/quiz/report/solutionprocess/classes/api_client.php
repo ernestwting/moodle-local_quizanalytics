@@ -109,4 +109,85 @@ class quiz_solutionprocess_api_client {
             'colorblind_mode' => $colorblindmode,
         ]);
     }
+
+    /**
+     * The section names available for the Solution Process Visualization
+     * PDF, from GET /report-sections/solutionprocess — drives the "Generate
+     * PDF Report" checkbox list. Returns [] on any failure (the form still
+     * works, it just renders with no checkboxes).
+     *
+     * @return string[]
+     */
+    public function report_sections(): array {
+        $config = get_config('quiz_solutionprocess');
+        $base = !empty($config->apibaseurl) ? rtrim($config->apibaseurl, '/') : 'http://127.0.0.1:8600';
+
+        $curl = curl_init($base . '/report-sections/solutionprocess');
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+        ]);
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($response === false || $httpcode !== 200) {
+            return [];
+        }
+        $decoded = json_decode($response, true);
+        return $decoded['sections'] ?? [];
+    }
+
+    /**
+     * Requests the Solution Process Visualization PDF for one (question,
+     * part) and returns its raw bytes.
+     *
+     * @param string $quizname
+     * @param array  $records
+     * @param string $question
+     * @param int    $partindex
+     * @param array|null $selectedsections
+     * @param bool   $colorblindmode
+     * @return string|null Raw PDF bytes, or null on any failure.
+     */
+    public function download_pdf(
+        string $quizname,
+        array $records,
+        string $question,
+        int $partindex,
+        ?array $selectedsections,
+        bool $colorblindmode = false
+    ): ?string {
+        $config = get_config('quiz_solutionprocess');
+        $base = !empty($config->apibaseurl) ? rtrim($config->apibaseurl, '/') : 'http://127.0.0.1:8600';
+        $timeout = !empty($config->apipdftimeout) ? (int) $config->apipdftimeout : 90;
+
+        $curl = curl_init($base . '/pdf/solution-process');
+        curl_setopt_array($curl, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode([
+                'quiz_name'         => $quizname,
+                'records'           => $records,
+                'question'          => $question,
+                'part_index'        => $partindex,
+                'selected_sections' => $selectedsections,
+                'colorblind_mode'   => $colorblindmode,
+            ]),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $timeout,
+        ]);
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $contenttype = curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
+        $curlerror = curl_error($curl);
+        curl_close($curl);
+
+        if ($response === false || $httpcode !== 200 || strpos((string) $contenttype, 'application/pdf') !== 0) {
+            debugging('quiz_solutionprocess: PDF request failed: HTTP ' . $httpcode . ' ' . $curlerror,
+                DEBUG_DEVELOPER);
+            return null;
+        }
+        return $response;
+    }
 }

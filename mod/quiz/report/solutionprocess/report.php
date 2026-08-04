@@ -15,6 +15,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/mod/quiz/report/default.php');
 require_once($CFG->dirroot . '/mod/quiz/report/quizanalytics/classes/data_fetcher.php');
+require_once($CFG->dirroot . '/mod/quiz/report/quizanalytics/classes/cache_helper.php');
 require_once(__DIR__ . '/classes/api_client.php');
 
 use quiz_quizanalytics\output\sections_renderer;
@@ -38,21 +39,43 @@ class quiz_solutionprocess_report extends quiz_default_report {
         // with "solutionprocess" highlighted.
         $this->print_header_and_tabs($cm, $course, $quiz, 'solutionprocess');
 
-        // --- 1. Pull this quiz's finished attempts. Deliberately reuses    ---
-        // --- quiz_quizanalytics_data_fetcher rather than re-implementing   ---
-        // --- attempt/response extraction — see version.php's dependency.  ---
-        $records = quiz_quizanalytics_data_fetcher::get_response_records($quiz, $cm, $course);
-        if (empty($records)) {
+        // --- 1. Cheap fingerprint of this quiz's finished attempts — lets   ---
+        // --- both cache lookups below skip the expensive per-attempt DB    ---
+        // --- fetch (quiz_quizanalytics_data_fetcher::get_response_records, ---
+        // --- reused rather than reimplemented — see version.php) entirely  ---
+        // --- when nothing's changed since the last request.                ---
+        $stats = quiz_quizanalytics_cache_helper::stats_for_quiz($quiz);
+        if ($stats->count === 0) {
             echo $OUTPUT->notification(get_string('noattempts', 'quiz_solutionprocess'), 'notifymessage');
             return true;
         }
 
-        // --- 2. Cheap metadata call to populate the selectors. ---
         $client = new quiz_solutionprocess_api_client();
-        $meta = $client->meta($quiz->name, $records);
-        if ($meta === null) {
-            echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
-            return true;
+
+        // Fetched lazily by fetch_records() below, at most once per request —
+        // both the meta and the main-result cache can independently need it
+        // on a miss, but neither should trigger a second fetch if the other
+        // already did.
+        $records = null;
+        $fetchrecords = function () use (&$records, $quiz, $cm, $course): array {
+            return $records ??= quiz_quizanalytics_data_fetcher::get_response_records($quiz, $cm, $course);
+        };
+
+        // --- 2. Cheap metadata call to populate the selectors — cached      ---
+        // --- separately from the main result since it only depends on the  ---
+        // --- quiz's attempts, not on the current question/part/student     ---
+        // --- selection, so it stays valid across every selector change.    ---
+        $metacache = cache::make('quiz_quizanalytics', 'solutionprocessmeta');
+        $metakey = quiz_quizanalytics_cache_helper::build_key($quiz->id, $stats->fingerprint);
+        $meta = $metacache->get($metakey);
+
+        if ($meta === false) {
+            $meta = $client->meta($quiz->name, $fetchrecords());
+            if ($meta === null) {
+                echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
+                return true;
+            }
+            $metacache->set($metakey, $meta);
         }
         if (empty($meta['questions'])) {
             echo $OUTPUT->notification(get_string('nostackquestions', 'quiz_solutionprocess'), 'notifymessage');
@@ -108,18 +131,50 @@ class quiz_solutionprocess_report extends quiz_default_report {
         echo self::render_selector_form($PAGE->url, $meta, $question, $partsforquestion, $part, $studentid);
         echo sections_renderer::render_colorblind_toggle($colorblind);
 
-        // --- 4. The actual visualization for the current selection. ---
-        $result = $client->analyze(
-            $quiz->name, $records, $question, $part,
-            $studentid !== '' ? $studentid : null, $colorblind
+        // --- 4. The actual visualization for the current selection — by far ---
+        // --- the most expensive call in this plugin family (tree edit      ---
+        // --- distance, 3D figures, network graphs), so the one caching     ---
+        // --- helps the most. Keyed on the selection too, since (unlike     ---
+        // --- meta) the result depends on which question/part/student is    ---
+        // --- picked.                                                       ---
+        $resultcache = cache::make('quiz_quizanalytics', 'solutionprocess');
+        $resultkey = quiz_quizanalytics_cache_helper::build_key(
+            $quiz->id, $stats->fingerprint, $question, $part, $studentid, $colorblind
         );
-        if ($result === null) {
-            echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
-            return true;
+        $result = $resultcache->get($resultkey);
+
+        if ($result === false) {
+            $result = $client->analyze(
+                $quiz->name, $fetchrecords(), $question, $part,
+                $studentid !== '' ? $studentid : null, $colorblind
+            );
+            if ($result === null) {
+                echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
+                return true;
+            }
+            $resultcache->set($resultkey, $result);
         }
 
         echo sections_renderer::render_containers('spv');
         echo sections_renderer::render_vendor_and_payload('spv', $result);
+
+        // --- "Generate PDF Report" — a separate GET-reload form to pdf.php, ---
+        // --- which re-derives everything server-side (including            ---
+        // --- re-validating question/part against a fresh meta() call)      ---
+        // --- rather than trusting a client-posted copy of $records.        ---
+        echo $OUTPUT->heading(get_string('generatepdfheading', 'quiz_solutionprocess'), 3);
+        echo sections_renderer::render_pdf_form(
+            new moodle_url('/mod/quiz/report/solutionprocess/pdf.php'),
+            [
+                'id'          => $cm->id,
+                'spvquestion' => $question,
+                'spvpart'     => $part,
+                'colorblind'  => $colorblind ? 1 : 0,
+            ],
+            $client->report_sections(),
+            get_string('downloadpdfbutton', 'quiz_solutionprocess'),
+            'spv-pdf'
+        );
 
         return true;
     }

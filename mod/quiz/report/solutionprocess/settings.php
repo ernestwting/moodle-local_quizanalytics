@@ -32,4 +32,12 @@ if ($hassiteconfig) {
         PARAM_INT
     ));
 
+    $settings->add(new admin_setting_configtext(
+        'quiz_solutionprocess/apipdftimeout',
+        get_string('apipdftimeout', 'quiz_solutionprocess'),
+        get_string('apipdftimeout_desc', 'quiz_solutionprocess'),
+        90,
+        PARAM_INT
+    ));
+
 }

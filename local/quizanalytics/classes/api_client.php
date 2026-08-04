@@ -110,4 +110,116 @@ class local_quizanalytics_api_client {
         }
         return $this->post('/analyze-course', $payload);
     }
+
+    /**
+     * GET /report-sections/{kind} — the section names available for one PDF
+     * kind, driving the "Generate PDF Report" checkbox list. Returns [] on
+     * any failure (the form still works, it just renders with no checkboxes).
+     *
+     * @param string $kind 'question' or 'quiz'
+     * @return string[]
+     */
+    public function report_sections(string $kind): array {
+        $config = get_config('local_quizanalytics');
+        $base = !empty($config->apibaseurl) ? rtrim($config->apibaseurl, '/') : 'http://127.0.0.1:8600';
+
+        $curl = curl_init($base . '/report-sections/' . $kind);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+        ]);
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($response === false || $httpcode !== 200) {
+            return [];
+        }
+        $decoded = json_decode($response, true);
+        return $decoded['sections'] ?? [];
+    }
+
+    /**
+     * Downloads raw PDF bytes from any /pdf/* endpoint. Shared by
+     * download_pdf_question() and download_pdf_quiz() below — the request
+     * shape differs per kind, but the transport (POST JSON, expect
+     * application/pdf back) is identical.
+     *
+     * @param string $endpointpath e.g. '/pdf/question' or '/pdf/quiz'
+     * @param array  $payload
+     * @return string|null Raw PDF bytes, or null on any failure.
+     */
+    protected function post_pdf(string $endpointpath, array $payload): ?string {
+        $config = get_config('local_quizanalytics');
+        $base = !empty($config->apibaseurl) ? rtrim($config->apibaseurl, '/') : 'http://127.0.0.1:8600';
+        $timeout = !empty($config->apipdftimeout) ? (int) $config->apipdftimeout : 90;
+
+        $curl = curl_init($base . $endpointpath);
+        curl_setopt_array($curl, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $timeout,
+        ]);
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $contenttype = curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
+        $curlerror = curl_error($curl);
+        curl_close($curl);
+
+        if ($response === false || $httpcode !== 200 || strpos((string) $contenttype, 'application/pdf') !== 0) {
+            debugging('local_quizanalytics: PDF request failed (' . $endpointpath . '): HTTP ' . $httpcode . ' ' .
+                $curlerror, DEBUG_DEVELOPER);
+            return null;
+        }
+        return $response;
+    }
+
+    /**
+     * Question Analysis PDF for one quiz, matching quiz_quizanalytics's own
+     * /pdf/question call.
+     *
+     * @param string $quizname
+     * @param array  $records
+     * @param array|null $selectedsections
+     * @param bool   $colorblindmode
+     * @return string|null
+     */
+    public function download_pdf_question(
+        string $quizname,
+        array $records,
+        ?array $selectedsections,
+        bool $colorblindmode = false
+    ): ?string {
+        return $this->post_pdf('/pdf/question', [
+            'quiz_name'         => $quizname,
+            'records'           => $records,
+            'selected_sections' => $selectedsections,
+            'colorblind_mode'   => $colorblindmode,
+        ]);
+    }
+
+    /**
+     * Cross-quiz Quiz Analysis PDF for the course-wide view.
+     *
+     * @param string $coursename
+     * @param array  $quizzes [quiz_name => records[]]
+     * @param array|null $selectedsections
+     * @param bool   $colorblindmode
+     * @return string|null
+     */
+    public function download_pdf_quiz(
+        string $coursename,
+        array $quizzes,
+        ?array $selectedsections,
+        bool $colorblindmode = false
+    ): ?string {
+        return $this->post_pdf('/pdf/quiz', [
+            'course_name'       => $coursename,
+            'quizzes'           => $quizzes,
+            'selected_sections' => $selectedsections,
+            'colorblind_mode'   => $colorblindmode,
+        ]);
+    }
 }

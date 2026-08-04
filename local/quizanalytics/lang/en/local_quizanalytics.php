@@ -36,3 +36,9 @@ $string['apibaseurl']       = 'Analytics service base URL';
 $string['apibaseurl_desc']  = 'Internal base URL of the analytics microservice — the same service quiz_quizanalytics already talks to. This plugin appends /analyze and /analyze-course itself, so enter just the base, e.g. http://127.0.0.1:8600. This should always point at localhost or a private/internal network address — never a public URL — since student response data is POSTed here in full.';
 $string['apitimeout']       = 'Analytics service timeout (seconds)';
 $string['apitimeout_desc']  = 'How long to wait for the analytics service before giving up. Course-wide requests bundle every STACK quiz\'s attempts in one call, so this may need to be higher than the per-quiz report\'s timeout on courses with many quizzes.';
+$string['apipdftimeout']      = 'PDF export timeout (seconds)';
+$string['apipdftimeout_desc'] = 'How long to wait for a PDF report to be generated before giving up. PDF generation rasterizes every chart, so it takes noticeably longer than a normal page load — course-wide PDFs especially.';
+
+$string['generatepdfheading'] = 'Generate PDF Report';
+$string['downloadpdfbutton']  = 'Download PDF';
+$string['pdferror']           = 'The PDF report could not be generated. Contact your Moodle administrator.';
