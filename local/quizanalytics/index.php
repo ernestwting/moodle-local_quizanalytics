@@ -14,6 +14,8 @@
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/api_client.php');
+require_once($CFG->dirroot . '/mod/quiz/report/solutionprocess/classes/api_client.php');
+require_once($CFG->dirroot . '/mod/quiz/report/solutionprocess/report.php');
 
 use quiz_quizanalytics\output\sections_renderer;
 
@@ -125,5 +127,83 @@ if ($result === null) {
 // --- and was confirmed to corrupt them.                                    ---
 echo sections_renderer::render_containers('qa');
 echo sections_renderer::render_vendor_and_payload('qa', $result);
+
+// --- Also embed Solution Process Visualization for the selected quiz, ---
+// --- reusing the exact same records already fetched above for the QA  ---
+// --- call and the same selector-form/rendering code the standalone    ---
+// --- quiz_solutionprocess report tab uses — see that plugin's         ---
+// --- report.php for what each piece does; nothing here re-implements  ---
+// --- it, just calls it a second time with a "spv" prefix so its DOM   ---
+// --- ids never collide with the "qa" containers above.                ---
+if ($quizid) {
+    echo $OUTPUT->heading(get_string('pluginname', 'quiz_solutionprocess'), 3);
+
+    $spvclient = new quiz_solutionprocess_api_client();
+    $spvmeta = $spvclient->meta($selectedquiz->name, $records);
+
+    if ($spvmeta === null) {
+        echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
+    } else if (empty($spvmeta['questions'])) {
+        echo $OUTPUT->notification(get_string('nostackquestions', 'quiz_solutionprocess'), 'notifymessage');
+    } else {
+        $spvquestionnames = array_column($spvmeta['questions'], 'name');
+        $spvquestion = optional_param('spvquestion', $spvquestionnames[0], PARAM_RAW);
+        if (!in_array($spvquestion, $spvquestionnames, true)) {
+            $spvquestion = $spvquestionnames[0];
+        }
+
+        $spvpartsforquestion = 1;
+        foreach ($spvmeta['questions'] as $q) {
+            if ($q['name'] === $spvquestion) {
+                $spvpartsforquestion = max(1, (int) $q['parts']);
+                break;
+            }
+        }
+        $spvpart = optional_param('spvpart', 1, PARAM_INT);
+        if ($spvpart < 1 || $spvpart > $spvpartsforquestion) {
+            $spvpart = 1;
+        }
+
+        $spvstudentid = optional_param('spvstudent', '', PARAM_RAW);
+        if ($spvstudentid !== '') {
+            $spvvalidstudent = false;
+            foreach ($spvmeta['students'] as $s) {
+                if ($s['id'] === $spvstudentid) {
+                    $spvvalidstudent = true;
+                    break;
+                }
+            }
+            if (!$spvvalidstudent) {
+                $spvstudentid = '';
+            }
+        }
+
+        $PAGE->url->params([
+            'spvquestion' => $spvquestion,
+            'spvpart'     => $spvpart,
+            'spvstudent'  => $spvstudentid,
+        ]);
+
+        echo quiz_solutionprocess_report::render_selector_form(
+            $PAGE->url, $spvmeta, $spvquestion, $spvpartsforquestion, $spvpart, $spvstudentid
+        );
+
+        $spvresult = $spvclient->analyze(
+            $selectedquiz->name, $records, $spvquestion, $spvpart,
+            $spvstudentid !== '' ? $spvstudentid : null, $colorblind
+        );
+
+        if ($spvresult === null) {
+            echo $OUTPUT->notification(get_string('servererror', 'quiz_solutionprocess'), 'notifyproblem');
+        } else {
+            echo sections_renderer::render_containers('spv');
+            // include_vendor=false: the 'qa' render above already emitted
+            // the Plotly/KaTeX <script> tags once; re-emitting them would
+            // just duplicate identical <script src> tags harmlessly, but
+            // there's no reason to.
+            echo sections_renderer::render_vendor_and_payload('spv', $spvresult, false);
+        }
+    }
+}
 
 echo $OUTPUT->footer();

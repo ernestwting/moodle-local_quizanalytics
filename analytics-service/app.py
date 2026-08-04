@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import Counter
 from typing import Any
 
 import pandas as pd
@@ -32,7 +33,7 @@ from pydantic import BaseModel, Field
 # those are the Streamlit-upload-specific modules. Everything below is the
 # pure-computation half of the package, which has no Streamlit runtime
 # dependency (see README for how this was verified).
-from analytics.parser import build_response_rows
+from analytics.parser import build_response_rows, get_attempt_pools
 from analytics.question_analytics import build_question_analytics
 from analytics.question_details import build_question_detail, build_error_drilldown
 from analytics.question_charts import (
@@ -53,6 +54,24 @@ from analytics.quiz_metrics import (
     build_boxplot_figure,
     build_engagement_figure,
 )
+from analytics.prt_transitions import (
+    count_question_parts,
+    build_aggregate_graph,
+    build_transition_graph_figure,
+    compute_network_features,
+    build_student_node_sequence,
+    build_transition_pairs,
+)
+from analytics.spv_charts import build_centrality_bar_figures
+from analytics.solution_distance import (
+    CROSS_ATTEMPT_METRICS,
+    build_prt_distance_3d_figure,
+    build_ted_distance_3d_figure,
+    compute_cross_attempt_comparison,
+    classify_cross_attempt_trends,
+    build_cross_attempt_figure,
+    build_single_student_attempt_figure,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quizanalytics")
@@ -71,6 +90,20 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeCourseRequest(BaseModel):
     course_name: str
     quizzes: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+
+
+class SolutionProcessMetaRequest(BaseModel):
+    quiz_name: str
+    records: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SolutionProcessRequest(BaseModel):
+    quiz_name: str
+    records: list[dict[str, Any]] = Field(default_factory=list)
+    question: str
+    part_index: int = 1
+    student_id: str | None = None
+    colorblind_mode: bool = False
 
 
 # --- The one piece of genuinely new code: JSON -> Moodle-CSV-shaped frame. --
@@ -123,6 +156,13 @@ def _fig_to_json(fig) -> dict[str, Any]:
     """Plotly figure -> plain dict, matching what render.js expects
     (`fig.plotly_json.data` / `.layout`)."""
     return json.loads(fig.to_json())
+
+
+def _q_num(q_name: str) -> int:
+    """Natural sort key for question names ("Q10" after "Q2", not before) —
+    matches report_sections.py's identically-named helper."""
+    m = re.search(r"\d+", str(q_name))
+    return int(m.group(0)) if m else 0
 
 
 def _df_to_table(df: pd.DataFrame) -> dict[str, Any]:
@@ -357,4 +397,176 @@ def analyze_course(req: AnalyzeCourseRequest) -> dict[str, Any]:
     return {
         "summary": {"course_name": req.course_name, "quizzes_analyzed": stats_df.to_dict(orient="records")},
         "figures": figures,
+    }
+
+
+@app.post("/solution-process/meta")
+def solution_process_meta(req: SolutionProcessMetaRequest) -> dict[str, Any]:
+    """Cheap metadata for populating quiz_solutionprocess's question/part/
+    student selectors — no graph or tree-edit-distance computation, safe to
+    call on every page load unlike POST /solution-process itself."""
+    moodle_df = _records_to_moodle_df(req.records)
+    if moodle_df.empty:
+        raise HTTPException(status_code=400, detail="No records supplied.")
+
+    response_df = build_response_rows(moodle_df, quiz_name=req.quiz_name)
+    if response_df.empty:
+        raise HTTPException(
+            status_code=422,
+            detail="No finished, gradable attempts parsed from the supplied records.",
+        )
+
+    pool_a_df, _ = get_attempt_pools(response_df)
+    question_names = sorted(pool_a_df["question"].unique(), key=_q_num)
+    questions = [{"name": q, "parts": count_question_parts(pool_a_df, q)} for q in question_names]
+
+    student_rows = pool_a_df[["student_id", "student_name"]].drop_duplicates().sort_values("student_name")
+    students = [{"id": r.student_id, "name": r.student_name} for r in student_rows.itertuples(index=False)]
+
+    return {"questions": questions, "students": students}
+
+
+@app.post("/solution-process")
+def solution_process(req: SolutionProcessRequest) -> dict[str, Any]:
+    """Solution Process Visualization for one (question, part) of a quiz —
+    the class-wide transition graph, per-node network features, PRT/TED 3D
+    distance charts, and cross-attempt comparison. Optionally a single
+    student's own drill-down (their transition path + their own metric
+    trend across attempts) when `student_id` is supplied.
+
+    Uses Pool A (every attempt, not just each student's best) throughout —
+    unlike Question Analysis, seeing retries is the whole point here.
+    """
+    moodle_df = _records_to_moodle_df(req.records)
+    if moodle_df.empty:
+        raise HTTPException(status_code=400, detail="No records supplied.")
+
+    response_df = build_response_rows(moodle_df, quiz_name=req.quiz_name)
+    if response_df.empty:
+        raise HTTPException(
+            status_code=422,
+            detail="No finished, gradable attempts parsed from the supplied records.",
+        )
+
+    pool_a_df, _ = get_attempt_pools(response_df)
+    if req.question not in set(pool_a_df["question"]):
+        raise HTTPException(status_code=422, detail=f"Unknown question: {req.question!r}")
+
+    # A part the caller asked for may not exist on this question — fall back
+    # to the last one that does, same as report_sections.build_spv_pdf_sections.
+    part_index = min(req.part_index, count_question_parts(pool_a_df, req.question))
+
+    sections: list[dict[str, Any]] = []
+
+    agg_nodes, agg_edges = build_aggregate_graph(pool_a_df, req.question, part_index)
+    if agg_edges:
+        transition_fig = build_transition_graph_figure(
+            agg_nodes, agg_edges, colorblind_mode=req.colorblind_mode,
+            title=f"Class-wide Answer Transitions — {req.question} (part {part_index})",
+        )
+        sections.append({
+            "id": "transition-graph",
+            "title": "Class-Wide Transition Graph",
+            "caption": "Edge thickness and color scale with how many students made each transition.",
+            "charts": [{"id": "agg-graph", "title": None, "plotly_json": _fig_to_json(transition_fig)}],
+        })
+
+        network_features = compute_network_features(agg_nodes, agg_edges)
+        centrality_charts = [
+            {"id": c["metric"], "title": c["label"], "plotly_json": _fig_to_json(c["figure"])}
+            for c in build_centrality_bar_figures(network_features)
+        ]
+        sections.append({
+            "id": "network-features",
+            "title": "Network Features per Node",
+            "table": _df_to_table(network_features),
+            "charts": centrality_charts,
+        })
+
+    prt_fig = build_prt_distance_3d_figure(pool_a_df, req.question, part_index)
+    sections.append({
+        "id": "prt-distance-3d",
+        "title": "PRT-Distance 3D Chart",
+        "charts": [{"id": "prt-3d", "title": None, "plotly_json": _fig_to_json(prt_fig)}],
+    })
+
+    ted_fig = build_ted_distance_3d_figure(pool_a_df, req.question, part_index)
+    sections.append({
+        "id": "ted-distance-3d",
+        "title": "Tree Edit Distance 3D Chart",
+        "charts": [{"id": "ted-3d", "title": None, "plotly_json": _fig_to_json(ted_fig)}],
+    })
+
+    # Grade matches report_sections._DEFAULT_CROSS_ATTEMPT_METRIC — the report
+    # has no page-side control for which metric to compare by either, and
+    # Grade has the advantage of not depending on which part is selected.
+    metric = "Grade"
+    higher_is_better = bool(CROSS_ATTEMPT_METRICS[metric]["higher_is_better"])
+    comparison = compute_cross_attempt_comparison(pool_a_df, req.question, metric, part_index)
+    trends = classify_cross_attempt_trends(comparison, higher_is_better)
+    if not comparison.empty:
+        cross_fig = build_cross_attempt_figure(comparison, trends, metric, req.colorblind_mode)
+        counts = trends["trend"].value_counts()
+        ranking_table = trends.rename(columns={
+            "student_name": "Student Name", "attempt_count": "Attempts",
+            "first_value": "First Attempt", "last_value": "Last Attempt",
+            "change": "Change", "trend": "Trend",
+        })[["Student Name", "Attempts", "First Attempt", "Last Attempt", "Change", "Trend"]]
+        sections.append({
+            "id": "cross-attempt",
+            "title": f"Cross-Attempt Comparison ({metric})",
+            "caption": (
+                f"{int(counts.get('Improved', 0))} improved, "
+                f"{int(counts.get('Flat', 0))} flat, {int(counts.get('Regressed', 0))} regressed "
+                "among students with 2+ attempts."
+            ),
+            "table": _df_to_table(ranking_table),
+            "charts": [{"id": "cross-attempt-fig", "title": None, "plotly_json": _fig_to_json(cross_fig)}],
+        })
+
+    student_drilldown = None
+    if req.student_id:
+        name_rows = pool_a_df.loc[pool_a_df["student_id"] == req.student_id, "student_name"]
+        student_name = name_rows.iloc[0] if not name_rows.empty else req.student_id
+        student_sections: list[dict[str, Any]] = []
+
+        seq = build_student_node_sequence(pool_a_df, req.question, req.student_id, part_index)
+        if not seq.empty:
+            seq_nodes = seq["node"].tolist()
+            student_edges = Counter(build_transition_pairs(seq_nodes))
+            student_nodes = sorted(set(seq_nodes) | {"0", "c"})
+            student_fig = build_transition_graph_figure(
+                student_nodes, student_edges, colorblind_mode=req.colorblind_mode,
+                title=f"{student_name} — {req.question} (part {part_index})",
+            )
+            student_sections.append({
+                "id": "student-transition",
+                "title": "This Student's Transition Path",
+                "charts": [{"id": "student-graph", "title": None, "plotly_json": _fig_to_json(student_fig)}],
+            })
+
+        student_comparison = comparison[comparison["student_id"] == req.student_id]
+        if len(student_comparison) >= 2:
+            trend_rows = trends[trends["student_id"] == req.student_id]
+            trend = trend_rows["trend"].iloc[0] if not trend_rows.empty else "Flat"
+            student_cross_fig = build_single_student_attempt_figure(
+                student_comparison, student_name, metric, trend, req.colorblind_mode,
+            )
+            student_sections.append({
+                "id": "student-cross-attempt",
+                "title": f"This Student's {metric} Across Attempts",
+                "charts": [{"id": "student-cross-fig", "title": None, "plotly_json": _fig_to_json(student_cross_fig)}],
+            })
+
+        student_drilldown = {
+            "student_id": req.student_id,
+            "student_name": student_name,
+            "sections": student_sections,
+        }
+
+    return {
+        "question": req.question,
+        "part_index": part_index,
+        "sections": sections,
+        "student_drilldown": student_drilldown,
     }

@@ -70,7 +70,7 @@
 
     var chartCounter = 0;
 
-    function renderChart(root, chart) {
+    function renderChart(root, chart, prefix) {
         if (!chart || !chart.plotly_json) {
             return;
         }
@@ -80,7 +80,7 @@
             root.appendChild(heading);
         }
         var container = document.createElement('div');
-        container.id = chart.id ? ('qa-chart-' + chart.id) : ('qa-chart-auto-' + (chartCounter++));
+        container.id = chart.id ? (prefix + '-chart-' + chart.id) : (prefix + '-chart-auto-' + (chartCounter++));
         container.style.marginBottom = '2rem';
         root.appendChild(container);
         // Pass the element itself, not container.id: sections are built in a
@@ -106,11 +106,11 @@
         root.appendChild(list);
     }
 
-    function renderSection(root, section) {
+    function renderSection(root, section, prefix) {
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
         if (section.id) {
-            wrapper.id = 'qa-section-' + section.id;
+            wrapper.id = prefix + '-section-' + section.id;
         }
         if (section.title) {
             var heading = document.createElement('h4');
@@ -127,7 +127,7 @@
         }
         if (section.charts) {
             section.charts.forEach(function (chart) {
-                renderChart(wrapper, chart);
+                renderChart(wrapper, chart, prefix);
             });
         }
         if (section.notes) {
@@ -235,18 +235,38 @@
         typesetMath(wrapper);
     }
 
-    function renderLegacyFigures(root, figures) {
+    function renderStudentDrilldown(root, prefix, drilldown) {
+        if (!drilldown || !drilldown.sections || !drilldown.sections.length) {
+            return;
+        }
+        var wrapper = document.createElement('div');
+        wrapper.className = 'qa-section';
+        wrapper.id = prefix + '-section-student-drilldown';
+
+        var heading = document.createElement('h4');
+        heading.textContent = 'Student drill-down: ' + (drilldown.student_name || drilldown.student_id || '');
+        wrapper.appendChild(heading);
+
+        drilldown.sections.forEach(function (section) {
+            renderSection(wrapper, section, prefix);
+        });
+
+        root.appendChild(wrapper);
+        typesetMath(wrapper);
+    }
+
+    function renderLegacyFigures(root, figures, prefix) {
         figures.forEach(function (fig, i) {
             var heading = document.createElement('h4');
             heading.textContent = fig.title || ('Chart ' + (i + 1));
             root.appendChild(heading);
 
             var container = document.createElement('div');
-            container.id = 'qa-chart-' + i;
+            container.id = prefix + '-chart-' + i;
             container.style.marginBottom = '2rem';
             root.appendChild(container);
 
-            global.Plotly.newPlot(container.id, fig.plotly_json.data, fig.plotly_json.layout, {
+            global.Plotly.newPlot(container, fig.plotly_json.data, fig.plotly_json.layout, {
                 responsive: true,
             });
         });
@@ -296,14 +316,15 @@
             // "4. Question Response Distribution" onward, matching the
             // Streamlit page's section ordering.
             result.sections.forEach(function (section) {
-                renderSection(sectionsRoot, section);
+                renderSection(sectionsRoot, section, prefix);
                 if (section.id === 'difficulty') {
                     renderQuestionDetails(sectionsRoot, prefix, result.questions);
                 }
             });
             renderAudit(sectionsRoot, prefix, result.audit);
+            renderStudentDrilldown(sectionsRoot, prefix, result.student_drilldown);
         } else if (sectionsRoot && Array.isArray(result.figures)) {
-            renderLegacyFigures(sectionsRoot, result.figures);
+            renderLegacyFigures(sectionsRoot, result.figures, prefix);
         }
     }
 
