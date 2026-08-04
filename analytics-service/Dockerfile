@@ -2,6 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /opt/quizanalytics
 
+# kaleido (Plotly->PNG rasterization for PDF export, see pdf_export.py) needs a
+# headless Chrome/Chromium. Its own get_chrome_sync() downloads "Chrome for
+# Testing", which has no official Linux arm64 build — on an arm64 host that
+# download is an x86_64 binary that won't reliably run. Installing the
+# distro-packaged, architecture-native `chromium` here means pdf_export.py's
+# _system_browser_path() finds a working browser on both amd64 and arm64
+# without ever needing that download.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

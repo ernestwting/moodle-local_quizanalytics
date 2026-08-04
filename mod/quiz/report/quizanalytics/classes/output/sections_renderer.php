@@ -145,4 +145,52 @@ class sections_renderer {
         $html .= \html_writer::end_tag('form');
         return $html;
     }
+
+    /**
+     * A "Generate PDF Report" form: one checkbox per available section (all
+     * checked by default, matching Streamlit's export-everything default),
+     * plus whatever hidden params the target pdf.php needs to re-derive the
+     * quiz/course/selection server-side. Deliberately GET, like every other
+     * form in this plugin family, so each distinct export stays a plain link.
+     *
+     * If $sectionnames is empty (e.g. the report-sections lookup itself
+     * failed), the form still renders with just the submit button — pdf.php
+     * treats a request with no `sections[]` at all as "export every section",
+     * so this degrades gracefully rather than blocking the download.
+     *
+     * @param \moodle_url $action    The pdf.php endpoint to submit to.
+     * @param array $hiddenparams    name => value pairs pdf.php needs (id, colorblind, etc).
+     * @param string[] $sectionnames Section names from GET /report-sections/{kind}.
+     * @param string $buttonlabel
+     * @param string $idprefix       Unique per rendered form, so checkbox ids never collide
+     *        when this is called more than once on one page (e.g. local_quizanalytics's
+     *        per-quiz view has both a Question Analysis and an SPV PDF form).
+     * @return string
+     */
+    public static function render_pdf_form(
+        \moodle_url $action,
+        array $hiddenparams,
+        array $sectionnames,
+        string $buttonlabel,
+        string $idprefix
+    ): string {
+        $html = \html_writer::start_tag('form', [
+            'method' => 'get', 'action' => $action->out(false), 'class' => 'mb-3',
+        ]);
+        foreach ($hiddenparams as $name => $value) {
+            $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
+        }
+        foreach ($sectionnames as $section) {
+            $id = $idprefix . '-' . md5($section);
+            $html .= \html_writer::empty_tag('input', [
+                'type' => 'checkbox', 'name' => 'sections[]', 'value' => $section, 'id' => $id, 'checked' => 'checked',
+            ]);
+            $html .= ' ' . \html_writer::label($section, $id) . \html_writer::empty_tag('br');
+        }
+        $html .= \html_writer::empty_tag('input', [
+            'type' => 'submit', 'value' => $buttonlabel, 'class' => 'btn btn-primary mt-2',
+        ]);
+        $html .= \html_writer::end_tag('form');
+        return $html;
+    }
 }

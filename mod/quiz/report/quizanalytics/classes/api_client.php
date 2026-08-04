@@ -64,4 +64,77 @@ class quiz_quizanalytics_api_client {
 
         return $decoded;
     }
+
+    /**
+     * The analytics service's base URL, derived from the existing `apiurl`
+     * setting (which stores the *full* /analyze endpoint) rather than a
+     * second setting — every other endpoint this client calls hangs off the
+     * same base.
+     *
+     * @return string
+     */
+    protected function base_url(): string {
+        $config = get_config('quiz_quizanalytics');
+        $apiurl = !empty($config->apiurl) ? $config->apiurl : 'http://127.0.0.1:8600/analyze';
+        return preg_replace('#/analyze/?$#', '', $apiurl);
+    }
+
+    /**
+     * The section names available for the Question Analysis PDF, from
+     * GET /report-sections/question — drives the "Generate PDF Report"
+     * checkbox list so it can never drift from what the PDF route actually
+     * includes. Returns [] on any failure (the form still works, it just
+     * renders with no checkboxes — see sections_renderer::render_pdf_form()).
+     *
+     * @return string[]
+     */
+    public function report_sections(): array {
+        $curl = curl_init($this->base_url() . '/report-sections/question');
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+        ]);
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($response === false || $httpcode !== 200) {
+            return [];
+        }
+        $decoded = json_decode($response, true);
+        return $decoded['sections'] ?? [];
+    }
+
+    /**
+     * Requests the Question Analysis PDF and returns its raw bytes.
+     *
+     * @param array $payload ['quiz_name' => string, 'records' => array,
+     *              'selected_sections' => string[]|null, 'colorblind_mode' => bool]
+     * @return string|null Raw PDF bytes, or null on any failure.
+     */
+    public function download_pdf(array $payload): ?string {
+        $config = get_config('quiz_quizanalytics');
+        $timeout = !empty($config->apipdftimeout) ? (int) $config->apipdftimeout : 90;
+
+        $curl = curl_init($this->base_url() . '/pdf/question');
+        curl_setopt_array($curl, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $timeout,
+        ]);
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $contenttype = curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
+        $curlerror = curl_error($curl);
+        curl_close($curl);
+
+        if ($response === false || $httpcode !== 200 || strpos((string) $contenttype, 'application/pdf') !== 0) {
+            debugging('quiz_quizanalytics: PDF request failed: HTTP ' . $httpcode . ' ' . $curlerror,
+                DEBUG_DEVELOPER);
+            return null;
+        }
+        return $response;
+    }
 }

@@ -6,6 +6,7 @@ import io
 import logging
 import os
 import re
+import shutil
 import tempfile
 from typing import Any
 import pandas as pd
@@ -57,6 +58,31 @@ def _record_rasterization_error(exc: Exception) -> None:
     _last_rasterization_error_var.set(f"{type(exc).__name__}: {exc}")
 
 
+def _system_browser_path() -> str | None:
+    """A system-installed Chromium/Chrome, if one is on PATH.
+
+    Chrome for Testing (what kaleido's own `get_chrome_sync()` downloads) has no
+    official Linux arm64 build — on an arm64 host/container it silently downloads
+    an x86_64 binary that then fails to start (relying on Rosetta/qemu translation
+    that may not be available or working). A distro-packaged Chromium installed
+    via apt is native and doesn't have this problem, so it's preferred whenever
+    present; `kaleido.get_chrome_sync()` stays as the fallback for platforms where
+    the download actually matches the host architecture (e.g. plain x86_64 hosts).
+    """
+    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+        if path := shutil.which(name):
+            return path
+    return None
+
+
+def _kaleido_browser_kopts() -> dict[str, Any]:
+    """`kopts` to pass to kaleido's calc_fig_sync/write_fig_from_object_sync so they
+    launch the system browser found by `_system_browser_path()` instead of letting
+    kaleido/choreographer pick (and potentially download) one on its own."""
+    path = _system_browser_path()
+    return {"path": path} if path else {}
+
+
 def _ensure_chrome_available() -> None:
     """One-time, best-effort attempt to download a private headless Chrome for
     kaleido when no system Chrome/Chromium was found. Safe to call repeatedly —
@@ -67,6 +93,8 @@ def _ensure_chrome_available() -> None:
     if _chrome_bootstrap_attempted:
         return
     _chrome_bootstrap_attempted = True
+    if _system_browser_path():
+        return  # Already have a working native browser; skip the (possibly wrong-arch) download.
     try:
         import kaleido
         kaleido.get_chrome_sync()
@@ -182,7 +210,7 @@ def _batch_rasterize_plotly_charts(sections: list[dict[str, Any]]) -> dict[int, 
                 {"fig": fig, "path": path, "opts": {"format": "png", "width": w, "height": h, "scale": 2}}
                 for (_, fig, w, h), path in zip(jobs, paths)
             ]
-            kaleido.write_fig_from_object_sync(specs, cancel_on_error=False)
+            kaleido.write_fig_from_object_sync(specs, cancel_on_error=False, kopts=_kaleido_browser_kopts())
             for (original_id, _, _, _), path in zip(jobs, paths):
                 if os.path.exists(path) and (data := open(path, "rb").read()):
                     batch_results[original_id] = data
@@ -222,12 +250,12 @@ def _figure_to_png_bytes(figure: Any) -> bytes | None:
 
         opts = {"format": "png", "width": w, "height": h, "scale": 2}
         try:
-            return kaleido.calc_fig_sync(fig, opts=opts)
+            return kaleido.calc_fig_sync(fig, opts=opts, kopts=_kaleido_browser_kopts())
         except Exception as exc:
             _record_rasterization_error(exc)
             _ensure_chrome_available()
             try:
-                return kaleido.calc_fig_sync(fig, opts=opts)
+                return kaleido.calc_fig_sync(fig, opts=opts, kopts=_kaleido_browser_kopts())
             except Exception as retry_exc:
                 _record_rasterization_error(retry_exc)
                 _logger.warning("Chart rasterization failed after Chrome bootstrap retry.", exc_info=True)
