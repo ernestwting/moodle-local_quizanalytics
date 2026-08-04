@@ -83,4 +83,63 @@ class sections_renderer {
 
         return $html;
     }
+
+    /**
+     * Reads (and, if a new value was submitted, persists) the colorblind
+     * display preference. Shared across Question Analysis, Solution Process
+     * Visualization, and the course-wide view — one preference key so a
+     * teacher's choice is consistent everywhere rather than set per-page.
+     *
+     * @return bool
+     */
+    public static function resolve_colorblind_mode(): bool {
+        $param = optional_param('colorblind', null, PARAM_INT);
+        if ($param !== null) {
+            \set_user_preference('quiz_quizanalytics_colorblind', (bool) $param);
+            return (bool) $param;
+        }
+        return (bool) \get_user_preference('quiz_quizanalytics_colorblind', false);
+    }
+
+    /**
+     * A small GET-reload checkbox form for the colorblind toggle, preserving
+     * every other current query parameter (quiz id, question/part selectors,
+     * etc.) — same plain-reload pattern already used for local_quizanalytics's
+     * quiz selector, so every distinct view stays a cacheable URL.
+     *
+     * @return string
+     */
+    public static function render_colorblind_toggle(bool $current): string {
+        global $PAGE;
+
+        $html = \html_writer::start_tag('form', [
+            'method' => 'get',
+            'action' => $PAGE->url->out_omit_querystring(),
+            'class'  => 'mb-3',
+        ]);
+        foreach ($PAGE->url->params() as $name => $value) {
+            if ($name === 'colorblind') {
+                continue;
+            }
+            $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
+        }
+        // An unchecked HTML checkbox submits nothing at all, which would
+        // leave $param null and fall through to the stored (possibly still
+        // "true") preference — this hidden 0, submitted first, is overridden
+        // by the checkbox's own value only when it's actually checked
+        // (PHP keeps the last of two same-named query params), so unchecking
+        // the box and submitting genuinely clears it.
+        $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'colorblind', 'value' => '0']);
+        $checkboxattrs = ['type' => 'checkbox', 'name' => 'colorblind', 'value' => '1', 'id' => 'qa-colorblind-toggle'];
+        if ($current) {
+            $checkboxattrs['checked'] = 'checked';
+        }
+        $html .= \html_writer::empty_tag('input', $checkboxattrs);
+        $html .= ' ' . \html_writer::label(\get_string('colorblindmode', 'quiz_quizanalytics'), 'qa-colorblind-toggle');
+        $html .= ' ' . \html_writer::empty_tag('input', [
+            'type' => 'submit', 'value' => \get_string('apply', 'moodle'), 'class' => 'btn btn-secondary btn-sm',
+        ]);
+        $html .= \html_writer::end_tag('form');
+        return $html;
+    }
 }

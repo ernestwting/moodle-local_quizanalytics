@@ -35,3 +35,5 @@ $string['apiurl']        = 'Analytics service URL';
 $string['apiurl_desc']   = 'Internal URL of the analytics microservice\'s /analyze endpoint. This should always point at localhost or a private/internal network address — never a public URL — since student response data is POSTed here in full.';
 $string['apitimeout']    = 'Analytics service timeout (seconds)';
 $string['apitimeout_desc'] = 'How long to wait for the analytics service before giving up.';
+
+$string['colorblindmode'] = 'Colorblind mode';

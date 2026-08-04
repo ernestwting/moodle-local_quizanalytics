@@ -132,6 +132,104 @@
         typesetMath(wrapper);
     }
 
+    var questionBlockCounter = 0;
+
+    function renderQuestionDetails(root, prefix, questions) {
+        var names = Object.keys(questions || {});
+        if (!names.length) {
+            return;
+        }
+        var wrapper = document.createElement('div');
+        wrapper.className = 'qa-section';
+        wrapper.id = prefix + '-section-questiondetails';
+
+        var heading = document.createElement('h4');
+        heading.textContent = '3. Question Item Details & Error Drill-Down';
+        wrapper.appendChild(heading);
+
+        var selectId = prefix + '-question-select-' + (questionBlockCounter++);
+        var label = document.createElement('label');
+        label.setAttribute('for', selectId);
+        label.textContent = 'Question: ';
+        wrapper.appendChild(label);
+
+        var select = document.createElement('select');
+        select.id = selectId;
+        names.forEach(function (name) {
+            var option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
+        });
+        wrapper.appendChild(select);
+
+        var blocksRoot = document.createElement('div');
+        names.forEach(function (name, i) {
+            var detail = questions[name];
+            var block = document.createElement('div');
+            block.className = 'qa-question-block';
+            block.setAttribute('data-question', name);
+            block.style.display = (i === 0) ? 'block' : 'none';
+            block.style.marginTop = '1rem';
+
+            var qHeading = document.createElement('h5');
+            qHeading.textContent = 'Question text';
+            block.appendChild(qHeading);
+            var qText = document.createElement('div');
+            qText.innerHTML = detail.question_text_html || '';
+            block.appendChild(qText);
+
+            var aHeading = document.createElement('h5');
+            aHeading.textContent = 'Right answer';
+            block.appendChild(aHeading);
+            var aText = document.createElement('div');
+            aText.innerHTML = detail.right_answer_html || '';
+            block.appendChild(aText);
+
+            var dHeading = document.createElement('h5');
+            dHeading.textContent = 'Error drill-down (best attempt, score < 1.0)';
+            block.appendChild(dHeading);
+            renderDataTable(block, detail.error_drilldown);
+
+            blocksRoot.appendChild(block);
+        });
+        wrapper.appendChild(blocksRoot);
+
+        select.addEventListener('change', function () {
+            var chosen = select.value;
+            Array.prototype.forEach.call(blocksRoot.children, function (block) {
+                block.style.display = (block.getAttribute('data-question') === chosen) ? 'block' : 'none';
+            });
+        });
+
+        root.appendChild(wrapper);
+        typesetMath(wrapper);
+    }
+
+    function renderAudit(root, prefix, audit) {
+        if (!audit) {
+            return;
+        }
+        var wrapper = document.createElement('div');
+        wrapper.className = 'qa-section';
+        wrapper.id = prefix + '-section-audit';
+
+        var heading = document.createElement('h4');
+        heading.textContent = '7. Interpretation Notes & Export';
+        wrapper.appendChild(heading);
+
+        if (audit.issues && audit.issues.length) {
+            renderNotes(wrapper, audit.issues);
+        } else {
+            var ok = document.createElement('p');
+            ok.textContent = 'No data-quality issues detected.';
+            wrapper.appendChild(ok);
+        }
+
+        root.appendChild(wrapper);
+        typesetMath(wrapper);
+    }
+
     function renderLegacyFigures(root, figures) {
         figures.forEach(function (fig, i) {
             var heading = document.createElement('h4');
@@ -155,8 +253,18 @@
         }
         global.renderMathInElement(container, {
             delimiters: [
+                // STACK/Moodle's own question text uses \( \) / \[ \] natively.
                 {left: '\\(', right: '\\)', display: false},
                 {left: '\\[', right: '\\]', display: true},
+                // analytics.latex_utils.extract_stack_answer_latex() and
+                // compute_repeated_wrong_answers() wrap converted Maxima
+                // expressions in single/double $ instead (the Streamlit/
+                // MathJax convention) — recognized in addition since these
+                // strings are entirely programmatically constructed by
+                // those two functions, not free-form text where a literal
+                // "$" could cause a false-positive match.
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
             ],
             throwOnError: false,
         });
@@ -177,9 +285,18 @@
         typesetMath(summaryRoot);
 
         if (sectionsRoot && Array.isArray(result.sections)) {
+            // Sections 1-2 come first (summary is rendered separately above;
+            // "2. Question Difficulty Analysis" is sections[0]), then the
+            // per-question drill-down (section "3.") slots in before
+            // "4. Question Response Distribution" onward, matching the
+            // Streamlit page's section ordering.
             result.sections.forEach(function (section) {
                 renderSection(sectionsRoot, section);
+                if (section.id === 'difficulty') {
+                    renderQuestionDetails(sectionsRoot, prefix, result.questions);
+                }
             });
+            renderAudit(sectionsRoot, prefix, result.audit);
         } else if (sectionsRoot && Array.isArray(result.figures)) {
             renderLegacyFigures(sectionsRoot, result.figures);
         }

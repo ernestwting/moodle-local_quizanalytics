@@ -45,13 +45,16 @@ class quiz_quizanalytics_report extends quiz_default_report {
             return true;
         }
 
+        $colorblind = sections_renderer::resolve_colorblind_mode();
+
         // --- 2. Hand off to the local analytics engine. Nothing here leaves ---
         // --- this server: api_client only ever calls the configured        ---
         // --- localhost/private-network endpoint.                          ---
         $client = new quiz_quizanalytics_api_client();
         $result = $client->analyze([
-            'quiz_name' => $quiz->name,
-            'records'   => $records,
+            'quiz_name'       => $quiz->name,
+            'records'         => $records,
+            'colorblind_mode' => $colorblind,
         ]);
 
         if ($result === null) {
@@ -62,6 +65,7 @@ class quiz_quizanalytics_report extends quiz_default_report {
         // --- 3. Render via the shared sections_renderer (see its docblock ---
         // --- for why the vendored JS/CSS is echoed as raw tags rather    ---
         // --- than through $PAGE->requires()).                            ---
+        echo sections_renderer::render_colorblind_toggle($colorblind);
         echo sections_renderer::render_containers('qa');
         echo sections_renderer::render_vendor_and_payload('qa', $result);
 
