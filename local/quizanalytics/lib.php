@@ -84,6 +84,20 @@ function local_quizanalytics_extend_navigation_course($navigation, $course, $con
  * calls every local_*_extend_settings_navigation() unconditionally) — so
  * this returns immediately for anything that isn't a quiz's own page.
  *
+ * The link is added as a child of the 'modulesettings' node specifically
+ * (found via $settingsnav->find(), the same lookup mod_quiz's own
+ * secondary-nav view — mod_quiz\navigation\views\secondary::
+ * load_module_navigation() — uses to decide what belongs in the quiz
+ * page's "More" dropdown), not appended to $settingsnav directly. A plain
+ * $settingsnav->add() attaches the node as a top-level sibling of
+ * 'modulesettings' instead of a child of it, which mod_quiz's dropdown-
+ * building code never looks at — the link would exist in the tree
+ * somewhere, just nowhere a teacher would ever see it. Confirmed against
+ * this exact quiz page's real "More" dropdown, which is where core's own
+ * load_module_settings() (lib/navigationlib.php) builds 'modulesettings'
+ * — and does so before load_local_plugin_settings() runs, so it's always
+ * available to find() by the time this function fires.
+ *
  * @param \settings_navigation $settingsnav
  * @param \context $context the current page's context
  */
@@ -114,7 +128,9 @@ function local_quizanalytics_extend_settings_navigation($settingsnav, $context) 
         'quizid' => $cm->instance,
     ]);
 
-    $settingsnav->add(
+    $modulenode = $settingsnav->find('modulesettings', navigation_node::TYPE_SETTING);
+    $parent = $modulenode ?: $settingsnav;
+    $parent->add(
         get_string('pluginname', 'local_quizanalytics'),
         $url,
         navigation_node::TYPE_SETTING,
