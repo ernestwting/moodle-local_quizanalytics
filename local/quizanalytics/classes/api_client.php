@@ -67,17 +67,25 @@ class local_quizanalytics_api_client {
     /**
      * Question Analytics for a single quiz, for the per-quiz drill-down view.
      *
+     * Computed directly in PHP (see classes/analytics/) rather than calling
+     * out to the analytics-service — the whole point of this plugin being
+     * the only thing an institution has to install.
+     *
      * @param string $quizname
      * @param array  $records
      * @param bool   $colorblindmode
      * @return array|null
      */
     public function analyze(string $quizname, array $records, bool $colorblindmode = false): ?array {
-        return $this->post('/analyze', [
-            'quiz_name'       => $quizname,
-            'records'         => $records,
-            'colorblind_mode' => $colorblindmode,
-        ]);
+        try {
+            return \local_quizanalytics\analytics\question_analysis::build_analysis(
+                $records, $quizname, $colorblindmode
+            );
+        } catch (\Throwable $e) {
+            debugging('local_quizanalytics: error building question analytics: ' . $e->getMessage(),
+                DEBUG_DEVELOPER);
+            return null;
+        }
     }
 
     /**
