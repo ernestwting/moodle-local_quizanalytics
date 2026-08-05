@@ -10,11 +10,12 @@
  *   from the chart already rendered on screen) rather than rasterized
  *   server-side — PHP has no headless-browser/kaleido equivalent, and this
  *   plugin's whole point is needing no such external dependency.
- * - Math (STACK/Maxima LaTeX and \(...\)/$...$ delimited expressions in
- *   table cells) prints as its raw source text rather than being
- *   rasterized to an inline image — no server-side math-rendering
- *   dependency needed, at the cost of not showing typeset symbols in the
- *   PDF specifically (the on-screen page still renders it via KaTeX).
+ * - Math ($...$ delimited expressions in table cells) is rendered as
+ *   plain, readable text/Unicode (see latex_utils::latex_to_plain_text())
+ *   rather than a typeset image — no server-side math-rendering
+ *   dependency needed, at the cost of not showing true typeset symbols in
+ *   the PDF specifically (the on-screen page still renders the real
+ *   $...$ string via KaTeX).
  * - No auto-generated table of contents / PDF outline bookmarks — a
  *   navigation nicety, not core report content.
  *

@@ -1,9 +1,8 @@
 # STACK Quiz Analytics for Moodle
 
-Brings the analytics from the companion Streamlit app
-([`Interactive-quiz-analytics`](../Interactive-quiz-analytics)) directly into
-Moodle, scoped correctly per quiz and per course, with no CSV export/upload
-step — data is read straight out of Moodle's own database.
+Question-level and course-wide analytics for STACK (Maxima CAS) quizzes,
+scoped correctly per quiz and per course, with no CSV export/upload step —
+data is read straight out of Moodle's own database.
 
 **This is a single, self-contained Moodle plugin.** Every computation (STACK/
 Maxima response parsing, difficulty and PRT-pass-rate statistics, PDF export)
@@ -67,12 +66,10 @@ Plotly.js / KaTeX (client-side rendering) or TCPDF (server-side PDF)
 
 ## Where this came from
 
-The `classes/analytics/` PHP is a from-scratch port of the `analytics/`
-Python package the companion Streamlit app (and an earlier, Python-service-
-backed version of this same plugin) uses — same statistics, same chart
-shapes, verified field-by-field against the original for real quiz data.
-It is not kept in sync with the Streamlit app automatically; the two are
-now independent implementations of the same analysis.
+The `classes/analytics/` PHP is a from-scratch port of an earlier,
+Python-service-backed version of this same plugin — same statistics, same
+chart shapes, verified field-by-field against the original for real quiz
+data.
 
 ## Installation
 
