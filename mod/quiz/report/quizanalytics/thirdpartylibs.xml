@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<libraries>
+  <library>
+    <location>js/vendor/plotly.min.js</location>
+    <name>Plotly.js</name>
+    <description>Renders every chart in this plugin family (Question Analytics, Solution Process Visualization, and the course-wide Analytics page) — vendored locally rather than loaded from a CDN so no student response data or chart content ever leaves the Moodle server's own network.</description>
+    <version>2.32.0</version>
+    <license>MIT</license>
+    <licenseversion>MIT</licenseversion>
+    <repository>https://github.com/plotly/plotly.js</repository>
+    <copyrights>
+      <copyright>2012-2024 Plotly, Inc.</copyright>
+    </copyrights>
+    <upgradable>true</upgradable>
+  </library>
+  <library>
+    <location>js/vendor/katex/katex.min.js, js/vendor/katex/katex.min.css, js/vendor/katex/contrib/auto-render.min.js, js/vendor/katex/fonts/*</location>
+    <name>KaTeX</name>
+    <description>Client-side rendering of STACK/Maxima LaTeX (\( \), \[ \], and $ ... $ delimited math) in tables, question text, and notes — vendored locally for the same reason as Plotly.js above.</description>
+    <version>0.16.x</version>
+    <license>MIT</license>
+    <licenseversion>MIT</licenseversion>
+    <repository>https://github.com/KaTeX/KaTeX</repository>
+    <copyrights>
+      <copyright>2013-2020 Khan Academy and other contributors</copyright>
+    </copyrights>
+    <upgradable>true</upgradable>
+  </library>
+</libraries>
