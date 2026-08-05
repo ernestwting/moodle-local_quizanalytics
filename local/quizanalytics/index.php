@@ -144,7 +144,8 @@ if ($quizid) {
             ['id' => $courseid, 'kind' => 'question', 'quizid' => $quizid, 'colorblind' => $colorblind ? 1 : 0],
             $client->report_sections('question'),
             get_string('downloadpdfbutton', 'local_quizanalytics'),
-            'qa-pdf'
+            'qa-pdf',
+            'qa'
         );
     } else {
         // --- Solution Process Visualization ---
@@ -251,7 +252,8 @@ if ($quizid) {
             ],
             $client->report_sections('solutionprocess'),
             get_string('downloadpdfbutton', 'local_quizanalytics'),
-            'spv-pdf'
+            'spv-pdf',
+            'spv'
         );
     }
 } else {
@@ -333,7 +335,8 @@ if ($quizid) {
         ['id' => $courseid, 'kind' => 'quiz', 'colorblind' => $colorblind ? 1 : 0],
         $client->report_sections('quiz'),
         get_string('downloadpdfbutton', 'local_quizanalytics'),
-        'qw-pdf'
+        'qw-pdf',
+        'qw'
     );
 }
 

@@ -26,4 +26,17 @@
     </copyrights>
     <upgradable>true</upgradable>
   </library>
+  <library>
+    <location>classes/vendor/tcpdf/*</location>
+    <name>TCPDF</name>
+    <description>Generates the "Generate PDF Report" downloads (Question Analytics, Solution Process Visualization, Quiz Analysis) server-side in pure PHP — no external binaries or services needed. Vendored as a trimmed copy of the classic 6.x release (core Helvetica + DejaVu Sans fonts only, barcode modules and other font families removed) rather than the 7.x line, which is a deprecated Composer-only facade requiring PHP 8.2+ and a separate tc-lib-pdf package graph incompatible with this plugin's no-Composer, vendor-locally convention.</description>
+    <version>6.11.3</version>
+    <license>LGPLv3</license>
+    <licenseversion>3</licenseversion>
+    <repository>https://github.com/tecnickcom/TCPDF</repository>
+    <copyrights>
+      <copyright>2002-2026 Nicola Asuni - Tecnick.com LTD</copyright>
+    </copyrights>
+    <upgradable>true</upgradable>
+  </library>
 </libraries>

@@ -254,10 +254,18 @@ class sections_renderer {
      *
      * @param \moodle_url $action    The pdf.php endpoint to submit to.
      * @param array $hiddenparams    name => value pairs pdf.php needs (id, colorblind, etc).
-     * @param string[] $sectionnames Section names from GET /report-sections/{kind}.
+     * @param string[] $sectionnames Section checkbox labels, from
+     *        local_quizanalytics_api_client::report_sections($kind).
      * @param string $buttonlabel
      * @param string $idprefix       Unique per rendered form, so checkbox ids never collide
      *        when this is called more than once on one page.
+     * @param string $chartprefix    The DOM id prefix charts on this page were rendered
+     *        with (render_vendor_and_payload()'s own $prefix — "qa"/"spv"/"qw") — read by
+     *        sections-renderer.js's PDF submit handler to know which "{chartprefix}-
+     *        chart-*" containers on the page to capture via Plotly.toImage() before
+     *        this form actually submits. A plain POST form (not fetch/AJAX): the
+     *        browser handles the PDF download response the same way it always has,
+     *        the JS submit handler just fills in the chart_images field first.
      * @return string
      */
     public static function render_pdf_form(
@@ -265,14 +273,22 @@ class sections_renderer {
         array $hiddenparams,
         array $sectionnames,
         string $buttonlabel,
-        string $idprefix
+        string $idprefix,
+        string $chartprefix
     ): string {
         $html = \html_writer::start_tag('form', [
-            'method' => 'get', 'action' => $action->out(false), 'class' => 'mb-3',
+            'method' => 'post', 'action' => $action->out(false), 'class' => 'mb-3 qa-pdf-form',
+            'data-chart-prefix' => $chartprefix,
         ]);
         foreach ($hiddenparams as $name => $value) {
             $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
         }
+        // Populated by sections-renderer.js immediately before the form
+        // actually submits — see setupPdfForm() there. Never trusted as
+        // structured data server-side beyond "is this a plausible image":
+        // pdf.php only ever uses these bytes as-is to embed in the
+        // requesting user's own PDF, never to drive any computation.
+        $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'chart_images', 'value' => '']);
         foreach ($sectionnames as $section) {
             $id = $idprefix . '-' . md5($section);
             $html .= \html_writer::empty_tag('input', [

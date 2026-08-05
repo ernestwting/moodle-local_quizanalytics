@@ -7,9 +7,13 @@
  *
  * A separate entry point from index.php, gated by the same
  * local/quizanalytics:view capability that governs everything else shown on
- * that page. Re-derives every quiz/course/record from trusted URL params —
- * never trusts anything posted by the client beyond the course id, quiz id,
- * selection, and section choices.
+ * that page. Re-derives every quiz/course/record from trusted server-side
+ * data (course id, quiz id, selection, and section choices) — the one piece
+ * of client-posted content this route does use, chart_images, is never fed
+ * into any computation, only embedded as-is into the requesting user's own
+ * PDF (each image was itself captured, client-side, from a chart this same
+ * route's own re-derived data rendered a moment earlier — see
+ * sections-renderer.js's setupPdfForm()).
  *
  * @package local_quizanalytics
  */
@@ -31,6 +35,24 @@ $colorblind = (bool) optional_param('colorblind', 0, PARAM_INT);
 $sections = optional_param_array('sections', [], PARAM_RAW);
 $selectedsections = !empty($sections) ? $sections : null;
 
+// Client-captured chart PNGs (Plotly.toImage() data: URLs), keyed by chart
+// id — see sections-renderer.js's setupPdfForm()/collectChartImages().
+// Never trusted as anything more than opaque image bytes to embed: any
+// entry that isn't a plausible "chartid => data:image/..." pair is dropped
+// rather than passed through.
+$chartimages = [];
+$rawchartimages = optional_param('chart_images', '', PARAM_RAW);
+if ($rawchartimages !== '') {
+    $decoded = json_decode($rawchartimages, true);
+    if (is_array($decoded)) {
+        foreach ($decoded as $chartid => $datauri) {
+            if (is_string($chartid) && is_string($datauri) && strpos($datauri, 'data:image/') === 0) {
+                $chartimages[$chartid] = $datauri;
+            }
+        }
+    }
+}
+
 $client = new local_quizanalytics_api_client();
 
 if ($kind === 'quiz') {
@@ -41,7 +63,7 @@ if ($kind === 'quiz') {
         throw new \moodle_exception('nocourseattempts', 'local_quizanalytics');
     }
 
-    $pdf = $client->download_pdf_quiz($course->fullname, $byquiz, $selectedsections, $colorblind);
+    $pdf = $client->download_pdf_quiz($course->fullname, $byquiz, $selectedsections, $colorblind, $chartimages);
     $filename = clean_filename($course->shortname . '-quiz-analysis.pdf');
 
 } else if ($kind === 'question' || $kind === 'solutionprocess') {
@@ -65,7 +87,7 @@ if ($kind === 'quiz') {
     }
 
     if ($kind === 'question') {
-        $pdf = $client->download_pdf_question($selectedquiz->name, $records, $selectedsections, $colorblind);
+        $pdf = $client->download_pdf_question($selectedquiz->name, $records, $selectedsections, $colorblind, $chartimages);
         $filename = clean_filename($selectedquiz->name . '-question-analysis.pdf');
     } else {
         $meta = $client->solution_process_meta($selectedquiz->name, $records);
@@ -92,7 +114,7 @@ if ($kind === 'quiz') {
         }
 
         $pdf = $client->download_pdf_solutionprocess(
-            $selectedquiz->name, $records, $spvquestion, $spvpart, $selectedsections, $colorblind
+            $selectedquiz->name, $records, $spvquestion, $spvpart, $selectedsections, $colorblind, $chartimages
         );
         $filename = clean_filename(
             $selectedquiz->name . '-' . $spvquestion . '-part' . $spvpart . '-solution-process.pdf'

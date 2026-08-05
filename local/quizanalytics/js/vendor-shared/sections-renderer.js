@@ -505,5 +505,85 @@
         }
     }
 
+    // --- PDF export: client-side chart capture -----------------------------
+    //
+    // pdf.php has no headless-browser/rasterization dependency (the whole
+    // point of this plugin being pure PHP), so it can't turn a Plotly figure
+    // into an image itself. Instead, on "Generate PDF Report" click, every
+    // chart already drawn on this page (by renderChart() above, into a
+    // "{prefix}-chart-{chart.id}" container) is snapshotted client-side via
+    // Plotly's own toImage(), and the resulting PNG data URLs are POSTed
+    // alongside the section checkboxes — pdf.php embeds whichever ones match
+    // the sections it re-derives server-side, and shows a plain "unavailable"
+    // note for any section whose chart wasn't captured (e.g. a chart added
+    // to the page after this script last ran).
+    function collectChartImages(prefix) {
+        var selector = '[id^="' + prefix + '-chart-"]';
+        var containers = document.querySelectorAll(selector);
+        var ids = [];
+        var promises = [];
+        Array.prototype.forEach.call(containers, function (container) {
+            ids.push(container.id.slice(prefix.length + 7)); // strip "{prefix}-chart-"
+            promises.push(global.Plotly.toImage(container, {
+                format: 'png',
+                width: container.offsetWidth || 800,
+                height: container.offsetHeight || 400,
+            }));
+        });
+        return Promise.all(promises).then(function (images) {
+            var map = {};
+            ids.forEach(function (chartId, i) {
+                map[chartId] = images[i];
+            });
+            return map;
+        });
+    }
+
+    function setupPdfForm(form) {
+        var prefix = form.getAttribute('data-chart-prefix');
+        var imagesInput = form.querySelector('input[name="chart_images"]');
+        var submitBtn = form.querySelector('input[type="submit"]');
+        if (!prefix || !imagesInput || !submitBtn) {
+            return;
+        }
+        form.addEventListener('submit', function (e) {
+            if (form.dataset.imagesReady === '1') {
+                return; // Images already captured on a previous submit attempt.
+            }
+            e.preventDefault();
+            var originalLabel = submitBtn.value;
+            submitBtn.value = 'Generating chart images…';
+            submitBtn.disabled = true;
+            collectChartImages(prefix).then(function (images) {
+                imagesInput.value = JSON.stringify(images);
+                form.dataset.imagesReady = '1';
+                submitBtn.value = originalLabel;
+                submitBtn.disabled = false;
+                form.submit();
+            }).catch(function (err) {
+                submitBtn.value = originalLabel;
+                submitBtn.disabled = false;
+                global.alert('Could not capture chart images for the PDF: ' +
+                    (err && err.message ? err.message : err));
+            });
+        });
+    }
+
+    function initPdfForms() {
+        var forms = document.querySelectorAll('form.qa-pdf-form');
+        Array.prototype.forEach.call(forms, setupPdfForm);
+    }
+
+    // This script tag runs before the PDF form's own HTML exists in the page
+    // (render_pdf_form() is echoed later in index.php's document order) —
+    // DOMContentLoaded waits for the whole initial HTML response to finish
+    // parsing regardless of where this <script> sits within it, so the form
+    // is reliably present by the time this fires.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPdfForms);
+    } else {
+        initPdfForms();
+    }
+
     global.QuizAnalyticsRenderer = {render: render};
 })(window);
