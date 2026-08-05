@@ -504,6 +504,17 @@ class solution_distance {
                     'camera' => ['eye' => self::DEFAULT_CAMERA_EYE, 'up' => ['x' => 0, 'y' => 0, 'z' => 1]],
                 ],
                 'margin' => ['l' => 0, 'r' => 0, 't' => 50, 'b' => 0],
+                // Without an explicit height, this fills its container's
+                // width (Plotly's "responsive" sizing) but only Plotly's
+                // default ~450px height — since aspectmode=cube constrains
+                // all three scene axes equally, the shorter of the two
+                // dimensions decides how big the cube can actually grow,
+                // which left it rendering small with a lot of unused
+                // horizontal space around it. A generous fixed height gives
+                // the cube as much room as the width normally would, both
+                // on screen and in the client-captured PDF chart image
+                // (captured at this same container size).
+                'height' => 650,
             ],
         ];
     }

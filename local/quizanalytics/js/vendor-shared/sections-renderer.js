@@ -190,8 +190,17 @@
         container.id = chart.id ? (prefix + '-chart-' + chart.id) : (prefix + '-chart-auto-' + (chartCounter++));
         container.style.marginBottom = '2rem';
 
+        // 3D scene charts (the PRT/TED distance charts) are exempt: their
+        // height is a fixed, deliberate choice giving aspectmode="cube"
+        // enough room to render the cube at a reasonable size (see
+        // solution_distance.php's own comment on this), not a list that
+        // grows unbounded with the data the way the student-performance
+        // heatmap's height does — capping it to a small scrollable window
+        // would just shrink the visible chart back down to the same
+        // "looks tiny" problem that height was set to fix.
+        var isScene3d = !!(chart.plotly_json.layout && chart.plotly_json.layout.scene);
         var declaredHeight = chart.plotly_json.layout && chart.plotly_json.layout.height;
-        if (declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD) {
+        if (!isScene3d && declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD) {
             var scrollWrapper = document.createElement('div');
             scrollWrapper.style.maxHeight = CHART_SCROLL_MAX_HEIGHT + 'px';
             scrollWrapper.style.overflowY = 'auto';
@@ -263,9 +272,23 @@
         });
     }
 
+    // Every section wrapper gets the same top rule + generous top/bottom
+    // spacing, so consecutive sections (and the "Generate PDF Report" block
+    // right after the last one) read as clearly separate blocks instead of
+    // running straight into each other — there was previously no CSS at all
+    // marking this boundary, just whatever margin a section's own last
+    // element (a table, a scrollable notes list, ...) happened to have.
+    function styleSectionWrapper(wrapper) {
+        wrapper.style.borderTop = '1px solid #dee2e6';
+        wrapper.style.marginTop = '2rem';
+        wrapper.style.paddingTop = '1.5rem';
+        wrapper.style.marginBottom = '1rem';
+    }
+
     function renderSection(root, section, prefix) {
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
+        styleSectionWrapper(wrapper);
         if (section.id) {
             wrapper.id = prefix + '-section-' + section.id;
         }
@@ -314,6 +337,7 @@
         }
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
+        styleSectionWrapper(wrapper);
         wrapper.id = prefix + '-section-questiondetails';
 
         var heading = document.createElement('h4');
@@ -391,6 +415,7 @@
         }
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
+        styleSectionWrapper(wrapper);
         wrapper.id = prefix + '-section-audit';
 
         var heading = document.createElement('h4');
@@ -415,6 +440,7 @@
         }
         var wrapper = document.createElement('div');
         wrapper.className = 'qa-section';
+        styleSectionWrapper(wrapper);
         wrapper.id = prefix + '-section-student-drilldown';
         // Attached before populating — renderSection() below draws charts
         // into it, which need a live (attached) ancestor to size against;
