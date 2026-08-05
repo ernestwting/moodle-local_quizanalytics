@@ -41,66 +41,26 @@
 
 namespace local_quizanalytics\analytics;
 
-require_once(__DIR__ . '/../vendor/tcpdf/tcpdf.php');
-
 /**
- * TCPDF subclass adding the page header/footer band pdf_export.py's
- * NumberedCanvas drew directly on the reportlab canvas.
+ * Renders a pdf_content.php payload to PDF bytes via TCPDF (see quizanalytics_tcpdf.php
+ * for the TCPDF subclass this uses).
  */
-class quizanalytics_tcpdf extends \TCPDF {
-    public string $reportheading = 'Moodle STACK Analytics Hub — Performance Report';
-
-    public function __construct(
-        $orientation = 'P',
-        $unit = 'mm',
-        $format = 'A4',
-        $unicode = true,
-        $encoding = 'UTF-8',
-        $diskcache = false,
-        $pdfa = false
-    ) {
-        parent::__construct($orientation, $unit, $format, $unicode, $encoding, $diskcache, $pdfa);
-        // Suppress TCPDF's own "Powered by TCPDF" link, appended to the last
-        // page by Close() by default — a clean report, not a TCPDF ad.
-        $this->tcpdflink = false;
-    }
-
-    public function Header(): void {
-        $this->SetFont('dejavusans', '', 9);
-        $this->SetTextColor(0x64, 0x74, 0x8b);
-        $this->SetDrawColor(0xcb, 0xd5, 0xe1);
-        $this->SetLineWidth(0.2);
-        $y = $this->GetHeaderMargin() > 0 ? 10 : 10;
-        $this->Line($this->getMargins()['left'], $y, $this->getPageWidth() - $this->getMargins()['right'], $y);
-        $this->SetXY($this->getMargins()['left'], $y - 5);
-        $this->Cell(0, 5, $this->reportheading, 0, 0, 'L');
-    }
-
-    public function Footer(): void {
-        $this->SetFont('dejavusans', '', 9);
-        $this->SetTextColor(0x64, 0x74, 0x8b);
-        $this->SetDrawColor(0xcb, 0xd5, 0xe1);
-        $this->SetLineWidth(0.2);
-        $y = -15;
-        $this->SetY($y);
-        $this->Line($this->getMargins()['left'], $this->GetY(), $this->getPageWidth() - $this->getMargins()['right'], $this->GetY());
-        $this->SetY($y + 2);
-        $this->Cell(0, 8, 'Fully client-side chart export • No data transmitted externally', 0, 0, 'L');
-        $this->Cell(0, 8, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'R');
-    }
-}
-
 class pdf_builder {
+    /** @var float Chart images are scaled to fit within this max height, matching pdf_export.py's layout. */
     const MAX_CHART_HEIGHT_MM = 90.0;
 
-    // Column-width weighting, matching pdf_export.py's _compute_column_widths.
+    /** @var array<string, float> Column-width weighting, matching pdf_export.py's _compute_column_widths. */
     const NARROW_COLUMN_WEIGHTS = [
         'question' => 0.55, 'score' => 0.45, 'status' => 0.6,
         'student name' => 0.85, 'frequency' => 0.5,
     ];
+
+    /** @var string[] Column-name keywords that get wide-column treatment instead of NARROW_COLUMN_WEIGHTS. */
     const WIDE_COLUMN_KEYWORDS = ['response', 'answer', 'text', 'email'];
 
     /**
+     * Renders one PDF kind's content payload to PDF bytes.
+     *
      * @param array{title: string, subtitle: string, sections: array[]} $content
      * @param array<string, string> $chartimages chart id => data: URL (PNG)
      */
@@ -142,6 +102,9 @@ class pdf_builder {
         return $pdf->Output($content['title'] . '.pdf', 'S');
     }
 
+    /**
+     * Renders one section: divider, title/caption, table, and charts.
+     */
     private static function render_section(
         quizanalytics_tcpdf $pdf,
         array $section,
@@ -194,9 +157,13 @@ class pdf_builder {
         $pdf->Ln(7);
     }
 
-    /** @param array{columns: string[], rows: array[], truncated_from?: int} $table */
+    /**
+     * Renders one section's table as an HTML table via TCPDF's writeHTML().
+     *
+     * @param array{columns: string[], rows: array[], truncated_from?: int} $table
+     */
     private static function render_table(quizanalytics_tcpdf $pdf, array $table): void {
-        // writeHTML() below has no explicit font-family in its inline CSS,
+        // WriteHTML() below has no explicit font-family in its inline CSS,
         // so it inherits whatever font was last set on the document — set
         // explicitly here (not just relying on the caption/heading font
         // that happened to run before this) since table cells are the one
@@ -235,10 +202,18 @@ class pdf_builder {
         }
     }
 
-    // Matches sections-renderer.js's ISO_DATETIME_RE — the same
-    // "Y-m-d H:i:s" shape data_fetcher.php's userdate() calls produce.
+    /**
+     * Matches sections-renderer.js's ISO_DATETIME_RE — the same
+     * "Y-m-d H:i:s" shape data_fetcher.php's userdate() calls produce.
+     *
+     * @var string
+     */
     const ISO_DATETIME_RE = '/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?$/';
 
+    /**
+     * Formats one table cell value for display: dates get reformatted, math gets
+     * rendered as plain text, floats get trimmed, everything else stringified.
+     */
     private static function format_cell($value): string {
         if ($value === null) {
             return '';
@@ -260,7 +235,11 @@ class pdf_builder {
         return (string) $value;
     }
 
-    /** @return float[] column widths in mm, summing to $usablewidth. */
+    /**
+     * Column widths in mm for a table, narrow/wide-weighted by column name, summing to $usablewidth.
+     *
+     * @return float[]
+     */
     private static function compute_column_widths(array $columns, float $usablewidth): array {
         $weights = [];
         foreach ($columns as $col) {
@@ -282,7 +261,11 @@ class pdf_builder {
         return array_map(fn($w) => $usablewidth * $w / $total, $weights);
     }
 
-    /** @param array{id: string, title: ?string} $chart */
+    /**
+     * Embeds one chart's client-captured PNG image, sized to fit within MAX_CHART_HEIGHT_MM.
+     *
+     * @param array{id: string, title: ?string} $chart
+     */
     private static function render_chart(quizanalytics_tcpdf $pdf, array $chart, array $chartimages): void {
         $datauri = $chartimages[$chart['id']] ?? null;
 

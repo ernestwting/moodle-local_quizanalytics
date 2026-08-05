@@ -33,10 +33,13 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
+/**
+ * Builds a cheap fingerprint of a set of quizzes' attempts to key the analysis result cache by.
+ */
 class local_quizanalytics_cache_helper {
     /**
+     * Cheap per-quiz-set fingerprint (attempt count + latest timefinish + grade sum) used as a cache key.
+     *
      * @param int[] $quizids
      * @return stdClass {count: int, fingerprint: string}
      */

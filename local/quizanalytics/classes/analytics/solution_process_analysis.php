@@ -27,6 +27,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Assembles the Solution Process Visualization {summary, sections} payload for one question/part.
+ */
 class solution_process_analysis {
     /**
      * Cheap metadata for populating the question/part/student selectors —

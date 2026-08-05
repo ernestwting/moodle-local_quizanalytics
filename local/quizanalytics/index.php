@@ -37,7 +37,7 @@ require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/api_client.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/cache_helper.php');
 
-use local_quizanalytics\output\sections_renderer;
+use local_quizanalytics\output\sections_output_helper;
 
 $courseid = required_param('id', PARAM_INT);
 $quizid   = optional_param('quizid', 0, PARAM_INT);
@@ -65,8 +65,8 @@ if (empty($stackquizzes)) {
     exit;
 }
 
-// --- The quiz selector: a plain GET form, so picking a quiz is just a page ---
-// --- reload with &quizid=... — no JS or AJAX needed for the switch itself. ---
+// The quiz selector: a plain GET form, so picking a quiz is just a page
+// reload with &quizid=... — no JS or AJAX needed for the switch itself.
 $selectoptions = [0 => get_string('quizselectoption', 'local_quizanalytics')];
 foreach ($stackquizzes as $quiz) {
     $selectoptions[$quiz->id] = $quiz->name;
@@ -84,14 +84,14 @@ echo html_writer::empty_tag('input', [
 ]);
 echo html_writer::end_tag('form');
 
-$colorblind = sections_renderer::resolve_colorblind_mode();
-echo sections_renderer::render_colorblind_toggle($colorblind);
+$colorblind = sections_output_helper::resolve_colorblind_mode();
+echo sections_output_helper::render_colorblind_toggle($colorblind);
 
 $client = new local_quizanalytics_api_client();
 
 if ($quizid) {
-    // --- Drill-down: one quiz's Question Analytics or Solution Process ---
-    // --- Visualization, picked by the "view" selector below.           ---
+    // Drill-down: one quiz's Question Analytics or Solution Process
+    // Visualization, picked by the "view" selector below.
     $selectedquiz = null;
     foreach ($stackquizzes as $quiz) {
         if ((int) $quiz->id === $quizid) {
@@ -125,15 +125,15 @@ if ($quizid) {
         return $records ??= local_quizanalytics_data_fetcher::get_response_records_for_quiz($selectedquiz, $course);
     };
 
-    // --- "View:" sub-selector — only the selected view's data is ever   ---
-    // --- fetched/computed (a plain GET reload, not a client-side tab    ---
-    // --- swap that would need both already computed).                  ---
+    // The "View:" sub-selector — only the selected view's data is ever
+    // fetched/computed (a plain GET reload, not a client-side tab
+    // swap that would need both already computed).
     $view = optional_param('view', 'question', PARAM_ALPHA);
     if (!in_array($view, ['question', 'solutionprocess'], true)) {
         $view = 'question';
     }
     $PAGE->url->param('view', $view);
-    echo sections_renderer::render_view_selector_form($view);
+    echo sections_output_helper::render_view_selector_form($view);
 
     if ($view === 'question') {
         $qacache = cache::make('local_quizanalytics', 'questionanalysis');
@@ -152,11 +152,11 @@ if ($quizid) {
             exit;
         }
 
-        echo sections_renderer::render_containers('qa');
-        echo sections_renderer::render_vendor_and_payload('qa', $result);
+        echo sections_output_helper::render_containers('qa');
+        echo sections_output_helper::render_vendor_and_payload('qa', $result);
 
         echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
-        echo sections_renderer::render_pdf_form(
+        echo sections_output_helper::render_pdf_form(
             new moodle_url('/local/quizanalytics/pdf.php'),
             ['id' => $courseid, 'kind' => 'question', 'quizid' => $quizid, 'colorblind' => $colorblind ? 1 : 0],
             $client->report_sections('question'),
@@ -165,7 +165,7 @@ if ($quizid) {
             'qa'
         );
     } else {
-        // --- Solution Process Visualization ---
+        // Solution Process Visualization.
         $metacache = cache::make('local_quizanalytics', 'solutionprocessmeta');
         $metakey = local_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint);
         $meta = $metacache->get($metakey);
@@ -228,7 +228,7 @@ if ($quizid) {
             'spvstudent'  => $spvstudentid,
         ]);
 
-        echo sections_renderer::render_solutionprocess_selector_form(
+        echo sections_output_helper::render_solutionprocess_selector_form(
             $PAGE->url,
             $meta,
             $spvquestion,
@@ -267,11 +267,11 @@ if ($quizid) {
             exit;
         }
 
-        echo sections_renderer::render_containers('spv');
-        echo sections_renderer::render_vendor_and_payload('spv', $result);
+        echo sections_output_helper::render_containers('spv');
+        echo sections_output_helper::render_vendor_and_payload('spv', $result);
 
         echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
-        echo sections_renderer::render_pdf_form(
+        echo sections_output_helper::render_pdf_form(
             new moodle_url('/local/quizanalytics/pdf.php'),
             [
                 'id'          => $courseid,
@@ -288,7 +288,7 @@ if ($quizid) {
         );
     }
 } else {
-    // --- Course-wide: cross-quiz comparison across every STACK quiz. ---
+    // Course-wide: cross-quiz comparison across every STACK quiz.
     echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3);
 
     // Combines every STACK quiz's attempts into one computation — the one
@@ -313,9 +313,9 @@ if ($quizid) {
         return array_filter($byquiz, fn($records) => !empty($records));
     };
 
-    // --- Grade-type selector for the Attempts-vs-Grades scatter plot — a  ---
-    // --- plain GET-reload radio group, same convention as everywhere     ---
-    // --- else in this plugin.                                           ---
+    // Grade-type selector for the Attempts-vs-Grades scatter plot — a
+    // plain GET-reload radio group, same convention as everywhere
+    // else in this plugin.
     $gradetypeoptions = [
         'Highest Grade' => get_string('gradetypehighest', 'local_quizanalytics'),
         'Average Grade' => get_string('gradetypeaverage', 'local_quizanalytics'),
@@ -363,11 +363,11 @@ if ($quizid) {
         exit;
     }
 
-    echo sections_renderer::render_containers('qw');
-    echo sections_renderer::render_vendor_and_payload('qw', $result);
+    echo sections_output_helper::render_containers('qw');
+    echo sections_output_helper::render_vendor_and_payload('qw', $result);
 
     echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
-    echo sections_renderer::render_pdf_form(
+    echo sections_output_helper::render_pdf_form(
         new moodle_url('/local/quizanalytics/pdf.php'),
         ['id' => $courseid, 'kind' => 'quiz', 'colorblind' => $colorblind ? 1 : 0],
         $client->report_sections('quiz'),

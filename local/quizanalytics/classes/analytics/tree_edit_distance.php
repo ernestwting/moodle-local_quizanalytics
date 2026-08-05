@@ -26,6 +26,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Zhang-Shasha tree edit distance between two CAS expression trees.
+ */
 class tree_edit_distance {
     /**
      * Postorder traversal (children before parent).
@@ -96,7 +99,7 @@ class tree_edit_distance {
      * edit-operation model used to measure how far a student's submitted CAS
      * expression tree is from the correct answer's tree.
      */
-    public static function tree_edit_distance(expr_node $treea, expr_node $treeb): int {
+    public static function compute(expr_node $treea, expr_node $treeb): int {
         $nodesa = self::postorder($treea);
         $nodesb = self::postorder($treeb);
         $n = count($nodesa);

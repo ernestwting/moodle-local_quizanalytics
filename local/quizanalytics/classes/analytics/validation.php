@@ -24,6 +24,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Sanity checks on parsed response data before it's handed to the rest of the analytics pipeline.
+ */
 class validation {
     /**
      * Validate that the parsed response data contains the fields needed for
@@ -84,7 +87,7 @@ class validation {
                         $calculatedgrade,
                         $actualgrade
                     );
-                    // grade is null (excluded from the mean above) for any
+                    // Grade is null (excluded from the mean above) for any
                     // question left in a "validated, not (re-)graded" state —
                     // see parser::build_response_rows(). A mismatch on a row
                     // that has one of these has a known, specific cause, not

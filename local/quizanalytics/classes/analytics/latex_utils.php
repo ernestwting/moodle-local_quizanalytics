@@ -35,13 +35,22 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * LaTeX/math text cleanup: STACK debug-dump stripping, KaTeX-safe normalization, and plain-text math rendering.
+ */
 class latex_utils {
-    // Detects a Maxima "question variables" debug/error dump that has leaked into
-    // rendered question text — see latex_utils.py's own comment on _MAXIMA_DUMP_RE
-    // for the full story on why chain length 2+ is the signal.
+    /**
+     * Detects a Maxima "question variables" debug/error dump that has leaked into
+     * rendered question text — see latex_utils.py's own comment on _MAXIMA_DUMP_RE
+     * for the full story on why chain length 2+ is the signal.
+     *
+     * @var string
+     */
     const MAXIMA_ASSIGNMENT = '[a-zA-Z_][a-zA-Z0-9_]*\s*:?=\s*[^;=]*';
 
     /**
+     * Splits off a leaked Maxima debug dump from the end of question text, if present.
+     *
      * @return array{0: string, 1: string} [clean_text, dump_text]
      */
     public static function split_stack_debug_dump(string $text): array {
@@ -267,26 +276,38 @@ class latex_utils {
         return $out;
     }
 
-    // Maxima/STACK function names that map onto a *standard* LaTeX operator macro
-    // (confirmed to render in KaTeX on-screen). Deliberately excludes names that
-    // double as plausible plain variable names in this quiz domain (min, max, det,
-    // gcd, lim, sup, arg, deg, ...) — those are left for the generic-call fallback
-    // below, which only fires when the name is actually *called*, so a bare
-    // variable named e.g. `min` renders unchanged instead of being forced into
-    // operator form.
+    /**
+     * Maxima/STACK function names that map onto a *standard* LaTeX operator macro
+     * (confirmed to render in KaTeX on-screen). Deliberately excludes names that
+     * double as plausible plain variable names in this quiz domain (min, max, det,
+     * gcd, lim, sup, arg, deg, ...) — those are left for the generic-call fallback
+     * below, which only fires when the name is actually *called*, so a bare
+     * variable named e.g. `min` renders unchanged instead of being forced into
+     * operator form.
+     *
+     * @var string[]
+     */
     const FUNCTION_NAMES = [
         'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'sec', 'csc', 'cot',
         'arcsin', 'arccos', 'arctan',
         'log', 'ln', 'exp',
     ];
 
-    // Maxima spells the inverse trig functions without the "arc" prefix; `\asin`/
-    // `\acos`/`\atan` are not valid LaTeX macros, so rename to the standard
-    // `arcsin`/`arccos`/`arctan` spelling before the backslash-prefixing pass below.
+    /**
+     * Maxima spells the inverse trig functions without the "arc" prefix; `\asin`/
+     * `\acos`/`\atan` are not valid LaTeX macros, so rename to the standard
+     * `arcsin`/`arccos`/`arctan` spelling before the backslash-prefixing pass below.
+     *
+     * @var array<string, string>
+     */
     const RENAMED_FUNCTIONS = ['asin' => 'arcsin', 'acos' => 'arccos', 'atan' => 'arctan'];
 
-    // Bare Maxima constants/keywords that read as nonsense if left as literal
-    // math-mode variables (e.g. "true" would otherwise render as the product t*r*u*e).
+    /**
+     * Bare Maxima constants/keywords that read as nonsense if left as literal
+     * math-mode variables (e.g. "true" would otherwise render as the product t*r*u*e).
+     *
+     * @var array<string, string>
+     */
     const WORD_REPLACEMENTS = [
         'true' => '\text{true}',
         'false' => '\text{false}',
@@ -531,11 +552,15 @@ class latex_utils {
         return $out;
     }
 
-    // Simple, no-braces LaTeX-macro -> plain-text/Unicode substitutions for
-    // latex_to_plain_text() below, applied after the balanced-brace macros
-    // (\sqrt, ^, \operatorname, \text, \mathrm) have already been unwrapped —
-    // order matters here since e.g. \pi nested inside a \sqrt{...} is only
-    // reachable as plain text once the braces around it are gone.
+    /**
+     * Simple, no-braces LaTeX-macro -> plain-text/Unicode substitutions for
+     * latex_to_plain_text() below, applied after the balanced-brace macros
+     * (\sqrt, ^, \operatorname, \text, \mathrm) have already been unwrapped —
+     * order matters here since e.g. \pi nested inside a \sqrt{...} is only
+     * reachable as plain text once the braces around it are gone.
+     *
+     * @var array<string, string>
+     */
     const PLAIN_TEXT_REPLACEMENTS = [
         '\cdot' => "\u{00B7}", '\pi' => "\u{03C0}", '\varphi' => "\u{03C6}",
         '\gamma' => "\u{03B3}", '\infty' => "\u{221E}", '\neq' => "\u{2260}",
@@ -556,7 +581,7 @@ class latex_utils {
      */
     protected static function convert_latex_fragment_to_plain(string $expr): string {
         $out = $expr;
-        // \sqrt[n]{x} first (a regex, not convert_braced_call, since its
+        // Handle \sqrt[n]{x} first (a regex, not convert_braced_call, since its
         // degree argument sits in its own `[...]` before the `{...}`) —
         // fine for STACK's typical simple-degree output; see this
         // function's own "best-effort" scope note above.
@@ -568,7 +593,7 @@ class latex_utils {
         $out = self::convert_braced_call($out, '\mathrm', '', '');
         $out = self::convert_braced_call($out, '^', '^(', ')');
 
-        // \left[\substack{row \\ row}\right] matrix -> [cell, cell; cell, cell].
+        // Converts a substack-style bracketed matrix into "[cell, cell; cell, cell]" notation.
         $out = preg_replace_callback('/\\\\left\[\\\\substack\{(.*?)\}\\\\right\]/s', function ($m) {
             $rows = array_map(function ($row) {
                 $cells = array_map('trim', explode('\quad', $row));

@@ -44,6 +44,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Turns raw Moodle attempt records into the per-question "response rows" every other analytics module consumes.
+ */
 class parser {
     /**
      * Strip HTML tags/entities from a Moodle question/answer cell, leaving LaTeX
@@ -369,6 +372,10 @@ class parser {
         return ['pool_a' => $poola, 'pool_b' => $poolb];
     }
 
+    /**
+     * True if $candidate should replace $current as a student's "best attempt" (higher grade,
+     * ties broken by earlier attempt).
+     */
     protected static function is_better_attempt(array $candidate, array $current): bool {
         if ($candidate['overall_grade'] !== $current['overall_grade']) {
             return $candidate['overall_grade'] > $current['overall_grade'];

@@ -25,6 +25,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Small compatibility shims replicating specific Python builtin behaviors PHP's own don't match.
+ */
 class py_compat {
     /**
      * Replicates Python 3's round(value, ndigits): correctly-rounded
@@ -91,7 +94,7 @@ class py_compat {
         if ($ndigits <= 0) {
             $result = (float) $keptdigits;
         } else {
-            // $keptdigits may have grown by one digit if incrementing
+            // Keptdigits may have grown by one digit if incrementing
             // carried all the way through (e.g. "1999" -> "2000") — the
             // decimal point still belongs $ndigits from the right regardless.
             $intlen = strlen($keptdigits) - $ndigits;

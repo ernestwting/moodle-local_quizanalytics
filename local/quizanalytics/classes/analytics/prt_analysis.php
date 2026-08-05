@@ -24,14 +24,21 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Per-PRT pass rates, wrong-answer catch-all shares, and answer-note extraction from response text.
+ */
 class prt_analysis {
-    // PRT names are author-defined in STACK (default "prt1"/"prt2", but Moodle
-    // exports commonly show custom names like "Result"/"Result2" instead), so
-    // a segment is recognized as a PRT field by process of elimination rather
-    // than a literal "prt" prefix: exclude the "Seed: ..." metadata field and
-    // "ansK: ... [tag]" fields, and treat anything else shaped like
-    // "<name>: value" as a PRT.
+    /**
+     * PRT names are author-defined in STACK (default "prt1"/"prt2", but Moodle
+     * exports commonly show custom names like "Result"/"Result2" instead), so
+     * a segment is recognized as a PRT field by process of elimination rather
+     * than a literal "prt" prefix: exclude the "Seed: ..." metadata field and
+     * "ansK: ... [tag]" fields, and treat anything else shaped like
+     * "<name>: value" as a PRT.
+     */
     const ANS_FIELD_RE = '/^\s*ans\d+\s*:\s*.*\[(?:score|valid|invalid)\]\s*$/i';
+
+    /** @var string Matches the "Seed: ..." metadata line so it's excluded from PRT-field detection. */
     const SEED_FIELD_RE = '/^\s*seed\s*:/i';
 
     /**
@@ -80,6 +87,9 @@ class prt_analysis {
         return $prts;
     }
 
+    /**
+     * True if $haystack contains any one of $needles.
+     */
     protected static function str_contains_any(string $haystack, array $needles): bool {
         foreach ($needles as $needle) {
             if (str_contains($haystack, $needle)) {
@@ -102,7 +112,7 @@ class prt_analysis {
 
         $byquestion = table_helpers::group_by($prtframerows, 'question');
         $rows = [];
-        // pandas groupby("question") iterates groups in *sorted* key order by
+        // Pandas groupby("question") iterates groups in *sorted* key order by
         // default (sort=True) — plain string sort, matching PHP's ksort()
         // here (question labels are compared as strings either way).
         ksort($byquestion);
@@ -175,9 +185,13 @@ class prt_analysis {
         return $rows;
     }
 
-    // Cells for a question with no PRT at all — Plotly renders null cells as
-    // transparent, so painting the plot area this color is what makes them
-    // read as "not applicable" rather than a zero pass rate.
+    /**
+     * Cells for a question with no PRT at all — Plotly renders null cells as
+     * transparent, so painting the plot area this color is what makes them
+     * read as "not applicable" rather than a zero pass rate.
+     *
+     * @var string
+     */
     const NO_PRT_CELL_COLOR = '#d4d4d8';
 
     /**
@@ -203,7 +217,7 @@ class prt_analysis {
         $prtnames = array_values(array_unique(array_map(fn($r) => $r['prt_name'], $prtpassratesrows)));
         sort($prtnames);
 
-        // pivot_table(aggfunc="first"): first-seen (question, prt_name) pair wins.
+        // Pivot_table(aggfunc="first"): first-seen (question, prt_name) pair wins.
         $pivot = [];
         foreach ($prtpassratesrows as $r) {
             if (!isset($pivot[$r['question']][$r['prt_name']])) {

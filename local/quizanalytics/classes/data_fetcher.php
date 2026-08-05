@@ -32,6 +32,9 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/mod/quiz/locallib.php');
 require_once($CFG->dirroot . '/question/engine/lib.php');
 
+/**
+ * Fetches quiz/course attempt records from Moodle's own DB tables for the analytics package to consume.
+ */
 class local_quizanalytics_data_fetcher {
     /**
      * Cheap existence check: does this course contain at least one quiz with
@@ -184,7 +187,7 @@ class local_quizanalytics_data_fetcher {
                 'first_name'     => $user->firstname,
                 'email'          => $user->email,
                 'state'          => $attempt->state,
-                // $fixday=false: userdate()'s default (true) strips the
+                // Passing fixday=false: userdate()'s default (true) strips the
                 // leading zero from the day ("2026-6-3" instead of
                 // "2026-06-03"), which breaks sections-renderer.js's
                 // ISO_DATETIME_RE match for single-digit days — that row
@@ -206,7 +209,7 @@ class local_quizanalytics_data_fetcher {
             foreach ($quba->get_slots() as $slot) {
                 $question = $quba->get_question($slot);
 
-                // get_response_summary() is the same method the core "Responses"
+                // Get_response_summary() is the same method the core "Responses"
                 // report calls to build its "Response N" column — for STACK
                 // questions this includes the ansK/prtK trace the Python parser
                 // already knows how to read (parse_response_cell).

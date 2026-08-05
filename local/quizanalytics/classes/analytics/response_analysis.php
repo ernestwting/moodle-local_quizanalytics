@@ -24,6 +24,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Response outcome percentages and repeated-wrong-answer breakdowns per question.
+ */
 class response_analysis {
     /**
      * Response outcome percentages (Pool B for correct/incorrect, Pool A for

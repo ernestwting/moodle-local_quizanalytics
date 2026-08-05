@@ -24,7 +24,11 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Per-question drill-down: question text, right answer, and wrong-response breakdown.
+ */
 class question_details {
+    /** @var string Placeholder shown when a field wasn't captured for a given attempt. */
     const NOT_AVAILABLE = 'Not available in this export';
 
     /**

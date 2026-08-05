@@ -24,6 +24,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Difficulty, marks statistics, and top/bottom-group discrimination index per question.
+ */
 class difficulty {
     /**
      * Compute difficulty, marks stats, and discrimination index D using

@@ -42,11 +42,16 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Re-derives each PDF kind's section content server-side from the teacher's checkbox selections.
+ */
 class pdf_content {
     /** Matches pdf_export.py's df.head(60) row cap per table. */
     const MAX_TABLE_ROWS = 60;
 
     /**
+     * Question Analytics PDF section content for the checkbox labels the teacher selected.
+     *
      * @param array[] $records
      * @param string[] $selectedlabels checkbox labels ticked in the PDF form
      */
@@ -90,9 +95,15 @@ class pdf_content {
                         $rows[] = array_merge([$qname], $row);
                     }
                 }
-                $table = !empty($rows)
-                    ? ['columns' => array_merge(['Question'], $result['questions'][array_key_first($result['questions'])]['error_drilldown']['columns']), 'rows' => $rows]
-                    : ['columns' => [], 'rows' => []];
+                if (!empty($rows)) {
+                    $firstquestion = $result['questions'][array_key_first($result['questions'])];
+                    $table = [
+                        'columns' => array_merge(['Question'], $firstquestion['error_drilldown']['columns']),
+                        'rows' => $rows,
+                    ];
+                } else {
+                    $table = ['columns' => [], 'rows' => []];
+                }
                 $sections[] = [
                     'title' => '3. Question Item Details & Error Drill-Down',
                     'caption' => 'Question text, right answer, and wrong-response drill-down (Best Attempt)',
@@ -112,6 +123,8 @@ class pdf_content {
     }
 
     /**
+     * Solution Process Visualization PDF section content for the checkbox labels the teacher selected.
+     *
      * @param array[] $records
      * @param string[] $selectedlabels
      */
@@ -156,6 +169,8 @@ class pdf_content {
     }
 
     /**
+     * Quiz Analysis (course-wide) PDF section content for the checkbox labels the teacher selected.
+     *
      * @param array<string, array[]> $quizzes quiz_name => records[]
      * @param string[] $selectedlabels
      */
@@ -191,7 +206,9 @@ class pdf_content {
         ];
     }
 
-    /** One row-per-key display of the on-screen summary scalars. */
+    /**
+     * One row-per-key display of the on-screen summary scalars.
+     */
     private static function format_summary_subtitle(array $summary): string {
         $parts = [];
         foreach ($summary as $key => $value) {

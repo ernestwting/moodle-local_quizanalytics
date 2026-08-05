@@ -24,38 +24,66 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * PRT-distance and tree-edit-distance computations and their 3D/cross-attempt charts.
+ */
 class solution_distance {
+    /** @var string Matches one "ansK: ... [tag]" PRT answer-note segment. */
     const ANS_PATTERN = '/ans(\d+):\s*(.*?)\s*\[(score|valid|invalid)\]/';
 
+    /** @var int Cap on distinct tree-edit-distance values shown before bucketing the rest into "other". */
     const MAX_TED_DISPLAY = 20;
 
-    // Neon colorscale anchors for the 3D distance charts, in ascending
-    // distance order: a response sitting exactly on the correct answer
-    // (distance 0) is white, distance 1 is red, running up through orange,
-    // yellow, green, and blue to black at the top of the observed range.
+    /**
+     * Neon colorscale anchors for the 3D distance charts, in ascending
+     * distance order: a response sitting exactly on the correct answer
+     * (distance 0) is white, distance 1 is red, running up through orange,
+     * yellow, green, and blue to black at the top of the observed range.
+     *
+     * @var string[]
+     */
     const DISTANCE_COLOR_ANCHORS = [
         '#FFFFFF', '#FF1744', '#FF9100', '#FFEA00', '#39FF14', '#00B0FF', '#000000',
     ];
 
+    /** @var string Marker border color for the 3D distance chart scatter points. */
     const MARKER_OUTLINE = 'rgba(55, 65, 81, 0.9)';
+
+    /** @var string 3D scene background pane color. */
     const SCENE_PANE = '#E5ECF6';
+
+    /** @var string 3D scene grid line color. */
     const SCENE_GRID = '#FFFFFF';
+
+    /** @var string 3D scene axis label/tick font color. */
     const SCENE_FONT = '#2A3F5F';
+
+    /** @var float Small inset so axis gridlines don't visually clip at the scene boundary. */
     const GRID_INSET = 0.004;
+
+    /** @var bool Whether the students axis renders in reverse order in the 3D scene. */
     const STUDENTS_AXIS_REVERSED = true;
+
+    /** @var string Internal trace name for the invisible backdrop mesh used to size the 3D scene. */
     const BACKDROP_TRACE_NAME = '__scene_backdrop__';
+
+    /** @var array{x: float, y: float, z: float} Default initial camera position for the 3D scene. */
     const DEFAULT_CAMERA_EYE = ['x' => 1.25, 'y' => 1.25, 'z' => 1.25];
 
+    /** @var float Multiplier converting a 0-1 grade to the displayed 0-10 scale. */
     const GRADE_DISPLAY_SCALE = 10.0;
 
+    /** @var array<string, array{axis_title: string, higher_is_better: bool}> Cross-attempt comparison metric definitions. */
     const CROSS_ATTEMPT_METRICS = [
         'Grade' => ['axis_title' => 'Score (0-10)', 'higher_is_better' => true],
         'PRT Distance' => ['axis_title' => 'Type of Error (PRT distance)', 'higher_is_better' => false],
         'Tree Edit Distance' => ['axis_title' => 'Tree Edit Distance', 'higher_is_better' => false],
     ];
 
+    /** @var float Threshold below which a metric's change between attempts counts as "Flat" rather than a trend. */
     const FLAT_TOLERANCE = 1e-6;
 
+    /** @var string[] Display order for the cross-attempt trend classification. */
     const TREND_ORDER = ['Regressed', 'Flat', 'Improved'];
 
     /**
@@ -121,6 +149,7 @@ class solution_distance {
         return null;
     }
 
+    /** @var array<string, int|null> Memoized tree_edit_distance() results, keyed by submitted+correct answer pair. */
     private static array $tedcache = [];
 
     /**
@@ -137,7 +166,7 @@ class solution_distance {
         $correcttree = expression_tree::parse_expression($correcttext);
         $result = ($submittedtree === null || $correcttree === null)
             ? null
-            : tree_edit_distance::tree_edit_distance($submittedtree, $correcttree);
+            : tree_edit_distance::compute($submittedtree, $correcttree);
         self::$tedcache[$key] = $result;
         return $result;
     }
@@ -424,6 +453,8 @@ class solution_distance {
     }
 
     /**
+     * Shared 3D scatter builder for the PRT-distance and tree-edit-distance charts.
+     *
      * @param array[] $distancesubset
      */
     private static function build_distance_3d_figure(
@@ -526,9 +557,18 @@ class solution_distance {
             'layout' => [
                 'title' => ['text' => $title],
                 'scene' => [
-                    'xaxis' => array_merge(['title' => ['text' => 'Students'], 'range' => $studentsaxisrange, 'tickvals' => $xticks], $axiscommon),
-                    'yaxis' => array_merge(['title' => ['text' => 'Attempt'], 'range' => $yrange, 'tickvals' => $yticks], $axiscommon),
-                    'zaxis' => array_merge(['title' => ['text' => $ztitle], 'range' => $zrange, 'tickvals' => $zticks], $axiscommon),
+                    'xaxis' => array_merge(
+                        ['title' => ['text' => 'Students'], 'range' => $studentsaxisrange, 'tickvals' => $xticks],
+                        $axiscommon
+                    ),
+                    'yaxis' => array_merge(
+                        ['title' => ['text' => 'Attempt'], 'range' => $yrange, 'tickvals' => $yticks],
+                        $axiscommon
+                    ),
+                    'zaxis' => array_merge(
+                        ['title' => ['text' => $ztitle], 'range' => $zrange, 'tickvals' => $zticks],
+                        $axiscommon
+                    ),
                     'aspectmode' => 'cube',
                     'camera' => ['eye' => self::DEFAULT_CAMERA_EYE, 'up' => ['x' => 0, 'y' => 0, 'z' => 1]],
                 ],
@@ -548,6 +588,9 @@ class solution_distance {
         ];
     }
 
+    /**
+     * 3D scatter of PRT distance per attempt for one question/part.
+     */
     public static function build_prt_distance_3d_figure(array $responserows, string $question, int $partindex = 1): array {
         $subset = self::compute_prt_distance_series($responserows, $question, $partindex);
         return self::build_distance_3d_figure(
@@ -558,6 +601,9 @@ class solution_distance {
         );
     }
 
+    /**
+     * 3D scatter of tree edit distance per attempt for one question/part.
+     */
     public static function build_ted_distance_3d_figure(array $responserows, string $question, int $partindex = 1): array {
         $subset = self::compute_ted_distance_series($responserows, $question, $partindex);
         return self::build_distance_3d_figure(
@@ -572,7 +618,6 @@ class solution_distance {
     // Cross-Attempt Comparison: per student, per question, how did their
     // score/distance on their own retakes of this question change from
     // their first attempt to their last?
-    // -----------------------------------------------------------------
 
     /**
      * Per-attempt values of $metric (one of the keys in
@@ -723,7 +768,12 @@ class solution_distance {
      * @param array[] $comparison
      * @param array[] $trends
      */
-    public static function build_cross_attempt_figure(array $comparison, array $trends, string $metric, bool $colorblindmode): array {
+    public static function build_cross_attempt_figure(
+        array $comparison,
+        array $trends,
+        string $metric,
+        bool $colorblindmode
+    ): array {
         $axistitle = self::CROSS_ATTEMPT_METRICS[$metric]['axis_title'];
         $palette = chart_helpers::pass_fail_scale($colorblindmode);
         $trendcolor = array_combine(self::TREND_ORDER, $palette);

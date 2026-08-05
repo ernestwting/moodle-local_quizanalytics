@@ -30,63 +30,83 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Chart-building helpers shared across the ported analytics modules: palettes, label formatting, figure assembly.
+ */
 class chart_helpers {
-    // Named Plotly.express qualitative palettes actually used by the ported
-    // chart functions — exact RGB values pulled directly from plotly.express
-    // itself (px.colors.qualitative.*), not approximated.
+    /** @var string[] Plotly.express "Set2" qualitative palette (px.colors.qualitative.Set2), RGB values pulled directly from plotly.express. */
     const PALETTE_SET2 = [
         'rgb(102,194,165)', 'rgb(252,141,98)', 'rgb(141,160,203)', 'rgb(231,138,195)',
         'rgb(166,216,84)', 'rgb(255,217,47)', 'rgb(229,196,148)', 'rgb(179,179,179)',
     ];
+    /** @var string[] Plotly.express "Vivid" qualitative palette (px.colors.qualitative.Vivid). */
     const PALETTE_VIVID = [
         'rgb(229, 134, 6)', 'rgb(93, 105, 177)', 'rgb(82, 188, 163)', 'rgb(153, 201, 69)',
         'rgb(204, 97, 176)', 'rgb(36, 121, 108)', 'rgb(218, 165, 27)', 'rgb(47, 138, 196)',
         'rgb(118, 78, 159)', 'rgb(237, 100, 90)', 'rgb(165, 170, 153)',
     ];
+    /** @var string[] Plotly.express "Safe" qualitative palette (px.colors.qualitative.Safe) — colorblind-safe. */
     const PALETTE_SAFE = [
         'rgb(136, 204, 238)', 'rgb(204, 102, 119)', 'rgb(221, 204, 119)', 'rgb(17, 119, 51)',
         'rgb(51, 34, 136)', 'rgb(170, 68, 153)', 'rgb(68, 170, 153)', 'rgb(153, 153, 51)',
         'rgb(136, 34, 85)', 'rgb(102, 17, 0)', 'rgb(136, 136, 136)',
     ];
+    /** @var string[] Plotly.express "Bold" qualitative palette (px.colors.qualitative.Bold). */
     const PALETTE_BOLD = [
         'rgb(127, 60, 141)', 'rgb(17, 165, 121)', 'rgb(57, 105, 172)', 'rgb(242, 183, 1)',
         'rgb(231, 63, 116)', 'rgb(128, 186, 90)', 'rgb(230, 131, 16)', 'rgb(0, 134, 149)',
         'rgb(207, 28, 144)', 'rgb(249, 123, 114)', 'rgb(165, 170, 153)',
     ];
+    /** @var string[] Plotly's default qualitative palette (px.colors.qualitative.Plotly). */
     const PALETTE_PLOTLY = [
         '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
         '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52',
     ];
+    /** @var string[] Plotly.express "Set1" qualitative palette (px.colors.qualitative.Set1). */
     const PALETTE_SET1 = [
         'rgb(228,26,28)', 'rgb(55,126,184)', 'rgb(77,175,74)', 'rgb(152,78,163)', 'rgb(255,127,0)',
         'rgb(255,255,51)', 'rgb(166,86,40)', 'rgb(247,129,191)', 'rgb(153,153,153)',
     ];
 
+    /** @var string[] Diverging red/yellow/green pass-rate scale (low/mid/high). */
     const PASS_FAIL_SCALE_DEFAULT = ['#ef4444', '#fde68a', '#22c55e'];
-    // Blue/yellow/vermillion (Okabe-Ito) — red vs. green (the default scale's
-    // pass/fail encoding) is the one combination red-green colorblind users
-    // can't reliably tell apart.
+
+    /**
+     * Blue/yellow/vermillion (Okabe-Ito) — red vs. green (the default scale's
+     * pass/fail encoding) is the one combination red-green colorblind users
+     * can't reliably tell apart.
+     *
+     * @var string[]
+     */
     const PASS_FAIL_SCALE_COLORBLIND = ['#0072B2', '#F0E442', '#D55E00'];
 
-    // A handful of keys/columns come through as raw Python/PHP identifiers
-    // (student_count, mean_grade, invalid_rate, ...) since they double as
-    // array keys/column names throughout the analytics code — this turns
-    // those into presentable labels for chart legends and PDF table headers,
-    // matching sections-renderer.js's own humanizeLabel() (used for the
-    // on-screen table headers/summary) exactly, so a key reads identically
-    // wherever it's shown. Applying it to an already-nice string ("Valid %")
-    // is a no-op.
+    /**
+     * A handful of keys/columns come through as raw Python/PHP identifiers
+     * (student_count, mean_grade, invalid_rate, ...) since they double as
+     * array keys/column names throughout the analytics code — this turns
+     * those into presentable labels for chart legends and PDF table headers,
+     * matching sections-renderer.js's own humanizeLabel() (used for the
+     * on-screen table headers/summary) exactly, so a key reads identically
+     * wherever it's shown. Applying it to an already-nice string ("Valid %")
+     * is a no-op.
+     *
+     * @var array<string, string> lowercased word => override
+     */
     const LABEL_OVERRIDES = [
         'id' => 'ID', 'ids' => 'IDs', 'prt' => 'PRT', 'prts' => 'PRTs',
         'ted' => 'TED', 'stack' => 'STACK', 'url' => 'URL',
     ];
+
+    /** @var array<string, string> lowercased whole-key => override, checked before word-by-word LABEL_OVERRIDES. */
     const FULL_LABEL_OVERRIDES = [
         'attempt_idx' => 'Attempt Number',
         'completed_dt' => 'Completed On',
     ];
 
-    /** PHP port of sections-renderer.js's humanizeLabel() — see that
-     * function's own comment for why this exists. */
+    /**
+     * PHP port of sections-renderer.js's humanizeLabel() — see that
+     * function's own comment for why this exists.
+     */
     public static function humanize_label(string $key): string {
         if ($key === '') {
             return $key;
@@ -107,12 +127,16 @@ class chart_helpers {
         return implode(' ', $out);
     }
 
-    /** Categorical chart palette: $default normally, or the colorblind-safe Safe palette. */
+    /**
+     * Categorical chart palette: $default normally, or the colorblind-safe Safe palette.
+     */
     public static function qualitative_colors(bool $colorblindmode, array $default): array {
         return $colorblindmode ? self::PALETTE_SAFE : $default;
     }
 
-    /** Diverging red/yellow/green pass-rate scale, or its colorblind-safe equivalent. */
+    /**
+     * Diverging red/yellow/green pass-rate scale, or its colorblind-safe equivalent.
+     */
     public static function pass_fail_scale(bool $colorblindmode): array {
         return $colorblindmode ? self::PASS_FAIL_SCALE_COLORBLIND : self::PASS_FAIL_SCALE_DEFAULT;
     }
@@ -341,7 +365,11 @@ class chart_helpers {
         return "rgb({$r}, {$g}, {$b})";
     }
 
-    /** @return array{0: int, 1: int, 2: int} */
+    /**
+     * Parses a "#rrggbb" or "rgb(r, g, b)" color string into its [r, g, b] components.
+     *
+     * @return array{0: int, 1: int, 2: int}
+     */
     private static function parse_color(string $color): array {
         $color = trim($color);
         if ($color[0] === '#') {

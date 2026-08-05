@@ -24,7 +24,11 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Solution Process Visualization's network-feature bar charts (in/out/degree centrality per node).
+ */
 class spv_charts {
+    /** @var array{0: string, 1: string}[] [network-feature key, display label] pairs for the centrality bar charts. */
     const CENTRALITY_METRICS = [
         ['in_degree_centrality', 'In-Degree Centrality'],
         ['out_degree_centrality', 'Out-Degree Centrality'],

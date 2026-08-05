@@ -52,9 +52,9 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
+ * Adds an "Analytics" link to a course's own administration navigation.
+ *
  * @param navigation_node $navigation the course admin node
  * @param stdClass $course
  * @param context_course $context

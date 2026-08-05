@@ -38,7 +38,11 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Checkbox label <-> section id maps for the "which sections to include" PDF export forms.
+ */
 class pdf_sections {
+    /** @var array<string, string> checkbox label => section id, for the Question Analytics PDF. */
     const QUESTION = [
         '1. Question Summary' => 'summary',
         '2. Question Difficulty Analysis' => 'difficulty',
@@ -48,6 +52,7 @@ class pdf_sections {
         '6. Question Metrics' => 'metrics',
     ];
 
+    /** @var array<string, string> checkbox label => section id, for the Solution Process Visualization PDF. */
     const SOLUTIONPROCESS = [
         'Class-Wide Transition Graph' => 'transition-graph',
         'Network Features per Node' => 'network-features',
@@ -56,6 +61,7 @@ class pdf_sections {
         'Cross-Attempt Comparison' => 'cross-attempt',
     ];
 
+    /** @var array<string, string> checkbox label => section id, for the Quiz Analysis (course-wide) PDF. */
     const QUIZ = [
         '1. Merged List of Users and Files' => 'attempt-list',
         '2. Summary of Quiz Stats' => 'quiz-stats',
@@ -65,7 +71,11 @@ class pdf_sections {
         '6. Line Graph of Various Metrics' => 'trend',
     ];
 
-    /** @return string[] the checkbox label list for one PDF kind. */
+    /**
+     * The checkbox label list for one PDF kind.
+     *
+     * @return string[]
+     */
     public static function labels(string $kind): array {
         switch ($kind) {
             case 'question':
@@ -80,6 +90,8 @@ class pdf_sections {
     }
 
     /**
+     * Maps the checkbox labels the user ticked back to their section ids.
+     *
      * @param string[] $selectedlabels checkbox labels the user ticked
      * @return string[] the corresponding section ids, in canonical order
      *         (not necessarily the order $selectedlabels was posted in)

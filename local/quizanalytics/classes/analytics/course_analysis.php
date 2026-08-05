@@ -26,12 +26,25 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Assembles the Course-Wide Analytics {summary, sections} payload across every STACK quiz in a course.
+ */
 class course_analysis {
-    const DEFAULT_QUIZ_STATS = ['student_count', 'attempt_rate', 'mean_grade', 'grade_variance', 'mean_highest_grade', 'attempt_count'];
+    /** @var string[] Default "Summary of Quiz Stats" columns when the teacher hasn't picked any. */
+    const DEFAULT_QUIZ_STATS = [
+        'student_count', 'attempt_rate', 'mean_grade', 'grade_variance', 'mean_highest_grade', 'attempt_count',
+    ];
+
+    /** @var string[] Default "Line Graph of Various Metrics" series when the teacher hasn't picked any. */
     const DEFAULT_QUIZ_METRICS = ['student_count', 'attempt_rate', 'mean_grade', 'grade_variance'];
+
+    /** @var string Default grade type for the Attempts vs Grades scatter plot. */
     const DEFAULT_GRADE_TYPE = 'Average Grade';
 
     /**
+     * Builds the full Course-Wide Analytics payload: attempt list, quiz stats, boxplot,
+     * engagement, scatter, and metric-trend sections across every quiz passed in.
+     *
      * @param array<string, array[]> $quizzes quiz_name => records[]
      * @return array{summary: array, sections: array[]}
      */

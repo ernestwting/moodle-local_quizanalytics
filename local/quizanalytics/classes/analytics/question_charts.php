@@ -24,6 +24,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Question Analytics view's charts: difficulty ranking, response distribution, student performance matrix.
+ */
 class question_charts {
     /**
      * "Top Difficult Questions by Average Score" — hardest 10 questions;
@@ -54,7 +57,7 @@ class question_charts {
      * @param array[] $poolbrows
      */
     public static function build_score_boxplot_figure(array $poolbrows, bool $colorblindmode = false): array {
-        // px.box() keeps one y-entry per row (null for missing scaled_score) —
+        // Px.box() keeps one y-entry per row (null for missing scaled_score) —
         // Plotly ignores nulls in the box statistics, but the trace's y-array
         // still has one entry per underlying row, so this doesn't filter them
         // out (matching the Python oracle's actual trace length).
@@ -133,7 +136,7 @@ class question_charts {
      * @return array{students: string[], questions: string[], grid: array<string, array<string, float>>}
      */
     public static function build_student_matrix(array $poolbrows, array $questionorder): array {
-        // pivot_table(aggfunc="first"): first-seen (student, question) pair wins.
+        // Pivot_table(aggfunc="first"): first-seen (student, question) pair wins.
         $pivot = [];
         $studentsseen = [];
         foreach ($poolbrows as $r) {

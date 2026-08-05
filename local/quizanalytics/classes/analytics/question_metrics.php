@@ -24,6 +24,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Per-question participation (Pool A) and performance (Pool B) metrics, and the overall question summary.
+ */
 class question_metrics {
     /**
      * Per-question metrics using Pool A for participation and Pool B for
@@ -48,7 +51,7 @@ class question_metrics {
             $qa = array_values(array_filter($poola, fn($r) => $r['question'] === $q));
             $qb = array_values(array_filter($poolb, fn($r) => $r['question'] === $q));
 
-            // --- Pool A metrics (participation / usage) ---
+            // Pool A metrics (participation / usage).
             $attemptsa = count($qa);
             $studentsa = count(array_unique(array_map(fn($r) => $r['student_id'], $qa)));
             $invalidcounta = count(array_filter($qa, fn($r) => $r['response_status'] === 'invalid'));
@@ -58,7 +61,7 @@ class question_metrics {
             $percentvalida = max(0.0, (1.0 - $invalidratea - $blankratea) * 100.0);
             $reattemptsharea = $attemptsa > 0 ? max(0.0, (($attemptsa - $studentsa) / $attemptsa) * 100.0) : 0.0;
 
-            // --- Pool B metrics (performance / mastery) ---
+            // Pool B metrics (performance / mastery).
             $numstudentsb = count($qb);
             $correctcountb = count(array_filter($qb, fn($r) => $r['grade'] === 1.0));
             $facilityb = $numstudentsb > 0 ? $correctcountb / $numstudentsb : 0.0;

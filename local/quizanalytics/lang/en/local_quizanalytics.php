@@ -24,7 +24,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// pluginname is what shows up as the "Analytics" tab label in the course's
+// Pluginname is what shows up as the "Analytics" tab label in the course's
 // secondary navigation bar (Course | Settings | Participants | Grades |
 // Reports | More), as the link this plugin adds to each STACK quiz's own
 // settings/administration menu, and in Site Administration > Plugins >

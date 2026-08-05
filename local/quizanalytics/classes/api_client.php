@@ -17,7 +17,7 @@
 /**
  * Runs all the STACK/Maxima response analytics (see classes/analytics/) and
  * returns them in the {summary, sections} shape classes/output/
- * sections_renderer.php and js/vendor-shared/sections-renderer.js expect.
+ * sections_output_helper.php and js/vendor-shared/sections-renderer.js expect.
  *
  * Kept as its own class — rather than having index.php/pdf.php call
  * classes/analytics/*.php directly — so those two entry points don't need
@@ -29,8 +29,9 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
+/**
+ * Routes each on-screen/PDF view to the right classes/analytics/ entry point.
+ */
 class local_quizanalytics_api_client {
     /**
      * Question Analytics for a single quiz, for the per-quiz drill-down view.

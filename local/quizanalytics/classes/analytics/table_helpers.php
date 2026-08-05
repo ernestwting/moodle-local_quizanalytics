@@ -27,6 +27,9 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Minimal array-of-rows helpers (unique+sort, groupby) standing in for the pandas operations the ported modules need.
+ */
 class table_helpers {
     /**
      * The leading integer in a question label ("Q10" -> 10), matching every

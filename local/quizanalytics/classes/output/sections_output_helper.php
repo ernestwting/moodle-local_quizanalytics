@@ -34,7 +34,13 @@
  *
  * Namespaced, autoloaded class — no MOODLE_INTERNAL guard needed (that
  * convention is for classic directly-included files; this is loaded via
- * Moodle's PSR-4 autoloader from classes/output/sections_renderer.php).
+ * Moodle's PSR-4 autoloader from classes/output/sections_output_helper.php).
+ *
+ * Deliberately NOT named "*_renderer": these are plain static string-building
+ * helpers with no $this->page/$this->output (unlike a real Moodle renderer
+ * extending renderer_base) - naming it that way would trip moodle-cs's
+ * ForbiddenGlobalUseSniff, which assumes any "*_renderer" class is a genuine
+ * renderer and bans "global $PAGE" there in favor of $this->page.
  *
  * @package local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
@@ -43,7 +49,10 @@
 
 namespace local_quizanalytics\output;
 
-class sections_renderer {
+/**
+ * Static HTML-building helpers for the page scaffolding shared across every view.
+ */
+class sections_output_helper {
     /**
      * Echoes the empty container divs a payload gets rendered into.
      * Callers must use a unique $prefix per page when more than one

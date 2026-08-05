@@ -24,14 +24,20 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Class-wide PRT-node transition graph, per-node network features, and cross-attempt comparison.
+ */
 class prt_transitions {
-    // Green (few students traversed this edge) -> yellow -> red (many
-    // students traversed it); the colorblind variant swaps in the Okabe-Ito
-    // blue/yellow/vermillion triple used elsewhere in this app for
-    // red-green-unsafe scales.
+    /**
+     * Green (few students traversed this edge) -> yellow -> red (many
+     * students traversed it).
+     */
     const DEFAULT_TRAFFIC_SCALE = ['#22c55e', '#fde68a', '#ef4444'];
+
+    /** Okabe-Ito blue/yellow/vermillion triple standing in for the red-green-unsafe scale above. */
     const COLORBLIND_TRAFFIC_SCALE = ['#0072B2', '#F0E442', '#D55E00'];
 
+    /** Matches a PRT node id's trailing "-<index>-<T|F>" suffix, e.g. "prt1-2-T". */
     const NODE_RE = '/-(\d+)-([TF])$/';
 
     /**
@@ -138,6 +144,9 @@ class prt_transitions {
         return [1, 1000000, $node];
     }
 
+    /**
+     * Comparator for sorting node ids by node_sort_key().
+     */
     private static function node_cmp(string $a, string $b): int {
         return self::node_sort_key($a) <=> self::node_sort_key($b);
     }

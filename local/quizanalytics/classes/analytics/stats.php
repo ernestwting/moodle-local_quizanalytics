@@ -28,8 +28,13 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Small pandas-style descriptive statistics (mean, median, sample variance/stdev) skipping nulls.
+ */
 class stats {
     /**
+     * Drops null entries, matching pandas' skipna=True default before any aggregate.
+     *
      * @param array $values may contain null (skipped, matching pandas' skipna=True default)
      * @return float[]
      */
@@ -37,6 +42,9 @@ class stats {
         return array_values(array_filter($values, fn($v) => $v !== null));
     }
 
+    /**
+     * Arithmetic mean, skipping nulls; 0.0 for an empty/all-null input.
+     */
     public static function mean(array $values): float {
         $clean = self::non_null($values);
         if (empty($clean)) {
@@ -45,6 +53,9 @@ class stats {
         return array_sum($clean) / count($clean);
     }
 
+    /**
+     * Median, skipping nulls; 0.0 for an empty/all-null input.
+     */
     public static function median(array $values): float {
         $clean = self::non_null($values);
         $n = count($clean);
@@ -80,6 +91,9 @@ class stats {
         return $sumsq / ($n - 1);
     }
 
+    /**
+     * Sample standard deviation (sqrt of sample_variance()); 0.0 for fewer than 2 values.
+     */
     public static function sample_stdev(array $values): float {
         return sqrt(self::sample_variance($values));
     }

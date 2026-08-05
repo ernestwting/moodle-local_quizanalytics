@@ -30,8 +30,14 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Assembles the full Question Analytics {summary, sections, questions, audit} payload for one quiz.
+ */
 class question_analysis {
     /**
+     * Builds the full Question Analytics payload: difficulty, response distribution,
+     * student performance matrix, and question metrics sections, plus per-question drill-down.
+     *
      * @param array[] $records as returned by
      *        local_quizanalytics_data_fetcher::get_response_records_for_quiz()
      * @param string $quizname
@@ -58,7 +64,7 @@ class question_analysis {
         $sections = [];
         $questionorder = array_map(fn($r) => $r['question'], $questionmetricsrows);
 
-        // --- 2. Question Difficulty Analysis -------------------------------
+        // 2. Question Difficulty Analysis.
         // Adds scaled_score (grade * 10.0) to every Pool B row, matching the
         // Python route's pool_b_df["scaled_score"] = pool_b_df["grade"] * 10.0
         // — needed by the boxplot chart below.
@@ -87,7 +93,7 @@ class question_analysis {
             'charts' => $difficultycharts,
         ];
 
-        // --- 4. Question Response Distribution -----------------------------
+        // 4. Question Response Distribution.
         $hasprtdata = false;
         foreach ($responserows as $r) {
             if (trim((string) ($r['response_text'] ?? '')) !== '') {
@@ -137,7 +143,7 @@ class question_analysis {
             'charts' => $distributioncharts,
         ];
 
-        // --- 5. Student Performance Matrix ----------------------------------
+        // 5. Student Performance Matrix.
         $studentmatrixcharts = [];
         $studentmatrixtable = ['columns' => [], 'rows' => []];
         if (!empty($poolbscaled) && !empty($questionorder)) {
@@ -161,7 +167,7 @@ class question_analysis {
             'charts' => $studentmatrixcharts,
         ];
 
-        // --- 6. Question Metrics ---------------------------------------------
+        // 6. Question Metrics.
         $metricstable = ['columns' => [], 'rows' => []];
         if (!empty($questionmetricsrows) && !empty($difficultymetricsrows)) {
             $metricstable = question_charts::build_question_metrics_table($questionmetricsrows, $difficultymetricsrows);
@@ -172,7 +178,7 @@ class question_analysis {
             'table' => $metricstable,
         ];
 
-        // --- Per-question detail (drives the PHP question <select>) --------
+        // Per-question detail (drives the PHP question <select>).
         $questions = [];
         foreach ($questionorder as $q) {
             $detail = question_details::build_question_detail($poolb, $q);

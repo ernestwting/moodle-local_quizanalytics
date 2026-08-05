@@ -36,12 +36,12 @@
  */
 
 require_once(__DIR__ . '/../../config.php');
-require_once($CFG->libdir . '/filelib.php'); // send_file() lives here, not autoloaded for a lean entry point like this.
+require_once($CFG->libdir . '/filelib.php'); // Send_file() lives here, not autoloaded for a lean entry point like this.
 require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/api_client.php');
 
 $courseid = required_param('id', PARAM_INT);
-$kind     = required_param('kind', PARAM_ALPHA); // 'question' | 'solutionprocess' | 'quiz'
+$kind     = required_param('kind', PARAM_ALPHA); // Expected: question, solutionprocess, or quiz.
 
 $course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
 require_login($course);

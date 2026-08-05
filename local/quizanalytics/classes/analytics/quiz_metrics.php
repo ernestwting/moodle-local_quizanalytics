@@ -24,24 +24,40 @@
 
 namespace local_quizanalytics\analytics;
 
+/**
+ * Course-wide (cross-quiz) engagement, scatter, and metric-trend charts, and the quiz stats/attempt-list tables.
+ */
 class quiz_metrics {
-    // Okabe-Ito vermillion — a colorblind-safer stand-in for the default
-    // reddish mean-grade overlay line/marker color.
+    /** @var string Okabe-Ito vermillion — a colorblind-safer stand-in for DEFAULT_ACCENT. */
     const COLORBLIND_ACCENT = '#D55E00';
+
+    /** @var string Default reddish mean-grade overlay line/marker color. */
     const DEFAULT_ACCENT = '#FF474C';
 
+    /** @var string[] Column order for the per-attempt "Merged List of Users and Files" table. */
     const ATTEMPT_FRAME_COLUMNS = [
         'quiz_name', 'student_name', 'student_id', 'attempt_idx', 'overall_grade', 'completed_dt', 'started_on',
     ];
 
-    // Marker size range for the Attempts vs Grades scatter's density cue: a
-    // point on its own renders at the low end, a coordinate shared by
-    // several students renders larger, clamped so the largest overlaps
-    // don't balloon into a dominant bubble chart.
+    /**
+     * Marker size range for the Attempts vs Grades scatter's density cue: a
+     * point on its own renders at the low end, a coordinate shared by
+     * several students renders larger, clamped so the largest overlaps
+     * don't balloon into a dominant bubble chart.
+     *
+     * @var int
+     */
     const SCATTER_MARKER_SIZE_MIN = 12;
+
+    /** @var int Upper bound of the scatter marker size range - see SCATTER_MARKER_SIZE_MIN. */
     const SCATTER_MARKER_SIZE_MAX = 22;
+
+    /** @var int Overlap count at which the scatter marker size range saturates to SCATTER_MARKER_SIZE_MAX. */
     const SCATTER_MARKER_SIZE_SATURATES_AT = 6;
 
+    /**
+     * Splits a label into its word tokens (each token keeping its trailing separator/whitespace).
+     */
     private static function label_tokens(string $label): array {
         preg_match_all('/[^\s_-]+[\s_-]*/', $label, $m);
         return $m[0];
@@ -132,7 +148,7 @@ class quiz_metrics {
         }
 
         $byquiz = table_helpers::group_by($attemptframe, 'quiz_name');
-        // pandas groupby("quiz_name") iterates groups in *sorted* key order
+        // Pandas groupby("quiz_name") iterates groups in *sorted* key order
         // by default (sort=True) — every aggregation below derives from a
         // groupby, so the output row order needs the same plain string sort
         // (matching prt_analysis::compute_prt_pass_rates()'s identical note).
@@ -289,14 +305,14 @@ class quiz_metrics {
             return null;
         }
 
-        // attempt_count per (quiz_name, student_id).
+        // Attempt_count per (quiz_name, student_id).
         $attemptcounts = [];
         foreach ($attemptframe as $r) {
             $key = $r['quiz_name'] . '|' . $r['student_id'];
             $attemptcounts[$key] = ($attemptcounts[$key] ?? 0) + 1;
         }
 
-        // grade_data per (quiz_name, student_id), per $gradetype.
+        // Grade_data per (quiz_name, student_id), per $gradetype.
         $gradesbykey = [];
         foreach ($attemptframe as $r) {
             $key = $r['quiz_name'] . '|' . $r['student_id'];
@@ -349,10 +365,11 @@ class quiz_metrics {
             $gkey = "{$r['quiz_name']}\x00{$r['attempt_count']}\x00{$r['overall_grade']}";
             $size = $groupsizes[$gkey];
             $saturation = (min($size, self::SCATTER_MARKER_SIZE_SATURATES_AT) - 1) / (self::SCATTER_MARKER_SIZE_SATURATES_AT - 1);
-            $merged[$i]['_marker_size'] = self::SCATTER_MARKER_SIZE_MIN + $saturation * (self::SCATTER_MARKER_SIZE_MAX - self::SCATTER_MARKER_SIZE_MIN);
+            $merged[$i]['_marker_size'] = self::SCATTER_MARKER_SIZE_MIN
+                + $saturation * (self::SCATTER_MARKER_SIZE_MAX - self::SCATTER_MARKER_SIZE_MIN);
         }
 
-        // $merged's per-quiz trace order needs to match Python's: both
+        // Merged's per-quiz trace order needs to match Python's: both
         // attempt_count and grade_data come from a groupby(["quiz_name",
         // "student_id"]) there, which sorts by quiz_name first (sort=True
         // default) — a plain px.scatter() call over already-grouped-and-
@@ -407,6 +424,9 @@ class quiz_metrics {
         ];
     }
 
+    /**
+     * Pearson correlation coefficient between $xs and $ys; NAN if either has zero variance.
+     */
     private static function pearson_correlation(array $xs, array $ys): float {
         $n = count($xs);
         if ($n < 2) {
@@ -431,6 +451,8 @@ class quiz_metrics {
     }
 
     /**
+     * Per-quiz values for each selected metric, in quiz_name order, for the line-graph trend chart.
+     *
      * @param array[] $attemptframe
      * @param string[] $selectedmetrics
      * @return array[] one row per quiz_name
@@ -469,6 +491,8 @@ class quiz_metrics {
     }
 
     /**
+     * One line trace per selected metric across quizzes, for "Line Graph of Various Metrics".
+     *
      * @param array[] $trenddata one row per quiz_name, metric fields as
      *        selected by build_metric_trend_data()
      */
@@ -608,7 +632,11 @@ class quiz_metrics {
         return [stats::mean($datesnumeric), $covariance];
     }
 
-    /** @param float[] $datapoints */
+    /**
+     * Gaussian kernel density estimate at $x given $datapoints and a precomputed bandwidth $covariance.
+     *
+     * @param float[] $datapoints
+     */
     private static function kde_density(float $x, array $datapoints, float $covariance): float {
         $n = count($datapoints);
         $norm = 1.0 / sqrt(2 * M_PI * $covariance);
@@ -620,8 +648,10 @@ class quiz_metrics {
         return $sum / $n;
     }
 
-    /** Days since the Unix epoch (any fixed epoch works: only relative
-     * differences between values matter for KDE bandwidth/shape). */
+    /**
+     * Days since the Unix epoch (any fixed epoch works: only relative
+     * differences between values matter for KDE bandwidth/shape).
+     */
     private static function date_to_days(string $datetimestr): float {
         $ts = strtotime($datetimestr);
         return $ts !== false ? $ts / 86400.0 : 0.0;
