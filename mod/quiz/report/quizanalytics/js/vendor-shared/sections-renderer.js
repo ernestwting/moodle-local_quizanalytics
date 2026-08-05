@@ -225,7 +225,10 @@
             item.innerHTML = note;
             list.appendChild(item);
         });
-        root.appendChild(list);
+        // Same scrollable-viewport treatment as long data tables (e.g. a
+        // grade-mismatch audit can list one line per affected student) —
+        // reuses wrapScrollable's row-count threshold, one <li> per row.
+        root.appendChild(wrapScrollable(list, notes.length));
     }
 
     // Turns each row of the Cross-Attempt Comparison table into a link that
