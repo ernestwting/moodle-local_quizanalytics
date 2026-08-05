@@ -105,15 +105,20 @@ class local_quizanalytics_api_client {
         bool $colorblindmode = false,
         ?string $gradetype = null
     ): ?array {
-        $payload = [
-            'course_name'     => $coursename,
-            'quizzes'         => $quizzes,
-            'colorblind_mode' => $colorblindmode,
-        ];
-        if ($gradetype !== null) {
-            $payload['grade_type'] = $gradetype;
+        try {
+            return \local_quizanalytics\analytics\course_analysis::build_analysis(
+                $coursename,
+                $quizzes,
+                $colorblindmode,
+                null,
+                null,
+                $gradetype ?? \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE
+            );
+        } catch (\Throwable $e) {
+            debugging('local_quizanalytics: error building course analysis: ' . $e->getMessage(),
+                DEBUG_DEVELOPER);
+            return null;
         }
-        return $this->post('/analyze-course', $payload);
     }
 
     /**

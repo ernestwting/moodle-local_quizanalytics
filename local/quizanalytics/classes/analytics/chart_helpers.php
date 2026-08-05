@@ -32,6 +32,19 @@ class chart_helpers {
         'rgb(51, 34, 136)', 'rgb(170, 68, 153)', 'rgb(68, 170, 153)', 'rgb(153, 153, 51)',
         'rgb(136, 34, 85)', 'rgb(102, 17, 0)', 'rgb(136, 136, 136)',
     ];
+    const PALETTE_BOLD = [
+        'rgb(127, 60, 141)', 'rgb(17, 165, 121)', 'rgb(57, 105, 172)', 'rgb(242, 183, 1)',
+        'rgb(231, 63, 116)', 'rgb(128, 186, 90)', 'rgb(230, 131, 16)', 'rgb(0, 134, 149)',
+        'rgb(207, 28, 144)', 'rgb(249, 123, 114)', 'rgb(165, 170, 153)',
+    ];
+    const PALETTE_PLOTLY = [
+        '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
+        '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52',
+    ];
+    const PALETTE_SET1 = [
+        'rgb(228,26,28)', 'rgb(55,126,184)', 'rgb(77,175,74)', 'rgb(152,78,163)', 'rgb(255,127,0)',
+        'rgb(255,255,51)', 'rgb(166,86,40)', 'rgb(247,129,191)', 'rgb(153,153,153)',
+    ];
 
     const PASS_FAIL_SCALE_DEFAULT = ['#ef4444', '#fde68a', '#22c55e'];
     // Blue/yellow/vermillion (Okabe-Ito) — red vs. green (the default scale's
