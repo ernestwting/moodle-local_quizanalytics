@@ -125,10 +125,13 @@ class local_quizanalytics_api_client {
      * @return array|null
      */
     public function solution_process_meta(string $quizname, array $records): ?array {
-        return $this->post('/solution-process/meta', [
-            'quiz_name' => $quizname,
-            'records'   => $records,
-        ]);
+        try {
+            return \local_quizanalytics\analytics\solution_process_analysis::build_meta($records, $quizname);
+        } catch (\Throwable $e) {
+            debugging('local_quizanalytics: error building solution process meta: ' . $e->getMessage(),
+                DEBUG_DEVELOPER);
+            return null;
+        }
     }
 
     /**
@@ -151,14 +154,15 @@ class local_quizanalytics_api_client {
         ?string $studentid = null,
         bool $colorblindmode = false
     ): ?array {
-        return $this->post('/solution-process', [
-            'quiz_name'       => $quizname,
-            'records'         => $records,
-            'question'        => $question,
-            'part_index'      => $partindex,
-            'student_id'      => $studentid,
-            'colorblind_mode' => $colorblindmode,
-        ]);
+        try {
+            return \local_quizanalytics\analytics\solution_process_analysis::build_analysis(
+                $records, $quizname, $question, $partindex, $studentid, $colorblindmode
+            );
+        } catch (\Throwable $e) {
+            debugging('local_quizanalytics: error building solution process analysis: ' . $e->getMessage(),
+                DEBUG_DEVELOPER);
+            return null;
+        }
     }
 
     /**

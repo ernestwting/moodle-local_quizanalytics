@@ -228,6 +228,50 @@ class chart_helpers {
     }
 
     /**
+     * px.colors.sample_colorscale(colors, [t])[0] for a plain list of
+     * evenly-spaced color anchors: linear RGB interpolation between the two
+     * anchors bracketing $t (0.0-1.0). Accepts '#rrggbb' or 'rgb(r,g,b)'
+     * anchor strings, returns an 'rgb(r,g,b)' string (Plotly.js accepts
+     * either format, so this doesn't need to preserve the input format).
+     *
+     * @param string[] $colors
+     */
+    public static function sample_colorscale_color(array $colors, float $t): string {
+        $n = count($colors);
+        if ($n === 1) {
+            return $colors[0];
+        }
+        $t = max(0.0, min(1.0, $t));
+        $scaled = $t * ($n - 1);
+        $i = (int) floor($scaled);
+        if ($i >= $n - 1) {
+            return $colors[$n - 1];
+        }
+        $frac = $scaled - $i;
+        [$r1, $g1, $b1] = self::parse_color($colors[$i]);
+        [$r2, $g2, $b2] = self::parse_color($colors[$i + 1]);
+        $r = (int) round($r1 + ($r2 - $r1) * $frac);
+        $g = (int) round($g1 + ($g2 - $g1) * $frac);
+        $b = (int) round($b1 + ($b2 - $b1) * $frac);
+        return "rgb({$r}, {$g}, {$b})";
+    }
+
+    /** @return array{0: int, 1: int, 2: int} */
+    private static function parse_color(string $color): array {
+        $color = trim($color);
+        if ($color[0] === '#') {
+            $hex = substr($color, 1);
+            return [
+                hexdec(substr($hex, 0, 2)),
+                hexdec(substr($hex, 2, 2)),
+                hexdec(substr($hex, 4, 2)),
+            ];
+        }
+        preg_match('/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/', $color, $m);
+        return [(int) $m[1], (int) $m[2], (int) $m[3]];
+    }
+
+    /**
      * Spreads a list of colors evenly across the [0,1] colorscale domain,
      * e.g. 3 colors -> [[0,c1],[0.5,c2],[1,c3]] — the array form of a
      * Plotly.js colorscale.
