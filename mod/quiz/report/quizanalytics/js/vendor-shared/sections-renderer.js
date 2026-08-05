@@ -316,6 +316,12 @@
         heading.textContent = '3. Question Item Details & Error Drill-Down';
         wrapper.appendChild(heading);
 
+        var caption = document.createElement('p');
+        caption.textContent = 'The question as students see it, the correct answer for ' +
+            'each part, and — for students who didn’t get full credit on their best ' +
+            'attempt — what they actually submitted.';
+        wrapper.appendChild(caption);
+
         var selectId = prefix + '-question-select-' + (questionBlockCounter++);
         var label = document.createElement('label');
         label.setAttribute('for', selectId);

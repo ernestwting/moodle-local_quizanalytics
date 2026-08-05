@@ -38,6 +38,28 @@ def split_stack_debug_dump(text_str: str) -> tuple[str, str]:
     return text_str[:match.start()].strip(), text_str[match.start():].strip()
 
 
+# [[input:ansN]]/[[validation:ansN]] are STACK's own castext markup for where a
+# live attempt's answer box/validation feedback go — meaningful when rendering a
+# real question_attempt (there's an actual <input> to insert there), meaningless
+# in a report with no form to fill in, where they'd otherwise show up as literal
+# bracket text sitting in the middle of the question. [[feedback:prtN]] is the
+# equivalent for a PRT's feedback slot.
+_STACK_INPUT_VALIDATION_RE = re.compile(r"\[\[input:\w+\]\]\s*(?:\[\[validation:\w+\]\])?")
+_STACK_FEEDBACK_RE = re.compile(r"\[\[feedback:\w+\]\]")
+
+
+def strip_stack_input_placeholders(text_str: str) -> str:
+    """Replaces STACK's [[input:...]]/[[validation:...]] answer-box markup with a
+    plain "(student's answer)" marker, and drops [[feedback:...]] entirely — for
+    displaying question text in a report, where there's no live form to render
+    those slots into."""
+    if not text_str:
+        return text_str
+    cleaned = _STACK_INPUT_VALIDATION_RE.sub("<em>(student's answer)</em>", text_str)
+    cleaned = _STACK_FEEDBACK_RE.sub("", cleaned)
+    return cleaned
+
+
 def clean_moodle_latex(text_str: str, is_header: bool = False) -> str:
     """Normalize raw STACK/Moodle LaTeX so st.markdown renders it as math instead of
     literal escape sequences or broken `$$` collisions.

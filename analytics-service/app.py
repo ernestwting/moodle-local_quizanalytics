@@ -46,7 +46,11 @@ from analytics.question_charts import (
     build_question_metrics_table,
 )
 from analytics.prt_analysis import build_prt_pass_heatmap, build_prt_pass_heatmap_figure
-from analytics.latex_utils import extract_stack_answer_latex, split_stack_debug_dump
+from analytics.latex_utils import (
+    extract_stack_answer_latex,
+    split_stack_debug_dump,
+    strip_stack_input_placeholders,
+)
 from analytics.validation import audit_question_data
 from analytics.quiz_metrics import (
     build_quiz_attempt_frame,
@@ -380,7 +384,17 @@ def analyze(req: AnalyzeRequest) -> dict[str, Any]:
     for q in question_order:
         detail = build_question_detail(pool_b_df, q)
         clean_text, _dump = split_stack_debug_dump(detail["question_text"])
-        clean_answer, _ = split_stack_debug_dump(detail["right_answer_text"])
+        # [[input:...]]/[[validation:...]] read as noise with no live form to
+        # fill them in — see strip_stack_input_placeholders()'s own docstring.
+        clean_text = strip_stack_input_placeholders(clean_text)
+        # extract_stack_answer_latex(), not split_stack_debug_dump(): STACK's
+        # right-answer summary is a "Seed: ...; ans1: 0 [score]; ans2: -2
+        # [score]; prt1: # = 1 | prt1-1-T; ..." dump, not prose with a dump
+        # appended — split_stack_debug_dump() (meant for the latter) left the
+        # whole diagnostic-noise string untouched. extract_stack_answer_latex()
+        # keeps just the "ansN: <value>" parts, same as the error drill-down
+        # table's Right Answer column two lines below.
+        clean_answer = extract_stack_answer_latex(detail["right_answer_text"])
 
         drilldown = build_error_drilldown(pool_b_df, q)
         if not drilldown.empty:
