@@ -10,6 +10,12 @@ Nothing here ever sends data to the public internet: the backend is a local
 microservice the plugin talks to over `127.0.0.1` (or a private network),
 and student response data never leaves that boundary.
 
+**This isn't a one-click Marketplace install** — the backend service has to
+be deployed separately, by whoever administers the Moodle server, on that
+same server or private network. See [INSTALL.md](INSTALL.md)'s "Before you
+start" section before going further if you don't have that kind of server
+access.
+
 ## What's included
 
 | Component | Path | What it does |

@@ -1,5 +1,36 @@
 # Installing STACK Quiz Analytics — full stack
 
+## Before you start: is this right for your Moodle site?
+
+This is **not** a one-click Marketplace install. Installing `local_quizanalytics`
+only gets you the PHP side — it also requires a second, always-running
+**Python service** (`analytics-service/`) that does the actual analysis. That
+service is not a Moodle plugin and is not distributed through the Plugins
+directory; your own server admin has to deploy and keep it running.
+
+That means:
+
+- **You need shell/root access to the server Moodle runs on** (or a private
+  network you control that Moodle can reach) — enough to run a Docker
+  container or a systemd service. If your Moodle is hosted somewhere you
+  don't have that kind of access (a shared host, MoodleCloud, a managed
+  hosting plan where you only get the web UI), you cannot deploy this
+  plugin's backend, full stop — there's nowhere to put it.
+- **The privacy design only holds if you actually put it on the same server
+  (or the same private network) as Moodle.** Nothing in the plugin *enforces*
+  this — the `apibaseurl` setting will happily accept a public address if you
+  type one in. The whole point of this architecture (student response data
+  never leaving infrastructure your institution controls) depends on whoever
+  installs it following Part 1 below correctly, not on the code stopping a
+  misconfiguration.
+- If that's not you — e.g. you're a single teacher on a hosted Moodle with no
+  server access — this plugin isn't currently usable for you. It's built for
+  an institution (or an admin) that already runs its own Moodle server.
+
+If none of that is a blocker, continue below.
+
+---
+
 Two pieces, installed in this order — the plugin depends on the microservice
 being reachable, so it's easiest to bring the service up first, confirm it
 with `curl`, then install the plugin:
