@@ -83,7 +83,7 @@ class latex_utils {
      * docstring for the full explanation of the adjacent-inline-run collision this
      * guards against.
      */
-    public static function clean_moodle_latex(string $text, bool $is_header = false): string {
+    public static function clean_moodle_latex(string $text, bool $isheader = false): string {
         if ($text === '') {
             return $text;
         }
@@ -101,7 +101,7 @@ class latex_utils {
         // literal "$$" adjacent to a backreference are easy to get subtly wrong
         // (verified the hard way while writing this) — a callback's return value
         // is used verbatim, with no special-character reinterpretation at all.
-        if ($is_header) {
+        if ($isheader) {
             $cleaned = preg_replace_callback('/\\\\\[(.*?)\\\\\]/s', fn($m) => '$' . $m[1] . '$', $cleaned);
         } else {
             $cleaned = preg_replace_callback('/\\\\\[(.*?)\\\\\]/s', fn($m) => '$$' . $m[1] . '$$', $cleaned);
@@ -116,7 +116,7 @@ class latex_utils {
         // is exactly 2 `$` and must survive this — only collapse runs of 3+.
         $cleaned = preg_replace('/(?:\$\s*){3,}/', '$$', $cleaned);
 
-        if ($is_header) {
+        if ($isheader) {
             // Headers can't render multi-line display math or contain raw newlines.
             $cleaned = str_replace('$$', '$', $cleaned);
             $cleaned = str_replace("\n", ' ', $cleaned);
@@ -476,14 +476,14 @@ class latex_utils {
      * Falls back to clean_moodle_latex() on the whole string when no `ansN:`
      * pattern is found, e.g. a plain (non-STACK) right-answer value.
      */
-    public static function extract_stack_answer_latex(string $raw_text): string {
-        if ($raw_text === '') {
-            return $raw_text;
+    public static function extract_stack_answer_latex(string $rawtext): string {
+        if ($rawtext === '') {
+            return $rawtext;
         }
 
         $pattern = '/ans(\d+):\s*(.*?)\s*\[(score|valid|invalid)\]/';
-        if (!preg_match_all($pattern, $raw_text, $matches, PREG_SET_ORDER)) {
-            return self::clean_moodle_latex($raw_text);
+        if (!preg_match_all($pattern, $rawtext, $matches, PREG_SET_ORDER)) {
+            return self::clean_moodle_latex($rawtext);
         }
 
         $parts = [];

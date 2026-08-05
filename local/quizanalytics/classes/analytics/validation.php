@@ -30,17 +30,17 @@ class validation {
      * the dashboard, and cross-check each attempt's calculated average
      * against Moodle's own recorded overall grade.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array{checks: array, issues: string[], is_valid: bool}
      */
-    public static function audit_question_data(array $response_rows): array {
-        $total_attempts = count(array_unique(array_map(fn($r) => $r['attempt_idx'], $response_rows)));
-        $question_count = count(array_unique(array_map(fn($r) => $r['question'], $response_rows)));
+    public static function audit_question_data(array $responserows): array {
+        $totalattempts = count(array_unique(array_map(fn($r) => $r['attempt_idx'], $responserows)));
+        $questioncount = count(array_unique(array_map(fn($r) => $r['question'], $responserows)));
 
         $checks = [
-            'row_count' => $total_attempts,
-            'question_count' => $question_count,
-            'has_question_column' => $question_count > 0 || !empty($response_rows),
+            'row_count' => $totalattempts,
+            'question_count' => $questioncount,
+            'has_question_column' => $questioncount > 0 || !empty($responserows),
             'has_grade_column' => true,
             'has_max_grade_column' => true,
             'has_response_status_column' => true,
@@ -48,15 +48,15 @@ class validation {
         ];
 
         $issues = [];
-        if ($total_attempts === 0) {
+        if ($totalattempts === 0) {
             $issues[] = 'No response rows were parsed from the uploaded export.';
         }
 
-        if ($total_attempts > 0) {
-            $checks['syntax_error_count'] = count(array_filter($response_rows, fn($r) => $r['response_status'] === 'invalid'));
+        if ($totalattempts > 0) {
+            $checks['syntax_error_count'] = count(array_filter($responserows, fn($r) => $r['response_status'] === 'invalid'));
             $checks['invalid_count'] = $checks['syntax_error_count'];
-            $checks['blank_count'] = count(array_filter($response_rows, fn($r) => $r['response_status'] === 'blank'));
-            $checks['ungraded_count'] = count(array_filter($response_rows, fn($r) => $r['response_status'] === 'ungraded'));
+            $checks['blank_count'] = count(array_filter($responserows, fn($r) => $r['response_status'] === 'blank'));
+            $checks['ungraded_count'] = count(array_filter($responserows, fn($r) => $r['response_status'] === 'ungraded'));
         }
 
         // Automated grade verification / cross-check: each attempt's
@@ -64,45 +64,45 @@ class validation {
         // ungraded/null ones, scaled to 0-10) against Moodle's own recorded
         // overall_grade for that same attempt.
         $mismatches = [];
-        $has_ungraded_rows = [];
-        if (!empty($response_rows)) {
-            $by_attempt = table_helpers::group_by($response_rows, 'attempt_idx');
+        $hasungradedrows = [];
+        if (!empty($responserows)) {
+            $byattempt = table_helpers::group_by($responserows, 'attempt_idx');
             // Iterate in ascending attempt_idx order, matching pandas
             // groupby()'s default sorted-key iteration.
-            uksort($by_attempt, fn($a, $b) => ((int) $a) <=> ((int) $b));
+            uksort($byattempt, fn($a, $b) => ((int) $a) <=> ((int) $b));
 
-            foreach ($by_attempt as $attempt_id => $group) {
+            foreach ($byattempt as $attemptid => $group) {
                 $grades = array_map(fn($r) => $r['grade'], $group);
-                $calculated_grade = 10.0 * stats::mean($grades);
-                $actual_grade = (float) $group[0]['overall_grade'];
-                if (abs($calculated_grade - $actual_grade) >= 0.01) {
-                    $student_name = $group[0]['student_name'];
+                $calculatedgrade = 10.0 * stats::mean($grades);
+                $actualgrade = (float) $group[0]['overall_grade'];
+                if (abs($calculatedgrade - $actualgrade) >= 0.01) {
+                    $studentname = $group[0]['student_name'];
                     $mismatches[] = sprintf(
                         'Student: %s (Row %s) - Calculated=%.2f, Moodle=%.2f',
-                        $student_name,
-                        $attempt_id,
-                        $calculated_grade,
-                        $actual_grade
+                        $studentname,
+                        $attemptid,
+                        $calculatedgrade,
+                        $actualgrade
                     );
                     // grade is null (excluded from the mean above) for any
                     // question left in a "validated, not (re-)graded" state —
                     // see parser::build_response_rows(). A mismatch on a row
                     // that has one of these has a known, specific cause, not
                     // just the generic "manual override" guess.
-                    $has_ungraded = false;
+                    $hasungraded = false;
                     foreach ($group as $r) {
                         if ($r['response_status'] === 'ungraded') {
-                            $has_ungraded = true;
+                            $hasungraded = true;
                             break;
                         }
                     }
-                    $has_ungraded_rows[] = $has_ungraded;
+                    $hasungradedrows[] = $hasungraded;
                 }
             }
         }
 
         if (!empty($mismatches)) {
-            if (in_array(true, $has_ungraded_rows, true)) {
+            if (in_array(true, $hasungradedrows, true)) {
                 $issues[] = "Grade validation notice: Mismatches between calculated question-average scores and " .
                     "Moodle's overall attempt grades were found. Some are on rows with one or more " .
                     "'ungraded' responses (STACK re-validated an answer after it was already scored, so " .

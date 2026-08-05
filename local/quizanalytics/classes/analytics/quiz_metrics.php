@@ -48,12 +48,12 @@ class quiz_metrics {
     }
 
     /**
-     * Wrap a long quiz name onto up to $max_lines short horizontal lines
+     * Wrap a long quiz name onto up to $maxlines short horizontal lines
      * (joined with <br>) instead of leaving Plotly to render it as one long
      * diagonal tick label that eats most of the chart's vertical space.
      * Tokenizes on underscores and hyphens as well as whitespace.
      */
-    public static function wrap_category_label(string $label, int $max_chars = 22, int $max_lines = 2): string {
+    public static function wrap_category_label(string $label, int $maxchars = 22, int $maxlines = 2): string {
         $tokens = self::label_tokens($label);
         if (empty($tokens)) {
             return $label;
@@ -61,15 +61,15 @@ class quiz_metrics {
         $lines = [];
         $current = '';
         $remaining = $tokens;
-        while (!empty($remaining) && count($lines) < $max_lines) {
+        while (!empty($remaining) && count($lines) < $maxlines) {
             $token = $remaining[0];
-            if ($current === '' && strlen($token) > $max_chars) {
-                $lines[] = rtrim(substr($token, 0, $max_chars - 1)) . "\u{2026}";
+            if ($current === '' && strlen($token) > $maxchars) {
+                $lines[] = rtrim(substr($token, 0, $maxchars - 1)) . "\u{2026}";
                 array_shift($remaining);
                 continue;
             }
             $candidate = $current . $token;
-            if (strlen($candidate) > $max_chars && $current !== '') {
+            if (strlen($candidate) > $maxchars && $current !== '') {
                 $lines[] = rtrim($current);
                 $current = '';
                 continue;
@@ -77,14 +77,14 @@ class quiz_metrics {
             $current = $candidate;
             array_shift($remaining);
         }
-        if ($current !== '' && count($lines) < $max_lines) {
+        if ($current !== '' && count($lines) < $maxlines) {
             $lines[] = rtrim($current);
         }
         if (!empty($remaining) && !(!empty($lines) && str_ends_with(end($lines), "\u{2026}"))) {
             if (!empty($lines)) {
                 $lines[count($lines) - 1] = rtrim($lines[count($lines) - 1]) . "\u{2026}";
             } else {
-                $lines = [rtrim(substr($current, 0, $max_chars)) . "\u{2026}"];
+                $lines = [rtrim(substr($current, 0, $maxchars)) . "\u{2026}"];
             }
         }
         return implode('<br>', $lines);
@@ -96,13 +96,13 @@ class quiz_metrics {
      * rather than attempt_idx alone, since attempt_idx is only assigned
      * uniquely within a single quiz.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[] one row per attempt, ATTEMPT_FRAME_COLUMNS fields only
      */
-    public static function build_quiz_attempt_frame(array $response_rows): array {
+    public static function build_quiz_attempt_frame(array $responserows): array {
         $seen = [];
         $out = [];
-        foreach ($response_rows as $row) {
+        foreach ($responserows as $row) {
             $key = $row['quiz_name'] . '|' . $row['attempt_idx'];
             if (isset($seen[$key])) {
                 continue;
@@ -122,79 +122,79 @@ class quiz_metrics {
      * quiz_name and reading overall_grade instead of a locally normalized
      * grade.
      *
-     * @param array[] $attempt_frame
-     * @param string[] $selected_stats
+     * @param array[] $attemptframe
+     * @param string[] $selectedstats
      * @return array[] one row per quiz_name
      */
-    public static function compute_quiz_stats(array $attempt_frame, array $selected_stats): array {
-        if (empty($attempt_frame)) {
+    public static function compute_quiz_stats(array $attemptframe, array $selectedstats): array {
+        if (empty($attemptframe)) {
             return [];
         }
 
-        $by_quiz = table_helpers::group_by($attempt_frame, 'quiz_name');
+        $byquiz = table_helpers::group_by($attemptframe, 'quiz_name');
         // pandas groupby("quiz_name") iterates groups in *sorted* key order
         // by default (sort=True) — every aggregation below derives from a
         // groupby, so the output row order needs the same plain string sort
         // (matching prt_analysis::compute_prt_pass_rates()'s identical note).
-        $quiz_names = array_keys($by_quiz);
-        sort($quiz_names);
+        $quiznames = array_keys($byquiz);
+        sort($quiznames);
 
-        $stats_by_quiz = array_fill_keys($quiz_names, []);
+        $statsbyquiz = array_fill_keys($quiznames, []);
 
-        if (in_array('student_count', $selected_stats, true)) {
-            foreach ($by_quiz as $quiz => $rows) {
-                $stats_by_quiz[$quiz]['student_count'] = count(array_unique(array_map(fn($r) => $r['student_id'], $rows)));
+        if (in_array('student_count', $selectedstats, true)) {
+            foreach ($byquiz as $quiz => $rows) {
+                $statsbyquiz[$quiz]['student_count'] = count(array_unique(array_map(fn($r) => $r['student_id'], $rows)));
             }
         }
 
-        if (in_array('mean_grade', $selected_stats, true) || in_array('grade_variance', $selected_stats, true)) {
-            foreach ($by_quiz as $quiz => $rows) {
+        if (in_array('mean_grade', $selectedstats, true) || in_array('grade_variance', $selectedstats, true)) {
+            foreach ($byquiz as $quiz => $rows) {
                 $grades = array_map(fn($r) => $r['overall_grade'], $rows);
-                if (in_array('mean_grade', $selected_stats, true)) {
-                    $stats_by_quiz[$quiz]['mean_grade'] = stats::mean($grades);
+                if (in_array('mean_grade', $selectedstats, true)) {
+                    $statsbyquiz[$quiz]['mean_grade'] = stats::mean($grades);
                 }
-                if (in_array('grade_variance', $selected_stats, true)) {
-                    $stats_by_quiz[$quiz]['grade_variance'] = stats::sample_variance($grades);
+                if (in_array('grade_variance', $selectedstats, true)) {
+                    $statsbyquiz[$quiz]['grade_variance'] = stats::sample_variance($grades);
                 }
             }
         }
 
-        if (in_array('mean_highest_grade', $selected_stats, true)) {
-            foreach ($by_quiz as $quiz => $rows) {
-                $max_by_student = [];
+        if (in_array('mean_highest_grade', $selectedstats, true)) {
+            foreach ($byquiz as $quiz => $rows) {
+                $maxbystudent = [];
                 foreach ($rows as $r) {
                     $sid = $r['student_id'];
-                    $max_by_student[$sid] = isset($max_by_student[$sid])
-                        ? max($max_by_student[$sid], $r['overall_grade'])
+                    $maxbystudent[$sid] = isset($maxbystudent[$sid])
+                        ? max($maxbystudent[$sid], $r['overall_grade'])
                         : $r['overall_grade'];
                 }
-                $stats_by_quiz[$quiz]['mean_highest_grade'] = stats::mean(array_values($max_by_student));
+                $statsbyquiz[$quiz]['mean_highest_grade'] = stats::mean(array_values($maxbystudent));
             }
         }
 
-        if (in_array('attempt_count', $selected_stats, true)) {
-            foreach ($by_quiz as $quiz => $rows) {
-                $stats_by_quiz[$quiz]['attempt_count'] = count($rows);
+        if (in_array('attempt_count', $selectedstats, true)) {
+            foreach ($byquiz as $quiz => $rows) {
+                $statsbyquiz[$quiz]['attempt_count'] = count($rows);
             }
         }
 
-        if (in_array('attempt_rate', $selected_stats, true)) {
-            foreach ($by_quiz as $quiz => $rows) {
+        if (in_array('attempt_rate', $selectedstats, true)) {
+            foreach ($byquiz as $quiz => $rows) {
                 $counts = [];
                 foreach ($rows as $r) {
                     $counts[$r['student_id']] = ($counts[$r['student_id']] ?? 0) + 1;
                 }
-                $stats_by_quiz[$quiz]['attempt_rate'] = stats::mean(array_values($counts));
+                $statsbyquiz[$quiz]['attempt_rate'] = stats::mean(array_values($counts));
             }
         }
 
         $out = [];
-        foreach ($quiz_names as $quiz) {
-            if (empty($stats_by_quiz[$quiz])) {
+        foreach ($quiznames as $quiz) {
+            if (empty($statsbyquiz[$quiz])) {
                 continue;
             }
             $row = ['quiz_name' => $quiz];
-            foreach ($stats_by_quiz[$quiz] as $k => $v) {
+            foreach ($statsbyquiz[$quiz] as $k => $v) {
                 $row[$k] = py_compat::round($v, 2);
             }
             $out[] = $row;
@@ -205,19 +205,19 @@ class quiz_metrics {
     /**
      * Grade distribution per quiz, with an overlaid mean_grade line.
      *
-     * @param array[] $attempt_frame
+     * @param array[] $attemptframe
      */
-    public static function build_boxplot_figure(array $attempt_frame, bool $colorblind_mode = false): array {
-        $quiz_names = [];
-        foreach ($attempt_frame as $row) {
-            $quiz_names[$row['quiz_name']] = true;
+    public static function build_boxplot_figure(array $attemptframe, bool $colorblindmode = false): array {
+        $quiznames = [];
+        foreach ($attemptframe as $row) {
+            $quiznames[$row['quiz_name']] = true;
         }
-        $quiz_names = array_keys($quiz_names);
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_BOLD);
+        $quiznames = array_keys($quiznames);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_BOLD);
 
         $data = [];
-        foreach ($quiz_names as $i => $quiz) {
-            $rows = array_values(array_filter($attempt_frame, fn($r) => $r['quiz_name'] === $quiz));
+        foreach ($quiznames as $i => $quiz) {
+            $rows = array_values(array_filter($attemptframe, fn($r) => $r['quiz_name'] === $quiz));
             $data[] = [
                 'type' => 'box',
                 'y' => array_map(fn($r) => $r['overall_grade'], $rows),
@@ -230,24 +230,24 @@ class quiz_metrics {
             ];
         }
 
-        $accent = $colorblind_mode ? self::COLORBLIND_ACCENT : self::DEFAULT_ACCENT;
+        $accent = $colorblindmode ? self::COLORBLIND_ACCENT : self::DEFAULT_ACCENT;
         // Unlike the box traces above (plain px.box(color=...), which keeps
         // first-appearance order), Python builds this line from
         // attempt_frame.groupby("quiz_name")["overall_grade"].mean() — a
         // groupby, sorted alphabetically by default — so it needs its own,
-        // separately-sorted quiz name list rather than reusing $quiz_names.
-        $means_quiz_names = $quiz_names;
-        sort($means_quiz_names);
-        $means_x = [];
-        $means_y = [];
-        foreach ($means_quiz_names as $quiz) {
-            $rows = array_values(array_filter($attempt_frame, fn($r) => $r['quiz_name'] === $quiz));
-            $means_x[] = $quiz;
-            $means_y[] = stats::mean(array_map(fn($r) => $r['overall_grade'], $rows));
+        // separately-sorted quiz name list rather than reusing $quiznames.
+        $meansquiznames = $quiznames;
+        sort($meansquiznames);
+        $meansx = [];
+        $meansy = [];
+        foreach ($meansquiznames as $quiz) {
+            $rows = array_values(array_filter($attemptframe, fn($r) => $r['quiz_name'] === $quiz));
+            $meansx[] = $quiz;
+            $meansy[] = stats::mean(array_map(fn($r) => $r['overall_grade'], $rows));
         }
         $data[] = [
             'type' => 'scatter',
-            'x' => $means_x, 'y' => $means_y,
+            'x' => $meansx, 'y' => $meansy,
             'mode' => 'lines+markers',
             'name' => chart_helpers::humanize_label('mean_grade'),
             'line' => ['color' => $accent, 'width' => 2],
@@ -281,49 +281,49 @@ class quiz_metrics {
     /**
      * Attempts-vs-grade scatter, keyed by quiz_name.
      *
-     * @param array[] $attempt_frame
+     * @param array[] $attemptframe
      * @return array{plotly_json: array, correlation: float, y_label: string, title: string}|null
      */
-    public static function build_scatter_figure(array $attempt_frame, string $grade_type, bool $colorblind_mode = false): ?array {
-        if (empty($attempt_frame)) {
+    public static function build_scatter_figure(array $attemptframe, string $gradetype, bool $colorblindmode = false): ?array {
+        if (empty($attemptframe)) {
             return null;
         }
 
         // attempt_count per (quiz_name, student_id).
-        $attempt_counts = [];
-        foreach ($attempt_frame as $r) {
+        $attemptcounts = [];
+        foreach ($attemptframe as $r) {
             $key = $r['quiz_name'] . '|' . $r['student_id'];
-            $attempt_counts[$key] = ($attempt_counts[$key] ?? 0) + 1;
+            $attemptcounts[$key] = ($attemptcounts[$key] ?? 0) + 1;
         }
 
-        // grade_data per (quiz_name, student_id), per $grade_type.
-        $grades_by_key = [];
-        foreach ($attempt_frame as $r) {
+        // grade_data per (quiz_name, student_id), per $gradetype.
+        $gradesbykey = [];
+        foreach ($attemptframe as $r) {
             $key = $r['quiz_name'] . '|' . $r['student_id'];
-            $grades_by_key[$key][] = $r['overall_grade'];
+            $gradesbykey[$key][] = $r['overall_grade'];
         }
 
-        if ($grade_type === 'Highest Grade') {
+        if ($gradetype === 'Highest Grade') {
             $agg = fn($g) => max($g);
-            $y_label = 'Highest Grade';
+            $ylabel = 'Highest Grade';
             $title = 'Attempts vs Highest Grade';
-        } else if ($grade_type === 'Minimum Grade') {
+        } else if ($gradetype === 'Minimum Grade') {
             $agg = fn($g) => min($g);
-            $y_label = 'Minimum Grade';
+            $ylabel = 'Minimum Grade';
             $title = 'Attempts vs Minimum Grade';
         } else {
             $agg = fn($g) => stats::mean($g);
-            $y_label = 'Average Grade';
+            $ylabel = 'Average Grade';
             $title = 'Attempts vs Average Grade';
         }
 
         $merged = [];
-        foreach ($grades_by_key as $key => $grades) {
-            [$quiz_name, $student_id] = explode('|', $key, 2);
+        foreach ($gradesbykey as $key => $grades) {
+            [$quizname, $studentid] = explode('|', $key, 2);
             $merged[] = [
-                'quiz_name' => $quiz_name,
-                'student_id' => $student_id,
-                'attempt_count' => $attempt_counts[$key],
+                'quiz_name' => $quizname,
+                'student_id' => $studentid,
+                'attempt_count' => $attemptcounts[$key],
                 'overall_grade' => $agg($grades),
             ];
         }
@@ -336,18 +336,18 @@ class quiz_metrics {
         // Group sizes for marker-size saturation, keyed on
         // (quiz_name, attempt_count, overall_grade) — matches the Python
         // groupby key exactly (pre-jitter coordinates).
-        $group_sizes = [];
+        $groupsizes = [];
         foreach ($merged as $r) {
             $gkey = "{$r['quiz_name']}\x00{$r['attempt_count']}\x00{$r['overall_grade']}";
-            $group_sizes[$gkey] = ($group_sizes[$gkey] ?? 0) + 1;
+            $groupsizes[$gkey] = ($groupsizes[$gkey] ?? 0) + 1;
         }
 
         foreach ($merged as $i => $r) {
-            $jitter_key = $r['quiz_name'] . '|' . $r['student_id'];
-            $merged[$i]['attempt_count_plot'] = $r['attempt_count'] + self::deterministic_jitter($jitter_key, 0.15, 'x');
-            $merged[$i]['overall_grade_plot'] = $r['overall_grade'] + self::deterministic_jitter($jitter_key, 0.15, 'y');
+            $jitterkey = $r['quiz_name'] . '|' . $r['student_id'];
+            $merged[$i]['attempt_count_plot'] = $r['attempt_count'] + self::deterministic_jitter($jitterkey, 0.15, 'x');
+            $merged[$i]['overall_grade_plot'] = $r['overall_grade'] + self::deterministic_jitter($jitterkey, 0.15, 'y');
             $gkey = "{$r['quiz_name']}\x00{$r['attempt_count']}\x00{$r['overall_grade']}";
-            $size = $group_sizes[$gkey];
+            $size = $groupsizes[$gkey];
             $saturation = (min($size, self::SCATTER_MARKER_SIZE_SATURATES_AT) - 1) / (self::SCATTER_MARKER_SIZE_SATURATES_AT - 1);
             $merged[$i]['_marker_size'] = self::SCATTER_MARKER_SIZE_MIN + $saturation * (self::SCATTER_MARKER_SIZE_MAX - self::SCATTER_MARKER_SIZE_MIN);
         }
@@ -362,16 +362,16 @@ class quiz_metrics {
         // own point order has no visual effect (it's an unordered cloud of
         // markers), so this is a deliberately unmatched, invisible ordering
         // difference, confirmed by comparing point sets rather than order.
-        $quiz_names = [];
+        $quiznames = [];
         foreach ($merged as $r) {
-            $quiz_names[$r['quiz_name']] = true;
+            $quiznames[$r['quiz_name']] = true;
         }
-        $quiz_names = array_keys($quiz_names);
-        sort($quiz_names);
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_SET2);
+        $quiznames = array_keys($quiznames);
+        sort($quiznames);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_SET2);
 
         $data = [];
-        foreach ($quiz_names as $i => $quiz) {
+        foreach ($quiznames as $i => $quiz) {
             $rows = array_values(array_filter($merged, fn($r) => $r['quiz_name'] === $quiz));
             $data[] = [
                 'type' => 'scatter',
@@ -387,7 +387,7 @@ class quiz_metrics {
                     'line' => ['width' => 1, 'color' => 'white'],
                 ],
                 'customdata' => array_map(fn($r) => [$r['attempt_count'], $r['overall_grade']], $rows),
-                'hovertemplate' => "Attempts: %{customdata[0]}<br>{$y_label}: %{customdata[1]}<extra></extra>",
+                'hovertemplate' => "Attempts: %{customdata[0]}<br>{$ylabel}: %{customdata[1]}<extra></extra>",
             ];
         }
 
@@ -398,11 +398,11 @@ class quiz_metrics {
                     'title' => ['text' => $title],
                     'legend' => ['title' => ['text' => 'Quiz']],
                     'xaxis' => ['title' => ['text' => 'No. of Attempts'], 'tickmode' => 'linear', 'dtick' => 1],
-                    'yaxis' => ['title' => ['text' => $y_label]],
+                    'yaxis' => ['title' => ['text' => $ylabel]],
                 ],
             ],
             'correlation' => $correlation,
-            'y_label' => $y_label,
+            'y_label' => $ylabel,
             'title' => $title,
         ];
     }
@@ -412,55 +412,55 @@ class quiz_metrics {
         if ($n < 2) {
             return 0.0;
         }
-        $mean_x = stats::mean($xs);
-        $mean_y = stats::mean($ys);
+        $meanx = stats::mean($xs);
+        $meany = stats::mean($ys);
         $cov = 0.0;
-        $var_x = 0.0;
-        $var_y = 0.0;
+        $varx = 0.0;
+        $vary = 0.0;
         for ($i = 0; $i < $n; $i++) {
-            $dx = $xs[$i] - $mean_x;
-            $dy = $ys[$i] - $mean_y;
+            $dx = $xs[$i] - $meanx;
+            $dy = $ys[$i] - $meany;
             $cov += $dx * $dy;
-            $var_x += $dx * $dx;
-            $var_y += $dy * $dy;
+            $varx += $dx * $dx;
+            $vary += $dy * $dy;
         }
-        if ($var_x == 0.0 || $var_y == 0.0) {
+        if ($varx == 0.0 || $vary == 0.0) {
             return NAN;
         }
-        return $cov / sqrt($var_x * $var_y);
+        return $cov / sqrt($varx * $vary);
     }
 
     /**
-     * @param array[] $attempt_frame
-     * @param string[] $selected_metrics
+     * @param array[] $attemptframe
+     * @param string[] $selectedmetrics
      * @return array[] one row per quiz_name
      */
-    public static function build_metric_trend_data(array $attempt_frame, array $selected_metrics): array {
-        $by_quiz = table_helpers::group_by($attempt_frame, 'quiz_name');
+    public static function build_metric_trend_data(array $attemptframe, array $selectedmetrics): array {
+        $byquiz = table_helpers::group_by($attemptframe, 'quiz_name');
         // Every metric here comes from its own groupby("quiz_name") in the
         // Python original (sort=True default) — see compute_quiz_stats()'s
         // identical note.
-        $quiz_names = array_keys($by_quiz);
-        sort($quiz_names);
+        $quiznames = array_keys($byquiz);
+        sort($quiznames);
 
         $out = [];
-        foreach ($quiz_names as $quiz) {
-            $rows = $by_quiz[$quiz];
+        foreach ($quiznames as $quiz) {
+            $rows = $byquiz[$quiz];
             $entry = ['quiz_name' => $quiz];
-            if (in_array('student_count', $selected_metrics, true)) {
+            if (in_array('student_count', $selectedmetrics, true)) {
                 $entry['student_count'] = count(array_unique(array_map(fn($r) => $r['student_id'], $rows)));
             }
-            if (in_array('attempt_rate', $selected_metrics, true)) {
+            if (in_array('attempt_rate', $selectedmetrics, true)) {
                 $counts = [];
                 foreach ($rows as $r) {
                     $counts[$r['student_id']] = ($counts[$r['student_id']] ?? 0) + 1;
                 }
                 $entry['attempt_rate'] = stats::mean(array_values($counts));
             }
-            if (in_array('mean_grade', $selected_metrics, true)) {
+            if (in_array('mean_grade', $selectedmetrics, true)) {
                 $entry['mean_grade'] = stats::mean(array_map(fn($r) => $r['overall_grade'], $rows));
             }
-            if (in_array('grade_variance', $selected_metrics, true)) {
+            if (in_array('grade_variance', $selectedmetrics, true)) {
                 $entry['grade_variance'] = stats::sample_variance(array_map(fn($r) => $r['overall_grade'], $rows));
             }
             $out[] = $entry;
@@ -469,33 +469,33 @@ class quiz_metrics {
     }
 
     /**
-     * @param array[] $trend_data one row per quiz_name, metric fields as
+     * @param array[] $trenddata one row per quiz_name, metric fields as
      *        selected by build_metric_trend_data()
      */
-    public static function build_line_graph_figure(array $trend_data, bool $colorblind_mode = false): array {
-        if (empty($trend_data)) {
+    public static function build_line_graph_figure(array $trenddata, bool $colorblindmode = false): array {
+        if (empty($trenddata)) {
             return ['data' => [], 'layout' => ['title' => ['text' => 'Line Graph of Various Metrics']]];
         }
 
-        $metric_names = array_values(array_diff(array_keys($trend_data[0]), ['quiz_name']));
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_SET1);
+        $metricnames = array_values(array_diff(array_keys($trenddata[0]), ['quiz_name']));
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_SET1);
 
-        $wrapped_labels = array_map(fn($r) => self::wrap_category_label((string) $r['quiz_name']), $trend_data);
+        $wrappedlabels = array_map(fn($r) => self::wrap_category_label((string) $r['quiz_name']), $trenddata);
 
         $data = [];
-        foreach ($metric_names as $i => $metric) {
+        foreach ($metricnames as $i => $metric) {
             $data[] = [
                 'type' => 'scatter',
                 'mode' => 'lines+markers',
-                'x' => $wrapped_labels,
-                'y' => array_map(fn($r) => $r[$metric], $trend_data),
+                'x' => $wrappedlabels,
+                'y' => array_map(fn($r) => $r[$metric], $trenddata),
                 'name' => chart_helpers::humanize_label($metric),
                 'line' => ['color' => $palette[$i % count($palette)]],
                 'marker' => ['color' => $palette[$i % count($palette)]],
             ];
         }
 
-        $n_categories = max(count(array_unique(array_map(fn($r) => $r['quiz_name'], $trend_data))), 1);
+        $ncategories = max(count(array_unique(array_map(fn($r) => $r['quiz_name'], $trenddata))), 1);
 
         return [
             'data' => $data,
@@ -505,7 +505,7 @@ class quiz_metrics {
                 'legend' => ['title' => ['text' => 'Metric']],
                 'xaxis' => ['type' => 'category', 'tickangle' => 0, 'tickfont' => ['size' => 10], 'title' => ['text' => 'Quiz']],
                 'yaxis' => ['title' => ['text' => 'Value']],
-                'width' => max(800, 220 * $n_categories),
+                'width' => max(800, 220 * $ncategories),
             ],
         ];
     }
@@ -517,47 +517,47 @@ class quiz_metrics {
      * missing started_on, or no quiz ends up with a usable (2+ distinct
      * values) date series.
      *
-     * @param array[] $attempt_frame
+     * @param array[] $attemptframe
      */
-    public static function build_engagement_figure(array $attempt_frame, bool $colorblind_mode = false): ?array {
-        if (empty($attempt_frame)) {
+    public static function build_engagement_figure(array $attemptframe, bool $colorblindmode = false): ?array {
+        if (empty($attemptframe)) {
             return null;
         }
-        foreach ($attempt_frame as $row) {
+        foreach ($attemptframe as $row) {
             if (empty($row['started_on'])) {
                 return null;
             }
         }
 
-        $quiz_names = [];
-        foreach ($attempt_frame as $row) {
-            $quiz_names[$row['quiz_name']] = true;
+        $quiznames = [];
+        foreach ($attemptframe as $row) {
+            $quiznames[$row['quiz_name']] = true;
         }
-        $quiz_names = array_keys($quiz_names);
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_PLOTLY);
+        $quiznames = array_keys($quiznames);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_PLOTLY);
 
         $data = [];
-        foreach ($quiz_names as $i => $quiz) {
-            $rows = array_values(array_filter($attempt_frame, fn($r) => $r['quiz_name'] === $quiz));
+        foreach ($quiznames as $i => $quiz) {
+            $rows = array_values(array_filter($attemptframe, fn($r) => $r['quiz_name'] === $quiz));
             if (empty($rows)) {
                 continue;
             }
-            $dates_numeric = array_map(fn($r) => self::date_to_days((string) $r['started_on']), $rows);
+            $datesnumeric = array_map(fn($r) => self::date_to_days((string) $r['started_on']), $rows);
 
-            $kde = self::gaussian_kde_scott($dates_numeric);
+            $kde = self::gaussian_kde_scott($datesnumeric);
             if ($kde === null) {
                 continue;
             }
             [$mean, $variance] = $kde;
 
-            $min_d = min($dates_numeric);
-            $max_d = max($dates_numeric);
-            $n_grid = 200;
+            $mind = min($datesnumeric);
+            $maxd = max($datesnumeric);
+            $ngrid = 200;
             $grid = [];
-            for ($g = 0; $g < $n_grid; $g++) {
-                $grid[] = $min_d + ($max_d - $min_d) * $g / ($n_grid - 1);
+            for ($g = 0; $g < $ngrid; $g++) {
+                $grid[] = $mind + ($maxd - $mind) * $g / ($ngrid - 1);
             }
-            $density = array_map(fn($x) => self::kde_density($x, $dates_numeric, $variance), $grid);
+            $density = array_map(fn($x) => self::kde_density($x, $datesnumeric, $variance), $grid);
 
             $data[] = [
                 'type' => 'scatter',
@@ -591,29 +591,29 @@ class quiz_metrics {
      * points, or zero variance) — scipy raises LinAlgError in that case,
      * which the Python original catches and skips that quiz's trace for.
      *
-     * @param float[] $dates_numeric
+     * @param float[] $datesnumeric
      * @return array{0: float, 1: float}|null [mean, covariance]
      */
-    private static function gaussian_kde_scott(array $dates_numeric): ?array {
-        $n = count($dates_numeric);
+    private static function gaussian_kde_scott(array $datesnumeric): ?array {
+        $n = count($datesnumeric);
         if ($n < 2) {
             return null;
         }
-        $variance = stats::sample_variance($dates_numeric);
+        $variance = stats::sample_variance($datesnumeric);
         if ($variance <= 0.0 || !is_finite($variance)) {
             return null;
         }
         $factor = $n ** (-1.0 / 5.0);
         $covariance = $variance * $factor * $factor;
-        return [stats::mean($dates_numeric), $covariance];
+        return [stats::mean($datesnumeric), $covariance];
     }
 
-    /** @param float[] $data_points */
-    private static function kde_density(float $x, array $data_points, float $covariance): float {
-        $n = count($data_points);
+    /** @param float[] $datapoints */
+    private static function kde_density(float $x, array $datapoints, float $covariance): float {
+        $n = count($datapoints);
         $norm = 1.0 / sqrt(2 * M_PI * $covariance);
         $sum = 0.0;
-        foreach ($data_points as $xi) {
+        foreach ($datapoints as $xi) {
             $d = $x - $xi;
             $sum += $norm * exp(-($d * $d) / (2 * $covariance));
         }
@@ -622,8 +622,8 @@ class quiz_metrics {
 
     /** Days since the Unix epoch (any fixed epoch works: only relative
      * differences between values matter for KDE bandwidth/shape). */
-    private static function date_to_days(string $datetime_str): float {
-        $ts = strtotime($datetime_str);
+    private static function date_to_days(string $datetimestr): float {
+        $ts = strtotime($datetimestr);
         return $ts !== false ? $ts / 86400.0 : 0.0;
     }
 

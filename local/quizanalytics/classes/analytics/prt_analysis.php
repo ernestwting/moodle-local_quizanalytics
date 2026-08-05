@@ -39,41 +39,41 @@ class prt_analysis {
      *
      * @return array<int, array{0: string, 1: float, 2: string}> [prt_name, prt_score, status]
      */
-    protected static function parse_prt_values(string $response_text): array {
-        if ($response_text === '') {
+    protected static function parse_prt_values(string $responsetext): array {
+        if ($responsetext === '') {
             return [];
         }
 
         $prts = [];
-        foreach (explode(';', $response_text) as $part) {
+        foreach (explode(';', $responsetext) as $part) {
             if (preg_match(self::ANS_FIELD_RE, $part) || preg_match(self::SEED_FIELD_RE, $part)) {
                 continue;
             }
             if (!preg_match('/^\s*(\w+)\s*:\s*(.+)$/', $part, $m)) {
                 continue;
             }
-            $prt_name = strtolower($m[1]);
+            $prtname = strtolower($m[1]);
             $value = trim($m[2]);
 
             if ($value === '!') {
-                $prts[] = [$prt_name, 0.0, 'syntax_error'];
+                $prts[] = [$prtname, 0.0, 'syntax_error'];
                 continue;
             }
 
             if (preg_match('/#\s*=\s*([\d.]+)/', $value, $sm)) {
                 $score = (float) $sm[1];
                 $status = $score >= 0.5 ? 'correct' : 'incorrect';
-                $prts[] = [$prt_name, $score, $status];
+                $prts[] = [$prtname, $score, $status];
                 continue;
             }
 
-            $lower_value = strtolower($value);
-            if (self::str_contains_any($lower_value, ['correct', 'true', 'pass'])) {
-                $prts[] = [$prt_name, 1.0, 'correct'];
-            } else if (self::str_contains_any($lower_value, ['incorrect', 'false', 'fail'])) {
-                $prts[] = [$prt_name, 0.0, 'incorrect'];
+            $lowervalue = strtolower($value);
+            if (self::str_contains_any($lowervalue, ['correct', 'true', 'pass'])) {
+                $prts[] = [$prtname, 1.0, 'correct'];
+            } else if (self::str_contains_any($lowervalue, ['incorrect', 'false', 'fail'])) {
+                $prts[] = [$prtname, 0.0, 'incorrect'];
             } else {
-                $prts[] = [$prt_name, 0.0, 'incorrect'];
+                $prts[] = [$prtname, 0.0, 'incorrect'];
             }
         }
 
@@ -92,37 +92,37 @@ class prt_analysis {
     /**
      * PRT pass rates by question and PRT name.
      *
-     * @param array[] $prt_frame_rows as returned by build_prt_frame()
+     * @param array[] $prtframerows as returned by build_prt_frame()
      * @return array[]
      */
-    public static function compute_prt_pass_rates(array $prt_frame_rows): array {
-        if (empty($prt_frame_rows)) {
+    public static function compute_prt_pass_rates(array $prtframerows): array {
+        if (empty($prtframerows)) {
             return [];
         }
 
-        $by_question = table_helpers::group_by($prt_frame_rows, 'question');
+        $byquestion = table_helpers::group_by($prtframerows, 'question');
         $rows = [];
         // pandas groupby("question") iterates groups in *sorted* key order by
         // default (sort=True) — plain string sort, matching PHP's ksort()
         // here (question labels are compared as strings either way).
-        ksort($by_question);
+        ksort($byquestion);
 
-        foreach ($by_question as $question => $group) {
-            $prt_names = array_unique(array_map(fn($r) => (string) $r['prt_name'], $group));
-            sort($prt_names);
-            foreach ($prt_names as $prt_name) {
-                $prt_rows = array_values(array_filter($group, fn($r) => $r['prt_name'] === $prt_name));
-                $attempts = count($prt_rows);
-                $pass_rate = 0.0;
+        foreach ($byquestion as $question => $group) {
+            $prtnames = array_unique(array_map(fn($r) => (string) $r['prt_name'], $group));
+            sort($prtnames);
+            foreach ($prtnames as $prtname) {
+                $prtrows = array_values(array_filter($group, fn($r) => $r['prt_name'] === $prtname));
+                $attempts = count($prtrows);
+                $passrate = 0.0;
                 if ($attempts > 0) {
-                    $passing = count(array_filter($prt_rows, fn($r) => $r['prt_score'] >= 0.5));
-                    $pass_rate = py_compat::round(($passing / $attempts) * 100.0, 2);
+                    $passing = count(array_filter($prtrows, fn($r) => $r['prt_score'] >= 0.5));
+                    $passrate = py_compat::round(($passing / $attempts) * 100.0, 2);
                 }
                 $rows[] = [
                     'question' => $question,
-                    'prt_name' => $prt_name,
+                    'prt_name' => $prtname,
                     'attempts' => $attempts,
-                    'pass_rate' => $pass_rate,
+                    'pass_rate' => $passrate,
                 ];
             }
         }
@@ -135,16 +135,16 @@ class prt_analysis {
      * never already has prt_name/prt_score columns (that shape doesn't occur
      * in this plugin's pipeline), so this always re-parses response_text.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[]
      */
-    public static function build_prt_frame(array $response_rows): array {
-        if (empty($response_rows)) {
+    public static function build_prt_frame(array $responserows): array {
+        if (empty($responserows)) {
             return [];
         }
 
         $rows = [];
-        foreach ($response_rows as $row) {
+        foreach ($responserows as $row) {
             $parsed = self::parse_prt_values((string) ($row['response_text'] ?? ''));
             if (empty($parsed)) {
                 // A response with no PRT trace still contributes a scored-zero
@@ -161,11 +161,11 @@ class prt_analysis {
                 ];
                 continue;
             }
-            foreach ($parsed as [$prt_name, $prt_score, $status]) {
+            foreach ($parsed as [$prtname, $prtscore, $status]) {
                 $rows[] = [
                     'question' => $row['question'],
-                    'prt_name' => $prt_name,
-                    'prt_score' => $prt_score,
+                    'prt_name' => $prtname,
+                    'prt_score' => $prtscore,
                     'response_status' => $status,
                     'has_prt' => true,
                 ];
@@ -182,61 +182,61 @@ class prt_analysis {
 
     /**
      * Question x PRT pass-rate matrix for the heatmap. Every question in
-     * $question_order gets a row even with no PRT data; missing cells stay
-     * null rather than 0 (see NO_PRT_CELL_COLOR). Pass $prt_frame_rows to
+     * $questionorder gets a row even with no PRT data; missing cells stay
+     * null rather than 0 (see NO_PRT_CELL_COLOR). Pass $prtframerows to
      * blank out questions with no Potential Response Tree at all.
      *
-     * @param array[] $prt_pass_rates_rows
-     * @param string[] $question_order
-     * @param array[]|null $prt_frame_rows
+     * @param array[] $prtpassratesrows
+     * @param string[] $questionorder
+     * @param array[]|null $prtframerows
      * @return array{prt_names: string[], rows: array<string, array<string, float|null>>}
      */
     public static function build_prt_pass_heatmap(
-        array $prt_pass_rates_rows,
-        array $question_order,
-        ?array $prt_frame_rows = null
+        array $prtpassratesrows,
+        array $questionorder,
+        ?array $prtframerows = null
     ): array {
-        if (empty($prt_pass_rates_rows)) {
-            return ['prt_names' => [], 'rows' => array_fill_keys($question_order, [])];
+        if (empty($prtpassratesrows)) {
+            return ['prt_names' => [], 'rows' => array_fill_keys($questionorder, [])];
         }
 
-        $prt_names = array_values(array_unique(array_map(fn($r) => $r['prt_name'], $prt_pass_rates_rows)));
-        sort($prt_names);
+        $prtnames = array_values(array_unique(array_map(fn($r) => $r['prt_name'], $prtpassratesrows)));
+        sort($prtnames);
 
         // pivot_table(aggfunc="first"): first-seen (question, prt_name) pair wins.
         $pivot = [];
-        foreach ($prt_pass_rates_rows as $r) {
+        foreach ($prtpassratesrows as $r) {
             if (!isset($pivot[$r['question']][$r['prt_name']])) {
                 $pivot[$r['question']][$r['prt_name']] = $r['pass_rate'];
             }
         }
 
         $grid = [];
-        foreach ($question_order as $q) {
+        foreach ($questionorder as $q) {
             $row = [];
-            foreach ($prt_names as $prt_name) {
-                $row[$prt_name] = $pivot[$q][$prt_name] ?? null;
+            foreach ($prtnames as $prtname) {
+                $row[$prtname] = $pivot[$q][$prtname] ?? null;
             }
             $grid[$q] = $row;
         }
 
-        if ($prt_frame_rows !== null) {
-            $with_prt = [];
-            foreach ($prt_frame_rows as $r) {
+        if ($prtframerows !== null) {
+            $withprt = [];
+            foreach ($prtframerows as $r) {
                 if (!empty($r['has_prt'])) {
-                    $with_prt[$r['question']] = true;
+                    $withprt[$r['question']] = true;
                 }
             }
-            foreach ($question_order as $q) {
-                if (!isset($with_prt[$q])) {
-                    foreach ($prt_names as $prt_name) {
-                        $grid[$q][$prt_name] = null;
+            foreach ($questionorder as $q) {
+                if (!isset($withprt[$q])) {
+                    foreach ($prtnames as $prtname) {
+                        $grid[$q][$prtname] = null;
                     }
                 }
             }
         }
 
-        return ['prt_names' => $prt_names, 'rows' => $grid];
+        return ['prt_names' => $prtnames, 'rows' => $grid];
     }
 
     /**
@@ -251,25 +251,25 @@ class prt_analysis {
      *
      * @param array{prt_names: string[], rows: array<string, array<string, float|null>>} $heatmap
      */
-    public static function build_prt_pass_heatmap_figure(array $heatmap, bool $colorblind_mode): array {
+    public static function build_prt_pass_heatmap_figure(array $heatmap, bool $colorblindmode): array {
         $questions = array_keys($heatmap['rows']);
-        $prt_names = $heatmap['prt_names'];
+        $prtnames = $heatmap['prt_names'];
 
         $z = [];
         foreach ($questions as $q) {
             $row = [];
-            foreach ($prt_names as $prt_name) {
-                $row[] = $heatmap['rows'][$q][$prt_name] ?? null;
+            foreach ($prtnames as $prtname) {
+                $row[] = $heatmap['rows'][$q][$prtname] ?? null;
             }
             $z[] = $row;
         }
 
         return chart_helpers::build_heatmap_figure(
             $z,
-            $prt_names,
+            $prtnames,
             $questions,
             'PRT Pass Heatmap',
-            chart_helpers::pass_fail_scale($colorblind_mode),
+            chart_helpers::pass_fail_scale($colorblindmode),
             0.0,
             100.0,
             null,

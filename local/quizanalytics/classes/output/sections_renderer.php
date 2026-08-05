@@ -67,16 +67,16 @@ class sections_renderer {
      * @param string $prefix Must match the prefix passed to render_containers().
      * @param array $result The API response to render (summary/sections or
      *        the legacy summary/figures shape).
-     * @param bool $include_vendor Set false to skip re-emitting the vendored
+     * @param bool $includevendor Set false to skip re-emitting the vendored
      *        library tags when multiple payloads are rendered on one page
      *        (only the first render_vendor_and_payload() call on a page
-     *        needs $include_vendor = true).
+     *        needs $includevendor = true).
      * @return string
      */
-    public static function render_vendor_and_payload(string $prefix, array $result, bool $include_vendor = true): string {
+    public static function render_vendor_and_payload(string $prefix, array $result, bool $includevendor = true): string {
         $html = '';
 
-        if ($include_vendor) {
+        if ($includevendor) {
             $plotlyurl = new \moodle_url('/local/quizanalytics/js/vendor/plotly.min.js');
             $katexcssurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/katex.min.css');
             $katexjsurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/katex.min.js');

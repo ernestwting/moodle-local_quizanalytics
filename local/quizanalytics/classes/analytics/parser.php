@@ -78,16 +78,16 @@ class parser {
      *
      * @return array{ans_list: array, prt_list: array}
      */
-    public static function parse_response_cell(?string $cell_text): array {
-        if ($cell_text === null || $cell_text === '') {
+    public static function parse_response_cell(?string $celltext): array {
+        if ($celltext === null || $celltext === '') {
             return ['ans_list' => [], 'prt_list' => []];
         }
 
         // 1. Parse ans fields: ansK: expression [tag]
-        preg_match_all('/ans(\d+):\s*(.*?)\s*\[(score|valid|invalid)\]/', $cell_text, $ans_matches, PREG_SET_ORDER);
-        $ans_list = [];
-        foreach ($ans_matches as $m) {
-            $ans_list[] = [
+        preg_match_all('/ans(\d+):\s*(.*?)\s*\[(score|valid|invalid)\]/', $celltext, $ansmatches, PREG_SET_ORDER);
+        $anslist = [];
+        foreach ($ansmatches as $m) {
+            $anslist[] = [
                 'index' => (int) $m[1],
                 'expression' => trim($m[2]),
                 'tag' => $m[3],
@@ -100,43 +100,43 @@ class parser {
         // matching depends on the "!" / "# = fraction" value shape, not on any
         // literal "prt" prefix or embedded digit, so an index is assigned by order
         // of appearance rather than parsed from the name.
-        preg_match_all('/(\w+):\s*(!|# = ([0-9.]+))(?:\s*\|\s*([^;]*))?/', $cell_text, $prt_matches, PREG_SET_ORDER);
-        $prt_list = [];
+        preg_match_all('/(\w+):\s*(!|# = ([0-9.]+))(?:\s*\|\s*([^;]*))?/', $celltext, $prtmatches, PREG_SET_ORDER);
+        $prtlist = [];
         $idx = 1;
-        foreach ($prt_matches as $m) {
+        foreach ($prtmatches as $m) {
             $val = $m[2];
             $fraction = null;
-            $answer_note = '(invalid/blank input)';
-            $answer_notes = [];
+            $answernote = '(invalid/blank input)';
+            $answernotes = [];
 
             if ($val !== '!') {
                 $fraction = (float) $m[3];
-                $notes_str = $m[4] ?? '';
-                if ($notes_str !== '') {
+                $notesstr = $m[4] ?? '';
+                if ($notesstr !== '') {
                     $tokens = array_values(array_filter(
-                        array_map('trim', explode('|', $notes_str)),
+                        array_map('trim', explode('|', $notesstr)),
                         fn($t) => $t !== ''
                     ));
-                    $answer_notes = $tokens;
-                    $answer_note = !empty($tokens) ? end($tokens) : '';
+                    $answernotes = $tokens;
+                    $answernote = !empty($tokens) ? end($tokens) : '';
                 } else {
-                    $answer_note = '';
+                    $answernote = '';
                 }
             }
 
             // Terminal answer note only — the node the PRT traversal ended at,
             // kept as the primary field because that's what every existing
             // consumer expects. answer_notes carries the full traversal trace.
-            $prt_list[] = [
+            $prtlist[] = [
                 'index' => $idx,
                 'fraction' => $fraction,
-                'answer_note' => $answer_note,
-                'answer_notes' => $answer_notes,
+                'answer_note' => $answernote,
+                'answer_notes' => $answernotes,
             ];
             $idx++;
         }
 
-        return ['ans_list' => $ans_list, 'prt_list' => $prt_list];
+        return ['ans_list' => $anslist, 'prt_list' => $prtlist];
     }
 
     /**
@@ -161,32 +161,32 @@ class parser {
      *
      * @param array $records  as returned by
      *              local_quizanalytics_data_fetcher::get_response_records_for_quiz()
-     * @param string $quiz_name
+     * @param string $quizname
      * @return array[] list of associative arrays (the "response rows")
      */
-    public static function build_response_rows(array $records, string $quiz_name): array {
+    public static function build_response_rows(array $records, string $quizname): array {
         if (empty($records)) {
             return [];
         }
 
         // Discover which question numbers are present by scanning keys, matching
         // app.py's _records_to_moodle_df() question_numbers derivation.
-        $question_numbers = [];
+        $questionnumbers = [];
         foreach ($records as $rec) {
-            foreach ($rec as $key => $_) {
+            foreach ($rec as $key => $unused) {
                 if (preg_match('/^question_(\d+)_text$/', $key, $m)) {
-                    $question_numbers[(int) $m[1]] = true;
+                    $questionnumbers[(int) $m[1]] = true;
                 }
             }
         }
-        $question_numbers = array_keys($question_numbers);
-        sort($question_numbers);
+        $questionnumbers = array_keys($questionnumbers);
+        sort($questionnumbers);
 
         // Determine M (number of PRT parts) for each question, scanning every
         // record's response cell first — mirrors build_response_rows()'s M_dict.
-        $m_by_question = [];
-        foreach ($question_numbers as $n) {
-            $max_k = 1;
+        $mbyquestion = [];
+        foreach ($questionnumbers as $n) {
+            $maxk = 1;
             foreach ($records as $rec) {
                 $cell = $rec["response_{$n}"] ?? null;
                 if ($cell === null || $cell === '') {
@@ -194,48 +194,48 @@ class parser {
                 }
                 $parsed = self::parse_response_cell((string) $cell);
                 foreach ($parsed['prt_list'] as $prt) {
-                    if ($prt['index'] > $max_k) {
-                        $max_k = $prt['index'];
+                    if ($prt['index'] > $maxk) {
+                        $maxk = $prt['index'];
                     }
                 }
             }
-            $m_by_question[$n] = $max_k;
+            $mbyquestion[$n] = $maxk;
         }
 
         $rows = [];
         foreach (array_values($records) as $index => $rec) {
             $email = trim((string) ($rec['email'] ?? ''));
-            $first_name = trim((string) ($rec['first_name'] ?? ''));
-            $last_name = trim((string) ($rec['last_name'] ?? ''));
-            $full_name = trim("{$first_name} {$last_name}");
+            $firstname = trim((string) ($rec['first_name'] ?? ''));
+            $lastname = trim((string) ($rec['last_name'] ?? ''));
+            $fullname = trim("{$firstname} {$lastname}");
 
             // Moodle's own user table always has real names/emails for these
             // records (unlike an anonymized CSV export, the case parser.py's
             // fuller fallback logic exists for) — these are just a defensive
             // backstop, not expected to fire in practice.
-            $student_id = $email !== '' ? $email : ('student' . ($index + 1) . '@anonymized.local');
-            $student_name = $full_name !== '' ? $full_name : ('Student ' . ($index + 1));
+            $studentid = $email !== '' ? $email : ('student' . ($index + 1) . '@anonymized.local');
+            $studentname = $fullname !== '' ? $fullname : ('Student ' . ($index + 1));
 
-            $overall_grade = (isset($rec['grade']) && $rec['grade'] !== '') ? (float) $rec['grade'] : 0.0;
-            $completed_dt = (string) ($rec['completed'] ?? '');
-            $started_on = (string) ($rec['started_on'] ?? $completed_dt);
+            $overallgrade = (isset($rec['grade']) && $rec['grade'] !== '') ? (float) $rec['grade'] : 0.0;
+            $completeddt = (string) ($rec['completed'] ?? '');
+            $startedon = (string) ($rec['started_on'] ?? $completeddt);
 
-            foreach ($question_numbers as $n) {
-                $question_label = "Q{$n}";
-                $cell_text = (string) ($rec["response_{$n}"] ?? '');
+            foreach ($questionnumbers as $n) {
+                $questionlabel = "Q{$n}";
+                $celltext = (string) ($rec["response_{$n}"] ?? '');
 
-                $question_text = self::clean_html_text((string) ($rec["question_{$n}_text"] ?? ''));
-                $right_answer_text = self::clean_html_text((string) ($rec["right_answer_{$n}"] ?? ''));
+                $questiontext = self::clean_html_text((string) ($rec["question_{$n}_text"] ?? ''));
+                $rightanswertext = self::clean_html_text((string) ($rec["right_answer_{$n}"] ?? ''));
 
-                $parsed = self::parse_response_cell($cell_text);
-                $ans_list = $parsed['ans_list'];
-                $prt_list = $parsed['prt_list'];
+                $parsed = self::parse_response_cell($celltext);
+                $anslist = $parsed['ans_list'];
+                $prtlist = $parsed['prt_list'];
 
-                $is_blank = empty($ans_list);
-                $is_invalid = false;
-                foreach ($ans_list as $ans) {
+                $isblank = empty($anslist);
+                $isinvalid = false;
+                foreach ($anslist as $ans) {
                     if ($ans['tag'] === 'invalid') {
-                        $is_invalid = true;
+                        $isinvalid = true;
                         break;
                     }
                 }
@@ -245,63 +245,63 @@ class parser {
                 // story (STACK re-validating an answer after the attempt was
                 // already scored, so this cell no longer carries the PRT result
                 // that actually graded it). Distinct from blank/invalid.
-                $is_ungraded = false;
-                if (!$is_blank && !$is_invalid && !empty($prt_list)) {
-                    $is_ungraded = true;
-                    foreach ($prt_list as $prt) {
+                $isungraded = false;
+                if (!$isblank && !$isinvalid && !empty($prtlist)) {
+                    $isungraded = true;
+                    foreach ($prtlist as $prt) {
                         if ($prt['fraction'] !== null) {
-                            $is_ungraded = false;
+                            $isungraded = false;
                             break;
                         }
                     }
                 }
 
                 // Score computation: mean over all PRTs K of (prtK.fraction or 0.0).
-                $m = $m_by_question[$n];
-                $prt_by_index = [];
-                foreach ($prt_list as $prt) {
-                    $prt_by_index[$prt['index']] = $prt;
+                $m = $mbyquestion[$n];
+                $prtbyindex = [];
+                foreach ($prtlist as $prt) {
+                    $prtbyindex[$prt['index']] = $prt;
                 }
-                $prt_fractions = [];
+                $prtfractions = [];
                 for ($k = 1; $k <= $m; $k++) {
-                    if (isset($prt_by_index[$k]) && $prt_by_index[$k]['fraction'] !== null) {
-                        $prt_fractions[] = $prt_by_index[$k]['fraction'];
+                    if (isset($prtbyindex[$k]) && $prtbyindex[$k]['fraction'] !== null) {
+                        $prtfractions[] = $prtbyindex[$k]['fraction'];
                     } else {
-                        $prt_fractions[] = 0.0;
+                        $prtfractions[] = 0.0;
                     }
                 }
-                $q_score = $m > 0 ? array_sum($prt_fractions) / $m : 0.0;
+                $qscore = $m > 0 ? array_sum($prtfractions) / $m : 0.0;
 
-                if ($is_blank) {
-                    $response_status = 'blank';
-                } else if ($is_invalid) {
-                    $response_status = 'invalid';
-                } else if ($is_ungraded) {
-                    $response_status = 'ungraded';
-                } else if ($q_score == 1.0) {
-                    $response_status = 'correct';
+                if ($isblank) {
+                    $responsestatus = 'blank';
+                } else if ($isinvalid) {
+                    $responsestatus = 'invalid';
+                } else if ($isungraded) {
+                    $responsestatus = 'ungraded';
+                } else if ($qscore == 1.0) {
+                    $responsestatus = 'correct';
                 } else {
-                    $response_status = 'incorrect';
+                    $responsestatus = 'incorrect';
                 }
 
                 $rows[] = [
-                    'student_id' => $student_id,
-                    'student_name' => $student_name,
-                    'question' => $question_label,
-                    'grade' => $is_ungraded ? null : $q_score,
+                    'student_id' => $studentid,
+                    'student_name' => $studentname,
+                    'question' => $questionlabel,
+                    'grade' => $isungraded ? null : $qscore,
                     'max_grade' => 1.0,
-                    'response_status' => $response_status,
-                    'response_text' => $cell_text,
-                    'quiz_name' => $quiz_name,
-                    'ans_list' => $ans_list,
-                    'prt_list' => $prt_list,
-                    'overall_grade' => $overall_grade,
-                    'completed_dt' => $completed_dt,
-                    'started_on' => $started_on,
+                    'response_status' => $responsestatus,
+                    'response_text' => $celltext,
+                    'quiz_name' => $quizname,
+                    'ans_list' => $anslist,
+                    'prt_list' => $prtlist,
+                    'overall_grade' => $overallgrade,
+                    'completed_dt' => $completeddt,
+                    'started_on' => $startedon,
                     'attempt_idx' => $index,
                     'source_type' => 'responses',
-                    'question_text' => $question_text,
-                    'right_answer_text' => $right_answer_text,
+                    'question_text' => $questiontext,
+                    'right_answer_text' => $rightanswertext,
                 ];
             }
         }
@@ -316,28 +316,28 @@ class parser {
      *   selected as the row with the highest overall_grade (ties: latest
      *   completed_dt, then highest attempt_idx).
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array{pool_a: array[], pool_b: array[]}
      */
-    public static function get_attempt_pools(array $response_rows): array {
-        if (empty($response_rows)) {
-            return ['pool_a' => $response_rows, 'pool_b' => $response_rows];
+    public static function get_attempt_pools(array $responserows): array {
+        if (empty($responserows)) {
+            return ['pool_a' => $responserows, 'pool_b' => $responserows];
         }
 
-        $pool_a = $response_rows;
+        $poola = $responserows;
 
         // Deduplicate to one entry per (student_id, attempt_idx) — response_rows
         // has one row per question per attempt, so this collapses back to one
         // entry per actual attempt.
-        $attempt_meta = [];
+        $attemptmeta = [];
         $seen = [];
-        foreach ($response_rows as $row) {
+        foreach ($responserows as $row) {
             $key = $row['student_id'] . '|' . $row['attempt_idx'];
             if (isset($seen[$key])) {
                 continue;
             }
             $seen[$key] = true;
-            $attempt_meta[] = [
+            $attemptmeta[] = [
                 'student_id' => $row['student_id'],
                 'attempt_idx' => $row['attempt_idx'],
                 'overall_grade' => $row['overall_grade'],
@@ -348,25 +348,25 @@ class parser {
         // For each student, keep the attempt that sorts first under (overall_grade
         // desc, completed_dt desc, attempt_idx desc) — mirrors sort_values(...,
         // ascending=[False, False, False]).groupby('student_id').first().
-        $best_by_student = [];
-        foreach ($attempt_meta as $meta) {
+        $bestbystudent = [];
+        foreach ($attemptmeta as $meta) {
             $sid = $meta['student_id'];
-            if (!isset($best_by_student[$sid]) || self::is_better_attempt($meta, $best_by_student[$sid])) {
-                $best_by_student[$sid] = $meta;
+            if (!isset($bestbystudent[$sid]) || self::is_better_attempt($meta, $bestbystudent[$sid])) {
+                $bestbystudent[$sid] = $meta;
             }
         }
 
-        $best_indices = [];
-        foreach ($best_by_student as $meta) {
-            $best_indices[(string) $meta['attempt_idx']] = true;
+        $bestindices = [];
+        foreach ($bestbystudent as $meta) {
+            $bestindices[(string) $meta['attempt_idx']] = true;
         }
 
-        $pool_b = array_values(array_filter(
-            $response_rows,
-            fn($row) => isset($best_indices[(string) $row['attempt_idx']])
+        $poolb = array_values(array_filter(
+            $responserows,
+            fn($row) => isset($bestindices[(string) $row['attempt_idx']])
         ));
 
-        return ['pool_a' => $pool_a, 'pool_b' => $pool_b];
+        return ['pool_a' => $poola, 'pool_b' => $poolb];
     }
 
     protected static function is_better_attempt(array $candidate, array $current): bool {

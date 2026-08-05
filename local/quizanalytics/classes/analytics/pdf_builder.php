@@ -102,9 +102,9 @@ class pdf_builder {
 
     /**
      * @param array{title: string, subtitle: string, sections: array[]} $content
-     * @param array<string, string> $chart_images chart id => data: URL (PNG)
+     * @param array<string, string> $chartimages chart id => data: URL (PNG)
      */
-    public static function build(array $content, array $chart_images): string {
+    public static function build(array $content, array $chartimages): string {
         $pdf = new quizanalytics_tcpdf('P', 'mm', 'LETTER', true, 'UTF-8', false);
         $pdf->SetCreator('local_quizanalytics');
         $pdf->SetAuthor('Moodle STACK Analytics Hub');
@@ -136,7 +136,7 @@ class pdf_builder {
         }
 
         foreach ($content['sections'] as $i => $section) {
-            self::render_section($pdf, $section, $chart_images, $i === 0);
+            self::render_section($pdf, $section, $chartimages, $i === 0);
         }
 
         return $pdf->Output($content['title'] . '.pdf', 'S');
@@ -145,7 +145,7 @@ class pdf_builder {
     private static function render_section(
         quizanalytics_tcpdf $pdf,
         array $section,
-        array $chart_images,
+        array $chartimages,
         bool $isfirst
     ): void {
         // Don't strand a section's divider/heading alone at the very bottom
@@ -188,7 +188,7 @@ class pdf_builder {
         }
 
         foreach ($section['charts'] as $chart) {
-            self::render_chart($pdf, $chart, $chart_images);
+            self::render_chart($pdf, $chart, $chartimages);
         }
 
         $pdf->Ln(7);
@@ -283,8 +283,8 @@ class pdf_builder {
     }
 
     /** @param array{id: string, title: ?string} $chart */
-    private static function render_chart(quizanalytics_tcpdf $pdf, array $chart, array $chart_images): void {
-        $datauri = $chart_images[$chart['id']] ?? null;
+    private static function render_chart(quizanalytics_tcpdf $pdf, array $chart, array $chartimages): void {
+        $datauri = $chartimages[$chart['id']] ?? null;
 
         if ($chart['title']) {
             $pdf->SetFont('dejavusans', 'I', 8.5);

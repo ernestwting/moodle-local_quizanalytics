@@ -71,8 +71,8 @@ class table_helpers {
             return ['columns' => [], 'rows' => []];
         }
         $columns = array_keys($rows[0]);
-        $out_rows = array_map(fn($row) => array_values($row), $rows);
-        return ['columns' => $columns, 'rows' => $out_rows];
+        $outrows = array_map(fn($row) => array_values($row), $rows);
+        return ['columns' => $columns, 'rows' => $outrows];
     }
 
     /**

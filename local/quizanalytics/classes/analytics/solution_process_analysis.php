@@ -36,24 +36,24 @@ class solution_process_analysis {
      * @param array[] $records
      * @return array{questions: array{name: string, parts: int}[], students: array{id: string, name: string}[]}
      */
-    public static function build_meta(array $records, string $quiz_name): array {
-        $response_rows = parser::build_response_rows($records, $quiz_name);
-        $pools = parser::get_attempt_pools($response_rows);
-        $pool_a = $pools['pool_a'];
+    public static function build_meta(array $records, string $quizname): array {
+        $responserows = parser::build_response_rows($records, $quizname);
+        $pools = parser::get_attempt_pools($responserows);
+        $poola = $pools['pool_a'];
 
-        $question_names = table_helpers::unique_sorted_by_question($pool_a, 'question');
+        $questionnames = table_helpers::unique_sorted_by_question($poola, 'question');
         $questions = array_map(fn($q) => [
             'name' => $q,
-            'parts' => prt_transitions::count_question_parts($pool_a, $q),
-        ], $question_names);
+            'parts' => prt_transitions::count_question_parts($poola, $q),
+        ], $questionnames);
 
         $seen = [];
-        foreach ($pool_a as $row) {
+        foreach ($poola as $row) {
             $seen[$row['student_id']] = $row['student_name'];
         }
-        $student_ids = array_keys($seen);
-        usort($student_ids, fn($a, $b) => strcmp($seen[$a], $seen[$b]));
-        $students = array_map(fn($sid) => ['id' => $sid, 'name' => $seen[$sid]], $student_ids);
+        $studentids = array_keys($seen);
+        usort($studentids, fn($a, $b) => strcmp($seen[$a], $seen[$b]));
+        $students = array_map(fn($sid) => ['id' => $sid, 'name' => $seen[$sid]], $studentids);
 
         return ['questions' => $questions, 'students' => $students];
     }
@@ -63,7 +63,7 @@ class solution_process_analysis {
      * the class-wide transition graph, per-node network features, PRT/TED 3D
      * distance charts, and cross-attempt comparison. Optionally a single
      * student's own drill-down (their transition path + their own metric
-     * trend across attempts) when $student_id is supplied.
+     * trend across attempts) when $studentid is supplied.
      *
      * Uses Pool A (every attempt, not just each student's best) throughout —
      * unlike Question Analysis, seeing retries is the whole point here.
@@ -73,82 +73,82 @@ class solution_process_analysis {
      */
     public static function build_analysis(
         array $records,
-        string $quiz_name,
+        string $quizname,
         string $question,
-        int $part_index = 1,
-        ?string $student_id = null,
-        bool $colorblind_mode = false
+        int $partindex = 1,
+        ?string $studentid = null,
+        bool $colorblindmode = false
     ): array {
-        $response_rows = parser::build_response_rows($records, $quiz_name);
-        $pools = parser::get_attempt_pools($response_rows);
-        $pool_a = $pools['pool_a'];
+        $responserows = parser::build_response_rows($records, $quizname);
+        $pools = parser::get_attempt_pools($responserows);
+        $poola = $pools['pool_a'];
 
-        $known_questions = array_unique(array_map(fn($r) => $r['question'], $pool_a));
-        if (!in_array($question, $known_questions, true)) {
+        $knownquestions = array_unique(array_map(fn($r) => $r['question'], $poola));
+        if (!in_array($question, $knownquestions, true)) {
             throw new \InvalidArgumentException("Unknown question: {$question}");
         }
 
         // A part the caller asked for may not exist on this question — fall
         // back to the last one that does.
-        $part_index = min($part_index, prt_transitions::count_question_parts($pool_a, $question));
+        $partindex = min($partindex, prt_transitions::count_question_parts($poola, $question));
 
         $sections = [];
 
-        [$agg_nodes, $agg_edges] = prt_transitions::build_aggregate_graph($pool_a, $question, $part_index);
-        if (!empty($agg_edges)) {
-            $transition_fig = prt_transitions::build_transition_graph_figure(
-                $agg_nodes,
-                $agg_edges,
-                $colorblind_mode,
-                "Class-wide Answer Transitions — {$question} (part {$part_index})"
+        [$aggnodes, $aggedges] = prt_transitions::build_aggregate_graph($poola, $question, $partindex);
+        if (!empty($aggedges)) {
+            $transitionfig = prt_transitions::build_transition_graph_figure(
+                $aggnodes,
+                $aggedges,
+                $colorblindmode,
+                "Class-wide Answer Transitions — {$question} (part {$partindex})"
             );
             $sections[] = [
                 'id' => 'transition-graph',
                 'title' => 'Class-Wide Transition Graph',
                 'caption' => 'Edge thickness and color scale with how many students made each transition.',
-                'charts' => [['id' => 'agg-graph', 'title' => null, 'plotly_json' => $transition_fig]],
+                'charts' => [['id' => 'agg-graph', 'title' => null, 'plotly_json' => $transitionfig]],
             ];
 
-            $network_features = prt_transitions::compute_network_features($agg_nodes, $agg_edges);
-            $centrality_charts = array_map(fn($c) => [
+            $networkfeatures = prt_transitions::compute_network_features($aggnodes, $aggedges);
+            $centralitycharts = array_map(fn($c) => [
                 'id' => $c['metric'], 'title' => $c['label'], 'plotly_json' => $c['plotly_json'],
-            ], spv_charts::build_centrality_bar_figures($network_features));
+            ], spv_charts::build_centrality_bar_figures($networkfeatures));
             $sections[] = [
                 'id' => 'network-features',
                 'title' => 'Network Features per Node',
-                'table' => table_helpers::to_table($network_features),
-                'charts' => $centrality_charts,
+                'table' => table_helpers::to_table($networkfeatures),
+                'charts' => $centralitycharts,
             ];
         }
 
-        $prt_fig = solution_distance::build_prt_distance_3d_figure($pool_a, $question, $part_index);
+        $prtfig = solution_distance::build_prt_distance_3d_figure($poola, $question, $partindex);
         $sections[] = [
             'id' => 'prt-distance-3d',
             'title' => 'PRT-Distance 3D Chart',
-            'charts' => [['id' => 'prt-3d', 'title' => null, 'plotly_json' => $prt_fig]],
+            'charts' => [['id' => 'prt-3d', 'title' => null, 'plotly_json' => $prtfig]],
         ];
 
-        $ted_fig = solution_distance::build_ted_distance_3d_figure($pool_a, $question, $part_index);
+        $tedfig = solution_distance::build_ted_distance_3d_figure($poola, $question, $partindex);
         $sections[] = [
             'id' => 'ted-distance-3d',
             'title' => 'Tree Edit Distance 3D Chart',
-            'charts' => [['id' => 'ted-3d', 'title' => null, 'plotly_json' => $ted_fig]],
+            'charts' => [['id' => 'ted-3d', 'title' => null, 'plotly_json' => $tedfig]],
         ];
 
         // Grade — the report has no page-side control for which metric to
         // compare by, and Grade has the advantage of not depending on which
         // part is selected.
         $metric = 'Grade';
-        $higher_is_better = solution_distance::CROSS_ATTEMPT_METRICS[$metric]['higher_is_better'];
-        $comparison = solution_distance::compute_cross_attempt_comparison($pool_a, $question, $metric, $part_index);
-        $trends = solution_distance::classify_cross_attempt_trends($comparison, $higher_is_better);
+        $higherisbetter = solution_distance::CROSS_ATTEMPT_METRICS[$metric]['higher_is_better'];
+        $comparison = solution_distance::compute_cross_attempt_comparison($poola, $question, $metric, $partindex);
+        $trends = solution_distance::classify_cross_attempt_trends($comparison, $higherisbetter);
         if (!empty($comparison)) {
-            $cross_fig = solution_distance::build_cross_attempt_figure($comparison, $trends, $metric, $colorblind_mode);
+            $crossfig = solution_distance::build_cross_attempt_figure($comparison, $trends, $metric, $colorblindmode);
             $counts = ['Improved' => 0, 'Flat' => 0, 'Regressed' => 0];
             foreach ($trends as $t) {
                 $counts[$t['trend']]++;
             }
-            $ranking_rows = array_map(fn($t) => [
+            $rankingrows = array_map(fn($t) => [
                 'Student Name' => $t['student_name'],
                 'Attempts' => $t['attempt_count'],
                 'First Attempt' => $t['first_value'],
@@ -162,8 +162,8 @@ class solution_process_analysis {
                 'caption' => "{$counts['Improved']} improved, {$counts['Flat']} flat, {$counts['Regressed']} regressed " .
                     'among students with 2+ attempts. Click a student\'s name for their own ' .
                     'attempt-by-attempt drill-down.',
-                'table' => table_helpers::to_table($ranking_rows),
-                'charts' => [['id' => 'cross-attempt-fig', 'title' => null, 'plotly_json' => $cross_fig]],
+                'table' => table_helpers::to_table($rankingrows),
+                'charts' => [['id' => 'cross-attempt-fig', 'title' => null, 'plotly_json' => $crossfig]],
                 // Parallel to table["rows"] (same row order) — lets the PHP/
                 // JS side turn each "Student Name" cell into a link that
                 // reloads this same page with that student's drill-down
@@ -172,74 +172,74 @@ class solution_process_analysis {
             ];
         }
 
-        $student_drilldown = null;
-        if ($student_id !== null && $student_id !== '') {
-            $student_name = $student_id;
-            foreach ($pool_a as $row) {
-                if ($row['student_id'] === $student_id) {
-                    $student_name = $row['student_name'];
+        $studentdrilldown = null;
+        if ($studentid !== null && $studentid !== '') {
+            $studentname = $studentid;
+            foreach ($poola as $row) {
+                if ($row['student_id'] === $studentid) {
+                    $studentname = $row['student_name'];
                     break;
                 }
             }
-            $student_sections = [];
+            $studentsections = [];
 
-            $seq = prt_transitions::build_student_node_sequence($pool_a, $question, $student_id, $part_index);
+            $seq = prt_transitions::build_student_node_sequence($poola, $question, $studentid, $partindex);
             if (!empty($seq)) {
-                $seq_nodes = array_map(fn($r) => $r['node'], $seq);
-                $student_edges = [];
-                foreach (prt_transitions::build_transition_pairs($seq_nodes) as [$src, $dst]) {
+                $seqnodes = array_map(fn($r) => $r['node'], $seq);
+                $studentedges = [];
+                foreach (prt_transitions::build_transition_pairs($seqnodes) as [$src, $dst]) {
                     $key = "{$src}|{$dst}";
-                    $student_edges[$key] = ($student_edges[$key] ?? 0) + 1;
+                    $studentedges[$key] = ($studentedges[$key] ?? 0) + 1;
                 }
-                $student_nodes = array_values(array_unique(array_merge($seq_nodes, ['0', 'c'])));
-                $student_fig = prt_transitions::build_transition_graph_figure(
-                    $student_nodes,
-                    $student_edges,
-                    $colorblind_mode,
-                    "{$student_name} — {$question} (part {$part_index})"
+                $studentnodes = array_values(array_unique(array_merge($seqnodes, ['0', 'c'])));
+                $studentfig = prt_transitions::build_transition_graph_figure(
+                    $studentnodes,
+                    $studentedges,
+                    $colorblindmode,
+                    "{$studentname} — {$question} (part {$partindex})"
                 );
-                $student_sections[] = [
+                $studentsections[] = [
                     'id' => 'student-transition',
                     'title' => "This Student's Transition Path",
-                    'charts' => [['id' => 'student-graph', 'title' => null, 'plotly_json' => $student_fig]],
+                    'charts' => [['id' => 'student-graph', 'title' => null, 'plotly_json' => $studentfig]],
                 ];
             }
 
-            $student_comparison = array_values(array_filter($comparison, fn($r) => $r['student_id'] === $student_id));
-            if (count($student_comparison) >= 2) {
+            $studentcomparison = array_values(array_filter($comparison, fn($r) => $r['student_id'] === $studentid));
+            if (count($studentcomparison) >= 2) {
                 $trend = 'Flat';
                 foreach ($trends as $t) {
-                    if ($t['student_id'] === $student_id) {
+                    if ($t['student_id'] === $studentid) {
                         $trend = $t['trend'];
                         break;
                     }
                 }
-                $student_cross_fig = solution_distance::build_single_student_attempt_figure(
-                    $student_comparison,
-                    $student_name,
+                $studentcrossfig = solution_distance::build_single_student_attempt_figure(
+                    $studentcomparison,
+                    $studentname,
                     $metric,
                     $trend,
-                    $colorblind_mode
+                    $colorblindmode
                 );
-                $student_sections[] = [
+                $studentsections[] = [
                     'id' => 'student-cross-attempt',
                     'title' => "This Student's {$metric} Across Attempts",
-                    'charts' => [['id' => 'student-cross-fig', 'title' => null, 'plotly_json' => $student_cross_fig]],
+                    'charts' => [['id' => 'student-cross-fig', 'title' => null, 'plotly_json' => $studentcrossfig]],
                 ];
             }
 
-            $student_drilldown = [
-                'student_id' => $student_id,
-                'student_name' => $student_name,
-                'sections' => $student_sections,
+            $studentdrilldown = [
+                'student_id' => $studentid,
+                'student_name' => $studentname,
+                'sections' => $studentsections,
             ];
         }
 
         return [
             'question' => $question,
-            'part_index' => $part_index,
+            'part_index' => $partindex,
             'sections' => $sections,
-            'student_drilldown' => $student_drilldown,
+            'student_drilldown' => $studentdrilldown,
         ];
     }
 }

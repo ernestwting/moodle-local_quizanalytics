@@ -31,13 +31,13 @@ class question_details {
      * Question text / right answer for a question, taken from Pool B (Best
      * Attempt per Student).
      *
-     * @param array[] $pool_b_rows
+     * @param array[] $poolbrows
      * @return array{question_text: string, right_answer_text: string}
      */
-    public static function build_question_detail(array $pool_b_rows, string $question): array {
-        $rows = array_values(array_filter($pool_b_rows, fn($r) => $r['question'] === $question));
+    public static function build_question_detail(array $poolbrows, string $question): array {
+        $rows = array_values(array_filter($poolbrows, fn($r) => $r['question'] === $question));
 
-        $first_non_empty = function (string $field) use ($rows): string {
+        $firstnonempty = function (string $field) use ($rows): string {
             foreach ($rows as $r) {
                 $v = $r[$field] ?? null;
                 if (is_string($v) && trim($v) !== '') {
@@ -48,8 +48,8 @@ class question_details {
         };
 
         return [
-            'question_text' => $first_non_empty('question_text'),
-            'right_answer_text' => $first_non_empty('right_answer_text'),
+            'question_text' => $firstnonempty('question_text'),
+            'right_answer_text' => $firstnonempty('right_answer_text'),
         ];
     }
 
@@ -58,14 +58,14 @@ class question_details {
      * credit — lets a teacher scan submitted responses against the right
      * answer to spot common misconceptions.
      *
-     * @param array[] $pool_b_rows
+     * @param array[] $poolbrows
      * @return array{columns: string[], rows: array[]}
      */
-    public static function build_error_drilldown(array $pool_b_rows, string $question): array {
+    public static function build_error_drilldown(array $poolbrows, string $question): array {
         $columns = ['Student Name', 'Email', 'Submitted Response', 'Right Answer', 'Score', 'Status'];
 
         $wrong = array_values(array_filter(
-            $pool_b_rows,
+            $poolbrows,
             fn($r) => $r['question'] === $question && $r['grade'] !== null && $r['grade'] < 1.0
         ));
 

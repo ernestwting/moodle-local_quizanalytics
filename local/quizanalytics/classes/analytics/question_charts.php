@@ -27,16 +27,16 @@ namespace local_quizanalytics\analytics;
 class question_charts {
     /**
      * "Top Difficult Questions by Average Score" — hardest 10 questions;
-     * $ranked_difficulty is already sorted ascending by avg_score (see
+     * $rankeddifficulty is already sorted ascending by avg_score (see
      * question_metrics::compute_ranked_difficulty()).
      *
-     * @param array[] $ranked_difficulty
+     * @param array[] $rankeddifficulty
      */
-    public static function build_difficulty_bar_figure(array $ranked_difficulty, bool $colorblind_mode = false): array {
-        $top10 = array_slice($ranked_difficulty, 0, 10);
+    public static function build_difficulty_bar_figure(array $rankeddifficulty, bool $colorblindmode = false): array {
+        $top10 = array_slice($rankeddifficulty, 0, 10);
         $categories = array_map(fn($r) => $r['question'], $top10);
         $values = array_map(fn($r) => $r['avg_score'], $top10);
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_SET2);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_SET2);
         return chart_helpers::build_bar_figure(
             $categories,
             $values,
@@ -49,27 +49,27 @@ class question_charts {
 
     /**
      * "Score Distribution by Question (Best Attempt per Student)" — expects
-     * $pool_b_rows to already have a scaled_score field (grade * 10.0).
+     * $poolbrows to already have a scaled_score field (grade * 10.0).
      *
-     * @param array[] $pool_b_rows
+     * @param array[] $poolbrows
      */
-    public static function build_score_boxplot_figure(array $pool_b_rows, bool $colorblind_mode = false): array {
+    public static function build_score_boxplot_figure(array $poolbrows, bool $colorblindmode = false): array {
         // px.box() keeps one y-entry per row (null for missing scaled_score) —
         // Plotly ignores nulls in the box statistics, but the trace's y-array
         // still has one entry per underlying row, so this doesn't filter them
         // out (matching the Python oracle's actual trace length).
-        $questions = table_helpers::unique_sorted_by_question($pool_b_rows, 'question');
-        $values_by_question = [];
+        $questions = table_helpers::unique_sorted_by_question($poolbrows, 'question');
+        $valuesbyquestion = [];
         foreach ($questions as $q) {
-            $values_by_question[$q] = array_values(array_map(
+            $valuesbyquestion[$q] = array_values(array_map(
                 fn($r) => $r['scaled_score'],
-                array_filter($pool_b_rows, fn($r) => $r['question'] === $q)
+                array_filter($poolbrows, fn($r) => $r['question'] === $q)
             ));
         }
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_SET2);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_SET2);
         return chart_helpers::build_box_figure(
             $questions,
-            $values_by_question,
+            $valuesbyquestion,
             'Score Distribution by Question (Best Attempt per Student)',
             'Question',
             'Score (0-10)',
@@ -81,15 +81,15 @@ class question_charts {
      * "Response Outcome Percentages (Best Attempts)" — correct_percent/
      * incorrect_percent grouped bars per question.
      *
-     * @param array[] $response_outcomes
+     * @param array[] $responseoutcomes
      */
-    public static function build_response_outcome_figure(array $response_outcomes, bool $colorblind_mode = false): array {
-        $categories = array_map(fn($r) => $r['question'], $response_outcomes);
+    public static function build_response_outcome_figure(array $responseoutcomes, bool $colorblindmode = false): array {
+        $categories = array_map(fn($r) => $r['question'], $responseoutcomes);
         $series = [
-            'correct_percent' => array_map(fn($r) => $r['correct_percent'], $response_outcomes),
-            'incorrect_percent' => array_map(fn($r) => $r['incorrect_percent'], $response_outcomes),
+            'correct_percent' => array_map(fn($r) => $r['correct_percent'], $responseoutcomes),
+            'incorrect_percent' => array_map(fn($r) => $r['incorrect_percent'], $responseoutcomes),
         ];
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_VIVID);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_VIVID);
         return chart_helpers::build_grouped_bar_figure(
             $categories,
             $series,
@@ -105,15 +105,15 @@ class question_charts {
      * percent_invalid grouped bars per question, from question_metrics
      * (Pool A based).
      *
-     * @param array[] $question_metrics_rows
+     * @param array[] $questionmetricsrows
      */
-    public static function build_valid_invalid_figure(array $question_metrics_rows, bool $colorblind_mode = false): array {
-        $categories = array_map(fn($r) => $r['question'], $question_metrics_rows);
+    public static function build_valid_invalid_figure(array $questionmetricsrows, bool $colorblindmode = false): array {
+        $categories = array_map(fn($r) => $r['question'], $questionmetricsrows);
         $series = [
-            'Valid %' => array_map(fn($r) => $r['percent_valid'], $question_metrics_rows),
-            'Invalid/Syntax Error %' => array_map(fn($r) => $r['percent_invalid'], $question_metrics_rows),
+            'Valid %' => array_map(fn($r) => $r['percent_valid'], $questionmetricsrows),
+            'Invalid/Syntax Error %' => array_map(fn($r) => $r['percent_invalid'], $questionmetricsrows),
         ];
-        $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_VIVID);
+        $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_VIVID);
         return chart_helpers::build_grouped_bar_figure(
             $categories,
             $series,
@@ -128,50 +128,50 @@ class question_charts {
      * Student x Question pivot (grade, 0.0-1.0), used both for the heatmap
      * figure below and as the section's raw data table.
      *
-     * @param array[] $pool_b_rows
-     * @param string[] $question_order
+     * @param array[] $poolbrows
+     * @param string[] $questionorder
      * @return array{students: string[], questions: string[], grid: array<string, array<string, float>>}
      */
-    public static function build_student_matrix(array $pool_b_rows, array $question_order): array {
+    public static function build_student_matrix(array $poolbrows, array $questionorder): array {
         // pivot_table(aggfunc="first"): first-seen (student, question) pair wins.
         $pivot = [];
-        $students_seen = [];
-        foreach ($pool_b_rows as $r) {
+        $studentsseen = [];
+        foreach ($poolbrows as $r) {
             $sid = $r['student_id'];
-            $students_seen[$sid] = true;
+            $studentsseen[$sid] = true;
             if (!isset($pivot[$sid][$r['question']])) {
                 $pivot[$sid][$r['question']] = $r['grade'] ?? 0.0;
             }
         }
-        $students = array_keys($students_seen);
+        $students = array_keys($studentsseen);
         sort($students);
 
         $grid = [];
         foreach ($students as $sid) {
             $row = [];
-            foreach ($question_order as $q) {
+            foreach ($questionorder as $q) {
                 $row[$q] = $pivot[$sid][$q] ?? 0.0;
             }
             $grid[$sid] = $row;
         }
 
-        return ['students' => $students, 'questions' => $question_order, 'grid' => $grid];
+        return ['students' => $students, 'questions' => $questionorder, 'grid' => $grid];
     }
 
     /**
      * "Student-by-Question Performance Matrix (Best Attempts)" heatmap, from
      * the pivot build_student_matrix() produces.
      *
-     * @param array{students: string[], questions: string[], grid: array} $student_matrix
+     * @param array{students: string[], questions: string[], grid: array} $studentmatrix
      */
-    public static function build_student_matrix_figure(array $student_matrix): array {
-        $students = $student_matrix['students'];
-        $questions = $student_matrix['questions'];
+    public static function build_student_matrix_figure(array $studentmatrix): array {
+        $students = $studentmatrix['students'];
+        $questions = $studentmatrix['questions'];
         $z = [];
         foreach ($students as $sid) {
             $row = [];
             foreach ($questions as $q) {
-                $row[] = $student_matrix['grid'][$sid][$q] ?? 0.0;
+                $row[] = $studentmatrix['grid'][$sid][$q] ?? 0.0;
             }
             $z[] = $row;
         }
@@ -193,14 +193,14 @@ class question_charts {
      * with a handful of difficulty_metrics columns, discrimination_index
      * renamed to discrimination.
      *
-     * @param array[] $question_metrics_rows
-     * @param array[] $difficulty_metrics_rows
+     * @param array[] $questionmetricsrows
+     * @param array[] $difficultymetricsrows
      * @return array{columns: string[], rows: array[]}
      */
-    public static function build_question_metrics_table(array $question_metrics_rows, array $difficulty_metrics_rows): array {
-        $difficulty_by_question = [];
-        foreach ($difficulty_metrics_rows as $r) {
-            $difficulty_by_question[$r['question']] = $r;
+    public static function build_question_metrics_table(array $questionmetricsrows, array $difficultymetricsrows): array {
+        $difficultybyquestion = [];
+        foreach ($difficultymetricsrows as $r) {
+            $difficultybyquestion[$r['question']] = $r;
         }
 
         $columns = [
@@ -211,8 +211,8 @@ class question_charts {
         ];
 
         $rows = [];
-        foreach ($question_metrics_rows as $qm) {
-            $d = $difficulty_by_question[$qm['question']] ?? null;
+        foreach ($questionmetricsrows as $qm) {
+            $d = $difficultybyquestion[$qm['question']] ?? null;
             $rows[] = [
                 $qm['question'],
                 $qm['attempts'],

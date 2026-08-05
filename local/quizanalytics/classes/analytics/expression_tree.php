@@ -132,8 +132,8 @@ class expr_parser_state {
     public function parse_factor(): expr_node {
         if ($this->peek_is('-')) {
             $this->advance();
-            $next_token = $this->peek();
-            if ($next_token !== null && $next_token[0] === 'NUMBER' && !$this->peek_is('^', 1)) {
+            $nexttoken = $this->peek();
+            if ($nexttoken !== null && $nexttoken[0] === 'NUMBER' && !$this->peek_is('^', 1)) {
                 $value = $this->advance()[1];
                 return new expr_node("-{$value}");
             }

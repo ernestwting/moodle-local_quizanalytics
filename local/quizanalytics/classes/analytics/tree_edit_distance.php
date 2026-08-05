@@ -56,9 +56,9 @@ class tree_edit_distance {
      */
     private static function leftmost_leaf_positions(array $nodes): array {
         $n = count($nodes);
-        $position_of_id = [];
+        $positionofid = [];
         foreach ($nodes as $index => $node) {
-            $position_of_id[spl_object_id($node)] = $index + 1;
+            $positionofid[spl_object_id($node)] = $index + 1;
         }
         $l = array_fill(0, $n + 1, 0);
         for ($i = 1; $i <= $n; $i++) {
@@ -66,8 +66,8 @@ class tree_edit_distance {
             if (empty($node->children)) {
                 $l[$i] = $i;
             } else {
-                $first_child_pos = $position_of_id[spl_object_id($node->children[0])];
-                $l[$i] = $l[$first_child_pos];
+                $firstchildpos = $positionofid[spl_object_id($node->children[0])];
+                $l[$i] = $l[$firstchildpos];
             }
         }
         return $l;
@@ -82,11 +82,11 @@ class tree_edit_distance {
      * @return int[]
      */
     private static function keyroots(array $l, int $n): array {
-        $last_index_for_l = [];
+        $lastindexforl = [];
         for ($i = 1; $i <= $n; $i++) {
-            $last_index_for_l[$l[$i]] = $i;
+            $lastindexforl[$l[$i]] = $i;
         }
-        $values = array_values($last_index_for_l);
+        $values = array_values($lastindexforl);
         sort($values);
         return $values;
     }
@@ -96,49 +96,49 @@ class tree_edit_distance {
      * edit-operation model used to measure how far a student's submitted CAS
      * expression tree is from the correct answer's tree.
      */
-    public static function tree_edit_distance(expr_node $tree_a, expr_node $tree_b): int {
-        $nodes_a = self::postorder($tree_a);
-        $nodes_b = self::postorder($tree_b);
-        $n = count($nodes_a);
-        $m = count($nodes_b);
+    public static function tree_edit_distance(expr_node $treea, expr_node $treeb): int {
+        $nodesa = self::postorder($treea);
+        $nodesb = self::postorder($treeb);
+        $n = count($nodesa);
+        $m = count($nodesb);
 
-        $l_a = self::leftmost_leaf_positions($nodes_a);
-        $l_b = self::leftmost_leaf_positions($nodes_b);
-        $keyroots_a = self::keyroots($l_a, $n);
-        $keyroots_b = self::keyroots($l_b, $m);
+        $la = self::leftmost_leaf_positions($nodesa);
+        $lb = self::leftmost_leaf_positions($nodesb);
+        $keyrootsa = self::keyroots($la, $n);
+        $keyrootsb = self::keyroots($lb, $m);
 
-        $label_a = [];
+        $labela = [];
         for ($i = 1; $i <= $n; $i++) {
-            $label_a[$i] = $nodes_a[$i - 1]->label;
+            $labela[$i] = $nodesa[$i - 1]->label;
         }
-        $label_b = [];
+        $labelb = [];
         for ($j = 1; $j <= $m; $j++) {
-            $label_b[$j] = $nodes_b[$j - 1]->label;
+            $labelb[$j] = $nodesb[$j - 1]->label;
         }
 
         $treedist = [];
 
-        foreach ($keyroots_a as $i) {
-            foreach ($keyroots_b as $j) {
+        foreach ($keyrootsa as $i) {
+            foreach ($keyrootsb as $j) {
                 $key = fn($x, $y) => "{$x},{$y}";
-                $forestdist = [$key($l_a[$i] - 1, $l_b[$j] - 1) => 0];
+                $forestdist = [$key($la[$i] - 1, $lb[$j] - 1) => 0];
 
-                for ($i1 = $l_a[$i]; $i1 <= $i; $i1++) {
-                    $forestdist[$key($i1, $l_b[$j] - 1)] = $forestdist[$key($i1 - 1, $l_b[$j] - 1)] + 1;
+                for ($i1 = $la[$i]; $i1 <= $i; $i1++) {
+                    $forestdist[$key($i1, $lb[$j] - 1)] = $forestdist[$key($i1 - 1, $lb[$j] - 1)] + 1;
                 }
 
-                for ($j1 = $l_b[$j]; $j1 <= $j; $j1++) {
-                    $forestdist[$key($l_a[$i] - 1, $j1)] = $forestdist[$key($l_a[$i] - 1, $j1 - 1)] + 1;
+                for ($j1 = $lb[$j]; $j1 <= $j; $j1++) {
+                    $forestdist[$key($la[$i] - 1, $j1)] = $forestdist[$key($la[$i] - 1, $j1 - 1)] + 1;
                 }
 
-                for ($i1 = $l_a[$i]; $i1 <= $i; $i1++) {
-                    for ($j1 = $l_b[$j]; $j1 <= $j; $j1++) {
-                        if ($l_a[$i1] === $l_a[$i] && $l_b[$j1] === $l_b[$j]) {
-                            $rename_cost = ($label_a[$i1] === $label_b[$j1]) ? 0 : 1;
+                for ($i1 = $la[$i]; $i1 <= $i; $i1++) {
+                    for ($j1 = $lb[$j]; $j1 <= $j; $j1++) {
+                        if ($la[$i1] === $la[$i] && $lb[$j1] === $lb[$j]) {
+                            $renamecost = ($labela[$i1] === $labelb[$j1]) ? 0 : 1;
                             $dist = min(
                                 $forestdist[$key($i1 - 1, $j1)] + 1,
                                 $forestdist[$key($i1, $j1 - 1)] + 1,
-                                $forestdist[$key($i1 - 1, $j1 - 1)] + $rename_cost
+                                $forestdist[$key($i1 - 1, $j1 - 1)] + $renamecost
                             );
                             $forestdist[$key($i1, $j1)] = $dist;
                             $treedist[$key($i1, $j1)] = $dist;
@@ -146,7 +146,7 @@ class tree_edit_distance {
                             $dist = min(
                                 $forestdist[$key($i1 - 1, $j1)] + 1,
                                 $forestdist[$key($i1, $j1 - 1)] + 1,
-                                $forestdist[$key($l_a[$i1] - 1, $l_b[$j1] - 1)] + $treedist[$key($i1, $j1)]
+                                $forestdist[$key($la[$i1] - 1, $lb[$j1] - 1)] + $treedist[$key($i1, $j1)]
                             );
                             $forestdist[$key($i1, $j1)] = $dist;
                         }

@@ -29,26 +29,26 @@ class difficulty {
      * Compute difficulty, marks stats, and discrimination index D using
      * Pool B (Best Attempt per Student).
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[] one row per question
      */
-    public static function compute_difficulty_metrics(array $response_rows): array {
-        if (empty($response_rows)) {
+    public static function compute_difficulty_metrics(array $responserows): array {
+        if (empty($responserows)) {
             return [];
         }
 
-        $pools = parser::get_attempt_pools($response_rows);
-        $pool_b = $pools['pool_b'];
+        $pools = parser::get_attempt_pools($responserows);
+        $poolb = $pools['pool_b'];
 
-        $questions = table_helpers::unique_sorted_by_question($pool_b, 'question');
+        $questions = table_helpers::unique_sorted_by_question($poolb, 'question');
 
         // Overall quiz performance per student in Pool B, for the top/bottom
         // 27% cohort ranking below — one overall_grade per student (all their
         // Pool B rows share the same attempt-level overall_grade).
-        $student_scores = [];
-        foreach ($pool_b as $row) {
-            if (!array_key_exists($row['student_id'], $student_scores)) {
-                $student_scores[$row['student_id']] = $row['overall_grade'];
+        $studentscores = [];
+        foreach ($poolb as $row) {
+            if (!array_key_exists($row['student_id'], $studentscores)) {
+                $studentscores[$row['student_id']] = $row['overall_grade'];
             }
         }
         // Known, accepted divergence from the Python original: when several
@@ -65,53 +65,53 @@ class difficulty {
         // for questions where a tied student's pass/fail differs from the
         // rest of the tied group, and only when a tie actually straddles the
         // cutoff — everything else in this function is unaffected.
-        arsort($student_scores, SORT_NUMERIC);
-        $sorted_students = array_keys($student_scores);
-        $n_students = count($sorted_students);
+        arsort($studentscores, SORT_NUMERIC);
+        $sortedstudents = array_keys($studentscores);
+        $nstudents = count($sortedstudents);
 
-        $k = $n_students > 0 ? max(1, (int) py_compat::round(0.27 * $n_students)) : 0;
-        $top_group = $k > 0 ? array_flip(array_slice($sorted_students, 0, $k)) : [];
-        $bottom_group = $k > 0 ? array_flip(array_slice($sorted_students, -$k)) : [];
+        $k = $nstudents > 0 ? max(1, (int) py_compat::round(0.27 * $nstudents)) : 0;
+        $topgroup = $k > 0 ? array_flip(array_slice($sortedstudents, 0, $k)) : [];
+        $bottomgroup = $k > 0 ? array_flip(array_slice($sortedstudents, -$k)) : [];
 
         $rows = [];
         foreach ($questions as $q) {
-            $q_b = array_values(array_filter($pool_b, fn($r) => $r['question'] === $q));
-            if (empty($q_b)) {
+            $qb = array_values(array_filter($poolb, fn($r) => $r['question'] === $q));
+            if (empty($qb)) {
                 continue;
             }
 
-            $scores10 = array_map(fn($r) => $r['grade'] === null ? null : $r['grade'] * 10.0, $q_b);
-            $avg_marks = stats::mean($scores10);
-            $median_marks = stats::median($scores10);
-            $non_null_count = count(array_filter($scores10, fn($v) => $v !== null));
-            $std_marks = $non_null_count > 1 ? stats::sample_stdev($scores10) : 0.0;
-            $var_marks = $non_null_count > 1 ? stats::sample_variance($scores10) : 0.0;
+            $scores10 = array_map(fn($r) => $r['grade'] === null ? null : $r['grade'] * 10.0, $qb);
+            $avgmarks = stats::mean($scores10);
+            $medianmarks = stats::median($scores10);
+            $nonnullcount = count(array_filter($scores10, fn($v) => $v !== null));
+            $stdmarks = $nonnullcount > 1 ? stats::sample_stdev($scores10) : 0.0;
+            $varmarks = $nonnullcount > 1 ? stats::sample_variance($scores10) : 0.0;
 
-            $len_qb = count($q_b);
-            $correct_count = count(array_filter($q_b, fn($r) => $r['grade'] === 1.0));
-            $facility = $len_qb > 0 ? $correct_count / $len_qb : 0.0;
-            $success_rate = $facility * 100.0;
+            $lenqb = count($qb);
+            $correctcount = count(array_filter($qb, fn($r) => $r['grade'] === 1.0));
+            $facility = $lenqb > 0 ? $correctcount / $lenqb : 0.0;
+            $successrate = $facility * 100.0;
 
-            $top_q = array_values(array_filter($q_b, fn($r) => isset($top_group[$r['student_id']])));
-            $bottom_q = array_values(array_filter($q_b, fn($r) => isset($bottom_group[$r['student_id']])));
+            $topq = array_values(array_filter($qb, fn($r) => isset($topgroup[$r['student_id']])));
+            $bottomq = array_values(array_filter($qb, fn($r) => isset($bottomgroup[$r['student_id']])));
 
-            $f_top = count($top_q) > 0
-                ? count(array_filter($top_q, fn($r) => $r['grade'] === 1.0)) / count($top_q)
+            $ftop = count($topq) > 0
+                ? count(array_filter($topq, fn($r) => $r['grade'] === 1.0)) / count($topq)
                 : 0.0;
-            $f_bottom = count($bottom_q) > 0
-                ? count(array_filter($bottom_q, fn($r) => $r['grade'] === 1.0)) / count($bottom_q)
+            $fbottom = count($bottomq) > 0
+                ? count(array_filter($bottomq, fn($r) => $r['grade'] === 1.0)) / count($bottomq)
                 : 0.0;
-            $d_index = $f_top - $f_bottom;
+            $dindex = $ftop - $fbottom;
 
             $rows[] = [
                 'question' => $q,
-                'difficulty_index' => py_compat::round($success_rate, 2),
-                'discrimination_index' => py_compat::round($d_index, 4),
-                'average_marks' => py_compat::round($avg_marks, 2),
-                'median_marks' => py_compat::round($median_marks, 2),
-                'standard_deviation' => py_compat::round($std_marks, 2),
-                'variance' => py_compat::round($var_marks, 2),
-                'success_rate' => py_compat::round($success_rate, 2),
+                'difficulty_index' => py_compat::round($successrate, 2),
+                'discrimination_index' => py_compat::round($dindex, 4),
+                'average_marks' => py_compat::round($avgmarks, 2),
+                'median_marks' => py_compat::round($medianmarks, 2),
+                'standard_deviation' => py_compat::round($stdmarks, 2),
+                'variance' => py_compat::round($varmarks, 2),
+                'success_rate' => py_compat::round($successrate, 2),
             ];
         }
 

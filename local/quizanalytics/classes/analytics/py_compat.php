@@ -61,41 +61,41 @@ class py_compat {
         $abs = abs($value);
 
         $str = sprintf('%.30f', $abs);
-        [$int_part, $frac_part] = explode('.', $str);
+        [$intpart, $fracpart] = explode('.', $str);
 
         if ($ndigits <= 0) {
-            $kept_digits = $int_part;
-            $round_digit = $frac_part[0] ?? '0';
-            $rest_is_zero = ltrim(substr($frac_part, 1), '0') === '';
+            $keptdigits = $intpart;
+            $rounddigit = $fracpart[0] ?? '0';
+            $restiszero = ltrim(substr($fracpart, 1), '0') === '';
         } else {
-            $kept_digits = $int_part . substr($frac_part, 0, $ndigits);
-            $remainder = substr($frac_part, $ndigits);
-            $round_digit = $remainder[0] ?? '0';
-            $rest_is_zero = ltrim(substr($remainder, 1), '0') === '';
+            $keptdigits = $intpart . substr($fracpart, 0, $ndigits);
+            $remainder = substr($fracpart, $ndigits);
+            $rounddigit = $remainder[0] ?? '0';
+            $restiszero = ltrim(substr($remainder, 1), '0') === '';
         }
-        $last_kept_digit = (int) substr($kept_digits, -1);
+        $lastkeptdigit = (int) substr($keptdigits, -1);
 
-        $round_up = false;
-        if ($round_digit > '5') {
-            $round_up = true;
-        } else if ($round_digit === '5') {
+        $roundup = false;
+        if ($rounddigit > '5') {
+            $roundup = true;
+        } else if ($rounddigit === '5') {
             // Exact tie (nothing nonzero beyond the 5) -> round to even;
             // otherwise the true value is past the midpoint -> round up.
-            $round_up = !$rest_is_zero || ($last_kept_digit % 2) !== 0;
+            $roundup = !$restiszero || ($lastkeptdigit % 2) !== 0;
         }
 
-        if ($round_up) {
-            $kept_digits = self::increment_digit_string($kept_digits);
+        if ($roundup) {
+            $keptdigits = self::increment_digit_string($keptdigits);
         }
 
         if ($ndigits <= 0) {
-            $result = (float) $kept_digits;
+            $result = (float) $keptdigits;
         } else {
-            // $kept_digits may have grown by one digit if incrementing
+            // $keptdigits may have grown by one digit if incrementing
             // carried all the way through (e.g. "1999" -> "2000") — the
             // decimal point still belongs $ndigits from the right regardless.
-            $int_len = strlen($kept_digits) - $ndigits;
-            $result = (float) (substr($kept_digits, 0, $int_len) . '.' . substr($kept_digits, $int_len));
+            $intlen = strlen($keptdigits) - $ndigits;
+            $result = (float) (substr($keptdigits, 0, $intlen) . '.' . substr($keptdigits, $intlen));
         }
 
         return $negative ? -$result : $result;

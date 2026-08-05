@@ -108,13 +108,13 @@ class chart_helpers {
     }
 
     /** Categorical chart palette: $default normally, or the colorblind-safe Safe palette. */
-    public static function qualitative_colors(bool $colorblind_mode, array $default): array {
-        return $colorblind_mode ? self::PALETTE_SAFE : $default;
+    public static function qualitative_colors(bool $colorblindmode, array $default): array {
+        return $colorblindmode ? self::PALETTE_SAFE : $default;
     }
 
     /** Diverging red/yellow/green pass-rate scale, or its colorblind-safe equivalent. */
-    public static function pass_fail_scale(bool $colorblind_mode): array {
-        return $colorblind_mode ? self::PASS_FAIL_SCALE_COLORBLIND : self::PASS_FAIL_SCALE_DEFAULT;
+    public static function pass_fail_scale(bool $colorblindmode): array {
+        return $colorblindmode ? self::PASS_FAIL_SCALE_COLORBLIND : self::PASS_FAIL_SCALE_DEFAULT;
     }
 
     /**
@@ -162,11 +162,11 @@ class chart_helpers {
      * client-side from the raw y values, matching what px.box does.
      *
      * @param string[] $categories in display order
-     * @param array<string, float[]> $values_by_category
+     * @param array<string, float[]> $valuesbycategory
      */
     public static function build_box_figure(
         array $categories,
-        array $values_by_category,
+        array $valuesbycategory,
         string $title,
         string $xtitle,
         string $ytitle,
@@ -176,7 +176,7 @@ class chart_helpers {
         foreach ($categories as $i => $cat) {
             $data[] = [
                 'type' => 'box',
-                'y' => array_values($values_by_category[$cat] ?? []),
+                'y' => array_values($valuesbycategory[$cat] ?? []),
                 'x0' => $cat,
                 'name' => (string) $cat,
                 'marker' => ['color' => $palette[$i % count($palette)]],
@@ -253,7 +253,7 @@ class chart_helpers {
         ?float $zmin = null,
         ?float $zmax = null,
         ?int $height = null,
-        ?string $plot_bgcolor = null
+        ?string $plotbgcolor = null
     ): array {
         $trace = [
             'type' => 'heatmap',
@@ -277,16 +277,16 @@ class chart_helpers {
         // a width-constrained page (Bootstrap container, not the full
         // viewport) doesn't always reserve enough room on the first layout
         // pass.
-        $longest_ylabel = 0;
+        $longestylabel = 0;
         foreach ($ylabels as $label) {
-            $longest_ylabel = max($longest_ylabel, strlen((string) $label));
+            $longestylabel = max($longestylabel, strlen((string) $label));
         }
-        $left_margin = (int) min(320, max(80, 6.5 * $longest_ylabel + 20));
+        $leftmargin = (int) min(320, max(80, 6.5 * $longestylabel + 20));
 
         $layout = [
             'title' => ['text' => $title],
             'template' => 'plotly',
-            'margin' => ['l' => $left_margin, 'r' => 40, 't' => 60, 'b' => 60],
+            'margin' => ['l' => $leftmargin, 'r' => 40, 't' => 60, 'b' => 60],
             'xaxis' => [
                 'tickmode' => 'array',
                 'tickvals' => count($xlabels) > 0 ? range(0, count($xlabels) - 1) : [],
@@ -305,8 +305,8 @@ class chart_helpers {
         if ($height !== null) {
             $layout['height'] = $height;
         }
-        if ($plot_bgcolor !== null) {
-            $layout['plot_bgcolor'] = $plot_bgcolor;
+        if ($plotbgcolor !== null) {
+            $layout['plot_bgcolor'] = $plotbgcolor;
         }
 
         return ['data' => [$trace], 'layout' => $layout];

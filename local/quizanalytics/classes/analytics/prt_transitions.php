@@ -38,9 +38,9 @@ class prt_transitions {
      * The PRT dict for one part of a multi-part question (prt1 -> part_index
      * 1, prt2 -> 2, ...), or null if this response has no such part.
      */
-    public static function get_part(array $row, int $part_index = 1): ?array {
+    public static function get_part(array $row, int $partindex = 1): ?array {
         foreach (($row['prt_list'] ?? []) as $prt) {
-            if (($prt['index'] ?? null) === $part_index) {
+            if (($prt['index'] ?? null) === $partindex) {
                 return $prt;
             }
         }
@@ -53,17 +53,17 @@ class prt_transitions {
      * response can omit trailing parts, so the maximum rather than the first
      * row's count is what's authoritative.
      */
-    public static function count_question_parts(array $response_rows, string $question): int {
-        $max_index = 0;
-        foreach ($response_rows as $row) {
+    public static function count_question_parts(array $responserows, string $question): int {
+        $maxindex = 0;
+        foreach ($responserows as $row) {
             if ($row['question'] !== $question) {
                 continue;
             }
             foreach (($row['prt_list'] ?? []) as $prt) {
-                $max_index = max($max_index, (int) ($prt['index'] ?? 0));
+                $maxindex = max($maxindex, (int) ($prt['index'] ?? 0));
             }
         }
-        return max($max_index, 1);
+        return max($maxindex, 1);
     }
 
     /**
@@ -97,8 +97,8 @@ class prt_transitions {
      * row's overall response_status, which on a multi-part question only
      * says "every part was right".
      */
-    public static function classify_node(array $row, int $part_index = 1): string {
-        $part = self::get_part($row, $part_index);
+    public static function classify_node(array $row, int $partindex = 1): string {
+        $part = self::get_part($row, $partindex);
         if ($part === null) {
             return '0';
         }
@@ -112,11 +112,11 @@ class prt_transitions {
             return '0';
         }
 
-        [$node_number, $outcome] = $terminal;
+        [$nodenumber, $outcome] = $terminal;
         if ($outcome !== 'T') {
             return '0';
         }
-        return $node_number === 1 ? 'c' : (string) ($node_number - 1);
+        return $nodenumber === 1 ? 'c' : (string) ($nodenumber - 1);
     }
 
     /**
@@ -145,21 +145,21 @@ class prt_transitions {
     /**
      * Ordered (by completed_dt, then attempt_idx) node-classification
      * sequence for one student's attempts at one part of one question.
-     * $response_rows should be Pool A (all attempts, not just each student's
+     * $responserows should be Pool A (all attempts, not just each student's
      * best) so a retry trajectory is visible.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[] each {attempt_order, node, grade, completed_dt, attempt_idx}
      */
     public static function build_student_node_sequence(
-        array $response_rows,
+        array $responserows,
         string $question,
-        string $student_id,
-        int $part_index = 1
+        string $studentid,
+        int $partindex = 1
     ): array {
         $rows = array_values(array_filter(
-            $response_rows,
-            fn($r) => $r['question'] === $question && $r['student_id'] === $student_id
+            $responserows,
+            fn($r) => $r['question'] === $question && $r['student_id'] === $studentid
         ));
         if (empty($rows)) {
             return [];
@@ -177,7 +177,7 @@ class prt_transitions {
         foreach ($rows as $order => $row) {
             $out[] = [
                 'attempt_order' => $order,
-                'node' => self::classify_node($row, $part_index),
+                'node' => self::classify_node($row, $partindex),
                 'grade' => $row['grade'],
                 'completed_dt' => $row['completed_dt'],
                 'attempt_idx' => $row['attempt_idx'],
@@ -206,12 +206,12 @@ class prt_transitions {
      * transition-pair counts across every student's sequence for one part of
      * $question, aggregated over the whole class.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array{0: string[], 1: array<string, int>} nodes, edge_counts
      *         keyed on "src|dst"
      */
-    public static function build_aggregate_graph(array $response_rows, string $question, int $part_index = 1): array {
-        $question_rows = array_values(array_filter($response_rows, fn($r) => $r['question'] === $question));
+    public static function build_aggregate_graph(array $responserows, string $question, int $partindex = 1): array {
+        $questionrows = array_values(array_filter($responserows, fn($r) => $r['question'] === $question));
         // A plain list, not an associative "set" keyed on the label itself:
         // PHP silently casts numeric-string array keys ("0") to int keys, and
         // node labels are exactly that ("0", "1", "2", ... or "c") — using
@@ -221,29 +221,29 @@ class prt_transitions {
         // array_unique()/array_values() below dedupe by value, not key, so
         // they don't have this problem.
         $nodes = ['0', 'c'];
-        $edge_counts = [];
+        $edgecounts = [];
 
-        $seen_students = [];
-        foreach ($question_rows as $row) {
-            $seen_students[$row['student_id']] = true;
+        $seenstudents = [];
+        foreach ($questionrows as $row) {
+            $seenstudents[$row['student_id']] = true;
         }
 
-        foreach (array_keys($seen_students) as $student_id) {
-            $seq = self::build_student_node_sequence($response_rows, $question, $student_id, $part_index);
-            $seq_nodes = array_map(fn($r) => $r['node'], $seq);
-            foreach ($seq_nodes as $n) {
+        foreach (array_keys($seenstudents) as $studentid) {
+            $seq = self::build_student_node_sequence($responserows, $question, $studentid, $partindex);
+            $seqnodes = array_map(fn($r) => $r['node'], $seq);
+            foreach ($seqnodes as $n) {
                 $nodes[] = $n;
             }
-            foreach (self::build_transition_pairs($seq_nodes) as [$src, $dst]) {
+            foreach (self::build_transition_pairs($seqnodes) as [$src, $dst]) {
                 $key = "{$src}|{$dst}";
-                $edge_counts[$key] = ($edge_counts[$key] ?? 0) + 1;
+                $edgecounts[$key] = ($edgecounts[$key] ?? 0) + 1;
             }
         }
 
-        $node_list = array_values(array_unique($nodes));
-        usort($node_list, fn($a, $b) => self::node_cmp($a, $b));
+        $nodelist = array_values(array_unique($nodes));
+        usort($nodelist, fn($a, $b) => self::node_cmp($a, $b));
 
-        return [$node_list, $edge_counts];
+        return [$nodelist, $edgecounts];
     }
 
     /**
@@ -251,25 +251,25 @@ class prt_transitions {
      * (degree / (n-1)), computed directly from the edge-count dict.
      *
      * @param string[] $nodes
-     * @param array<string, int> $edge_counts keyed on "src|dst"
+     * @param array<string, int> $edgecounts keyed on "src|dst"
      * @return array[] one row per node
      */
-    public static function compute_network_features(array $nodes, array $edge_counts): array {
+    public static function compute_network_features(array $nodes, array $edgecounts): array {
         $n = count($nodes);
         $denom = max($n - 1, 1);
 
-        $in_degree = array_fill_keys($nodes, 0);
-        $out_degree = array_fill_keys($nodes, 0);
-        foreach ($edge_counts as $key => $weight) {
+        $indegree = array_fill_keys($nodes, 0);
+        $outdegree = array_fill_keys($nodes, 0);
+        foreach ($edgecounts as $key => $weight) {
             [$src, $dst] = explode('|', $key);
-            $out_degree[$src] = ($out_degree[$src] ?? 0) + $weight;
-            $in_degree[$dst] = ($in_degree[$dst] ?? 0) + $weight;
+            $outdegree[$src] = ($outdegree[$src] ?? 0) + $weight;
+            $indegree[$dst] = ($indegree[$dst] ?? 0) + $weight;
         }
 
         $rows = [];
         foreach ($nodes as $node) {
-            $indeg = $in_degree[$node] ?? 0;
-            $outdeg = $out_degree[$node] ?? 0;
+            $indeg = $indegree[$node] ?? 0;
+            $outdeg = $outdegree[$node] ?? 0;
             $rows[] = [
                 'node' => $node,
                 'in_degree' => $indeg,
@@ -317,23 +317,23 @@ class prt_transitions {
      * scaled from transition count.
      *
      * @param string[] $nodes
-     * @param array<string, int> $edge_counts keyed on "src|dst"
+     * @param array<string, int> $edgecounts keyed on "src|dst"
      */
     public static function build_transition_graph_figure(
         array $nodes,
-        array $edge_counts,
-        bool $colorblind_mode = false,
+        array $edgecounts,
+        bool $colorblindmode = false,
         string $title = ''
     ): array {
         $positions = self::circular_layout($nodes);
-        $scale = $colorblind_mode ? self::COLORBLIND_TRAFFIC_SCALE : self::DEFAULT_TRAFFIC_SCALE;
+        $scale = $colorblindmode ? self::COLORBLIND_TRAFFIC_SCALE : self::DEFAULT_TRAFFIC_SCALE;
 
-        $weights = array_values(array_filter($edge_counts, fn($w) => $w > 0));
-        $min_w = !empty($weights) ? min($weights) : 0;
-        $max_w = !empty($weights) ? max($weights) : 0;
+        $weights = array_values(array_filter($edgecounts, fn($w) => $w > 0));
+        $minw = !empty($weights) ? min($weights) : 0;
+        $maxw = !empty($weights) ? max($weights) : 0;
 
-        $style = function (float $weight) use ($min_w, $max_w, $scale): array {
-            $norm = ($max_w == $min_w) ? 0.5 : ($weight - $min_w) / ($max_w - $min_w);
+        $style = function (float $weight) use ($minw, $maxw, $scale): array {
+            $norm = ($maxw == $minw) ? 0.5 : ($weight - $minw) / ($maxw - $minw);
             $width = 1.5 + $norm * 9.0;
             $color = chart_helpers::sample_colorscale_color($scale, $norm);
             return [$width, $color];
@@ -342,7 +342,7 @@ class prt_transitions {
         $data = [];
         $annotations = [];
 
-        foreach ($edge_counts as $key => $weight) {
+        foreach ($edgecounts as $key => $weight) {
             [$src, $dst] = explode('|', $key);
             if (!isset($positions[$src]) || !isset($positions[$dst])) {
                 continue;
@@ -352,20 +352,20 @@ class prt_transitions {
             [$x1, $y1] = $positions[$dst];
 
             if ($src === $dst) {
-                $norm_len = hypot($x0, $y0) ?: 1.0;
-                $ox = $x0 / $norm_len;
-                $oy = $y0 / $norm_len;
+                $normlen = hypot($x0, $y0) ?: 1.0;
+                $ox = $x0 / $normlen;
+                $oy = $y0 / $normlen;
                 $cx = $x0 + $ox * 0.28;
                 $cy = $y0 + $oy * 0.28;
-                $loop_x = [];
-                $loop_y = [];
+                $loopx = [];
+                $loopy = [];
                 for ($i = 0; $i <= 40; $i++) {
                     $t = $i / 40 * 2 * M_PI;
-                    $loop_x[] = $cx + 0.14 * cos($t);
-                    $loop_y[] = $cy + 0.14 * sin($t);
+                    $loopx[] = $cx + 0.14 * cos($t);
+                    $loopy[] = $cy + 0.14 * sin($t);
                 }
                 $data[] = [
-                    'type' => 'scatter', 'x' => $loop_x, 'y' => $loop_y, 'mode' => 'lines',
+                    'type' => 'scatter', 'x' => $loopx, 'y' => $loopy, 'mode' => 'lines',
                     'line' => ['width' => $width, 'color' => $color],
                     'hoverinfo' => 'text', 'text' => "{$src} \u{2192} {$dst}: " . self::format_g($weight),
                     'showlegend' => false,
@@ -396,28 +396,28 @@ class prt_transitions {
             ];
         }
 
-        $ordered_nodes = array_values(array_unique($nodes));
-        usort($ordered_nodes, fn($a, $b) => self::node_cmp($a, $b));
-        $node_colors = [];
-        foreach ($ordered_nodes as $node) {
+        $orderednodes = array_values(array_unique($nodes));
+        usort($orderednodes, fn($a, $b) => self::node_cmp($a, $b));
+        $nodecolors = [];
+        foreach ($orderednodes as $node) {
             if ($node === '0') {
-                $node_colors[] = '#9ca3af';
+                $nodecolors[] = '#9ca3af';
             } else if ($node === 'c') {
-                $node_colors[] = $colorblind_mode ? '#0072B2' : '#16a34a';
+                $nodecolors[] = $colorblindmode ? '#0072B2' : '#16a34a';
             } else {
-                $node_colors[] = $colorblind_mode ? '#F0E442' : '#3b82f6';
+                $nodecolors[] = $colorblindmode ? '#F0E442' : '#3b82f6';
             }
         }
 
         $data[] = [
             'type' => 'scatter',
-            'x' => array_map(fn($n) => $positions[$n][0], $ordered_nodes),
-            'y' => array_map(fn($n) => $positions[$n][1], $ordered_nodes),
+            'x' => array_map(fn($n) => $positions[$n][0], $orderednodes),
+            'y' => array_map(fn($n) => $positions[$n][1], $orderednodes),
             'mode' => 'markers+text',
-            'text' => $ordered_nodes,
+            'text' => $orderednodes,
             'textposition' => 'middle center',
-            'textfont' => ['color' => $colorblind_mode ? 'black' : 'white', 'size' => 13],
-            'marker' => ['size' => 34, 'color' => $node_colors, 'line' => ['width' => 2, 'color' => 'white']],
+            'textfont' => ['color' => $colorblindmode ? 'black' : 'white', 'size' => 13],
+            'marker' => ['size' => 34, 'color' => $nodecolors, 'line' => ['width' => 2, 'color' => 'white']],
             'hoverinfo' => 'text',
             'showlegend' => false,
         ];

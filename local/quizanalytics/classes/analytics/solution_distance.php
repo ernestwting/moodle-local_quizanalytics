@@ -64,8 +64,8 @@ class solution_distance {
      * compute_prt_distance_series() once the per-question max classified
      * distance is known).
      */
-    private static function raw_prt_distance(array $row, int $part_index = 1): ?int {
-        $label = prt_transitions::classify_node($row, $part_index);
+    private static function raw_prt_distance(array $row, int $partindex = 1): ?int {
+        $label = prt_transitions::classify_node($row, $partindex);
         if ($label === 'c') {
             return 0;
         }
@@ -84,16 +84,16 @@ class solution_distance {
      * classified distance — for every response that terminated False, or has
      * no PRT trace at all (blank/invalid).
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[] rows for $question with a 'prt_distance' int field added
      */
-    public static function compute_prt_distance_series(array $response_rows, string $question, int $part_index = 1): array {
-        $subset = array_values(array_filter($response_rows, fn($r) => $r['question'] === $question));
+    public static function compute_prt_distance_series(array $responserows, string $question, int $partindex = 1): array {
+        $subset = array_values(array_filter($responserows, fn($r) => $r['question'] === $question));
         if (empty($subset)) {
             return [];
         }
 
-        $raw = array_map(fn($r) => self::raw_prt_distance($r, $part_index), $subset);
+        $raw = array_map(fn($r) => self::raw_prt_distance($r, $partindex), $subset);
         $classified = array_values(array_filter($raw, fn($v) => $v !== null));
         $sentinel = !empty($classified) ? (max($classified) + 3) : 3;
 
@@ -107,13 +107,13 @@ class solution_distance {
      * First ansN: <expr> [tag] expression from a raw response/right-answer
      * dump.
      */
-    private static function extract_expression(string $text, int $ans_index = 1): ?string {
+    private static function extract_expression(string $text, int $ansindex = 1): ?string {
         if ($text === '') {
             return null;
         }
         if (preg_match_all(self::ANS_PATTERN, $text, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $m) {
-                if ((int) $m[1] === $ans_index) {
+                if ((int) $m[1] === $ansindex) {
                     return trim($m[2]);
                 }
             }
@@ -121,24 +121,24 @@ class solution_distance {
         return null;
     }
 
-    private static array $ted_cache = [];
+    private static array $tedcache = [];
 
     /**
      * TED for one (submitted, correct) expression-string pair, cached since
      * many students commonly submit the exact same wrong answer for a given
      * question.
      */
-    private static function cached_tree_edit_distance(string $submitted_text, string $correct_text): ?int {
-        $key = $submitted_text . "\x00" . $correct_text;
-        if (array_key_exists($key, self::$ted_cache)) {
-            return self::$ted_cache[$key];
+    private static function cached_tree_edit_distance(string $submittedtext, string $correcttext): ?int {
+        $key = $submittedtext . "\x00" . $correcttext;
+        if (array_key_exists($key, self::$tedcache)) {
+            return self::$tedcache[$key];
         }
-        $submitted_tree = expression_tree::parse_expression($submitted_text);
-        $correct_tree = expression_tree::parse_expression($correct_text);
-        $result = ($submitted_tree === null || $correct_tree === null)
+        $submittedtree = expression_tree::parse_expression($submittedtext);
+        $correcttree = expression_tree::parse_expression($correcttext);
+        $result = ($submittedtree === null || $correcttree === null)
             ? null
-            : tree_edit_distance::tree_edit_distance($submitted_tree, $correct_tree);
-        self::$ted_cache[$key] = $result;
+            : tree_edit_distance::tree_edit_distance($submittedtree, $correcttree);
+        self::$tedcache[$key] = $result;
         return $result;
     }
 
@@ -152,11 +152,11 @@ class solution_distance {
      * parsed get ted_distance = null and should be excluded from any chart
      * built on this field.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[] rows for $question with a 'ted_distance' field added
      */
-    public static function compute_ted_distance_series(array $response_rows, string $question, int $part_index = 1): array {
-        $subset = array_values(array_filter($response_rows, fn($r) => $r['question'] === $question));
+    public static function compute_ted_distance_series(array $responserows, string $question, int $partindex = 1): array {
+        $subset = array_values(array_filter($responserows, fn($r) => $r['question'] === $question));
         if (empty($subset)) {
             return [];
         }
@@ -166,26 +166,26 @@ class solution_distance {
         // legitimate submitted or correct expression can be the literal
         // text "0", which is falsy in PHP (unlike Python, where a non-empty
         // string is always truthy) — `if ($expr)` would silently drop it.
-        $correct_expr_text = null;
+        $correctexprtext = null;
         foreach ($subset as $row) {
-            $correct_expr_text = self::extract_expression((string) ($row['right_answer_text'] ?? ''), $part_index);
-            if ($correct_expr_text !== null && $correct_expr_text !== '') {
+            $correctexprtext = self::extract_expression((string) ($row['right_answer_text'] ?? ''), $partindex);
+            if ($correctexprtext !== null && $correctexprtext !== '') {
                 break;
             }
         }
 
         foreach ($subset as $i => $row) {
             $ted = null;
-            if ($correct_expr_text !== null && $correct_expr_text !== '') {
-                $submitted_expr = null;
+            if ($correctexprtext !== null && $correctexprtext !== '') {
+                $submittedexpr = null;
                 foreach (($row['ans_list'] ?? []) as $a) {
-                    if (($a['index'] ?? null) === $part_index) {
-                        $submitted_expr = $a['expression'] ?? null;
+                    if (($a['index'] ?? null) === $partindex) {
+                        $submittedexpr = $a['expression'] ?? null;
                         break;
                     }
                 }
-                if ($submitted_expr !== null && $submitted_expr !== '') {
-                    $ted = self::cached_tree_edit_distance($submitted_expr, $correct_expr_text);
+                if ($submittedexpr !== null && $submittedexpr !== '') {
+                    $ted = self::cached_tree_edit_distance($submittedexpr, $correctexprtext);
                 }
             }
             $subset[$i]['ted_distance'] = $ted !== null ? min($ted, self::MAX_TED_DISPLAY) : null;
@@ -200,15 +200,15 @@ class solution_distance {
      * lexicographically (unparseable/null distances sort after every known
      * value, via PHP_INT_MAX standing in for Python's float('inf')).
      *
-     * @param array[] $distance_subset rows with $distance_column present
+     * @param array[] $distancesubset rows with $distancecolumn present
      * @return array<string, int> student_id => 1-based rank
      */
-    public static function compute_question_student_order(array $distance_subset, string $distance_column): array {
-        if (empty($distance_subset)) {
+    public static function compute_question_student_order(array $distancesubset, string $distancecolumn): array {
+        if (empty($distancesubset)) {
             return [];
         }
 
-        $rows = $distance_subset;
+        $rows = $distancesubset;
         usort($rows, function ($a, $b) {
             $cmp = strcmp((string) $a['student_id'], (string) $b['student_id']);
             if ($cmp !== 0) {
@@ -221,72 +221,72 @@ class solution_distance {
             return $a['attempt_idx'] <=> $b['attempt_idx'];
         });
 
-        $by_student = [];
+        $bystudent = [];
         foreach ($rows as $row) {
-            $by_student[$row['student_id']][] = $row;
+            $bystudent[$row['student_id']][] = $row;
         }
 
         $entries = [];
-        foreach ($by_student as $student_id => $group) {
-            $sequence = array_map(function ($row) use ($distance_column) {
-                $v = $row[$distance_column] ?? null;
+        foreach ($bystudent as $studentid => $group) {
+            $sequence = array_map(function ($row) use ($distancecolumn) {
+                $v = $row[$distancecolumn] ?? null;
                 return $v !== null ? (float) $v : INF;
             }, $group);
-            $entries[] = [$student_id, $sequence];
+            $entries[] = [$studentid, $sequence];
         }
 
         usort($entries, function ($a, $b) {
-            [$sid_a, $seq_a] = $a;
-            [$sid_b, $seq_b] = $b;
-            $len = min(count($seq_a), count($seq_b));
+            [$sida, $seqa] = $a;
+            [$sidb, $seqb] = $b;
+            $len = min(count($seqa), count($seqb));
             for ($i = 0; $i < $len; $i++) {
-                if ($seq_a[$i] !== $seq_b[$i]) {
-                    return $seq_a[$i] <=> $seq_b[$i];
+                if ($seqa[$i] !== $seqb[$i]) {
+                    return $seqa[$i] <=> $seqb[$i];
                 }
             }
-            if (count($seq_a) !== count($seq_b)) {
-                return count($seq_a) <=> count($seq_b);
+            if (count($seqa) !== count($seqb)) {
+                return count($seqa) <=> count($seqb);
             }
-            return strcmp((string) $sid_a, (string) $sid_b);
+            return strcmp((string) $sida, (string) $sidb);
         });
 
         $order = [];
-        foreach ($entries as $rank => [$student_id, ]) {
-            $order[$student_id] = $rank + 1;
+        foreach ($entries as $rank => [$studentid, ]) {
+            $order[$studentid] = $rank + 1;
         }
         return $order;
     }
 
     /**
      * Continuous Plotly colorscale anchored so that, regardless of
-     * $max_value (the chart's own z-axis range), a distance of exactly 0
+     * $maxvalue (the chart's own z-axis range), a distance of exactly 0
      * always renders white and exactly 1 always renders neon red, with the
      * remaining neon anchors (orange, yellow, green, blue, black) spread
-     * evenly across whatever range is left up to $max_value.
+     * evenly across whatever range is left up to $maxvalue.
      *
      * @return array<int, array{0: float, 1: string}>
      */
-    private static function build_distance_colorscale(float $max_value): array {
+    private static function build_distance_colorscale(float $maxvalue): array {
         $anchors = self::DISTANCE_COLOR_ANCHORS;
         $white = $anchors[0];
         $red = $anchors[1];
-        $remaining_anchors = array_slice($anchors, 2);
+        $remaininganchors = array_slice($anchors, 2);
 
-        if ($max_value <= 0) {
+        if ($maxvalue <= 0) {
             return [[0.0, $white], [1.0, $white]];
         }
 
-        $red_position = min(1.0, 1.0 / $max_value);
-        $stops = [[0.0, $white], [$red_position, $red]];
-        if ($red_position >= 1.0) {
+        $redposition = min(1.0, 1.0 / $maxvalue);
+        $stops = [[0.0, $white], [$redposition, $red]];
+        if ($redposition >= 1.0) {
             return $stops;
         }
 
-        $span = 1.0 - $red_position;
-        $last_index = count($remaining_anchors);
-        foreach ($remaining_anchors as $i => $color) {
+        $span = 1.0 - $redposition;
+        $lastindex = count($remaininganchors);
+        foreach ($remaininganchors as $i => $color) {
             $index = $i + 1;
-            $position = ($index === $last_index) ? 1.0 : $red_position + $span * $index / $last_index;
+            $position = ($index === $lastindex) ? 1.0 : $redposition + $span * $index / $lastindex;
             $stops[] = [$position, $color];
         }
         return $stops;
@@ -312,13 +312,13 @@ class solution_distance {
     }
 
     /**
-     * Whole-number tick positions inside $axis_range.
+     * Whole-number tick positions inside $axisrange.
      *
-     * @param array{0: float, 1: float} $axis_range
+     * @param array{0: float, 1: float} $axisrange
      * @return int[]
      */
-    private static function integer_ticks(array $axis_range, int $step = 1): array {
-        [$low, $high] = $axis_range;
+    private static function integer_ticks(array $axisrange, int $step = 1): array {
+        [$low, $high] = $axisrange;
         $start = (int) (ceil($low / $step)) * $step;
         $end = (int) floor($high);
         if ($start > $end) {
@@ -333,29 +333,29 @@ class solution_distance {
      * docstring for why these are drawn as traces rather than left to
      * Plotly's own (camera-relative, so unstable under rotation) 3D panes.
      *
-     * @param array{0: float, 1: float} $x_range
-     * @param array{0: float, 1: float} $y_range
-     * @param array{0: float, 1: float} $z_range
-     * @param int[] $x_ticks
-     * @param int[] $y_ticks
-     * @param int[] $z_ticks
+     * @param array{0: float, 1: float} $xrange
+     * @param array{0: float, 1: float} $yrange
+     * @param array{0: float, 1: float} $zrange
+     * @param int[] $xticks
+     * @param int[] $yticks
+     * @param int[] $zticks
      * @return array[] Plotly trace dicts (mesh3d walls + one scatter3d gridline trace)
      */
     private static function static_backdrop_traces(
-        array $x_range,
-        array $y_range,
-        array $z_range,
-        array $x_ticks,
-        array $y_ticks,
-        array $z_ticks
+        array $xrange,
+        array $yrange,
+        array $zrange,
+        array $xticks,
+        array $yticks,
+        array $zticks
     ): array {
-        [$x0, $x1] = $x_range;
-        [$y0, $y1] = $y_range;
-        [$z0, $z1] = $z_range;
+        [$x0, $x1] = $xrange;
+        [$y0, $y1] = $yrange;
+        [$z0, $z1] = $zrange;
 
-        [$xw, $x_inward] = self::STUDENTS_AXIS_REVERSED ? [$x1, -1.0] : [$x0, 1.0];
-        [$yw, $y_inward] = [$y0, 1.0];
-        [$zw, $z_inward] = [$z0, 1.0];
+        [$xw, $xinward] = self::STUDENTS_AXIS_REVERSED ? [$x1, -1.0] : [$x0, 1.0];
+        [$yw, $yinward] = [$y0, 1.0];
+        [$zw, $zinward] = [$z0, 1.0];
 
         $quads = [
             ['x' => [$x0, $x1, $x1, $x0], 'y' => [$y0, $y0, $y1, $y1], 'z' => [$zw, $zw, $zw, $zw]],
@@ -378,42 +378,42 @@ class solution_distance {
             ]);
         }
 
-        $xg = $xw + $x_inward * self::GRID_INSET * ($x1 - $x0);
-        $yg = $yw + $y_inward * self::GRID_INSET * ($y1 - $y0);
-        $zg = $zw + $z_inward * self::GRID_INSET * ($z1 - $z0);
+        $xg = $xw + $xinward * self::GRID_INSET * ($x1 - $x0);
+        $yg = $yw + $yinward * self::GRID_INSET * ($y1 - $y0);
+        $zg = $zw + $zinward * self::GRID_INSET * ($z1 - $z0);
 
-        $grid_x = [];
-        $grid_y = [];
-        $grid_z = [];
-        $segment = function ($start, $end) use (&$grid_x, &$grid_y, &$grid_z) {
-            $grid_x[] = $start[0];
-            $grid_x[] = $end[0];
-            $grid_x[] = null;
-            $grid_y[] = $start[1];
-            $grid_y[] = $end[1];
-            $grid_y[] = null;
-            $grid_z[] = $start[2];
-            $grid_z[] = $end[2];
-            $grid_z[] = null;
+        $gridx = [];
+        $gridy = [];
+        $gridz = [];
+        $segment = function ($start, $end) use (&$gridx, &$gridy, &$gridz) {
+            $gridx[] = $start[0];
+            $gridx[] = $end[0];
+            $gridx[] = null;
+            $gridy[] = $start[1];
+            $gridy[] = $end[1];
+            $gridy[] = null;
+            $gridz[] = $start[2];
+            $gridz[] = $end[2];
+            $gridz[] = null;
         };
 
-        foreach ($x_ticks as $x_value) {
-            $segment([$x_value, $y0, $zg], [$x_value, $y1, $zg]);
-            $segment([$x_value, $yg, $z0], [$x_value, $yg, $z1]);
+        foreach ($xticks as $xvalue) {
+            $segment([$xvalue, $y0, $zg], [$xvalue, $y1, $zg]);
+            $segment([$xvalue, $yg, $z0], [$xvalue, $yg, $z1]);
         }
-        foreach ($y_ticks as $y_value) {
-            $segment([$x0, $y_value, $zg], [$x1, $y_value, $zg]);
-            $segment([$xg, $y_value, $z0], [$xg, $y_value, $z1]);
+        foreach ($yticks as $yvalue) {
+            $segment([$x0, $yvalue, $zg], [$x1, $yvalue, $zg]);
+            $segment([$xg, $yvalue, $z0], [$xg, $yvalue, $z1]);
         }
-        foreach ($z_ticks as $z_value) {
-            $segment([$x0, $yg, $z_value], [$x1, $yg, $z_value]);
-            $segment([$xg, $y0, $z_value], [$xg, $y1, $z_value]);
+        foreach ($zticks as $zvalue) {
+            $segment([$x0, $yg, $zvalue], [$x1, $yg, $zvalue]);
+            $segment([$xg, $y0, $zvalue], [$xg, $y1, $zvalue]);
         }
         $segment([$xw, $yw, $z0], [$xw, $yw, $z1]);
 
         $traces[] = [
             'type' => 'scatter3d',
-            'x' => $grid_x, 'y' => $grid_y, 'z' => $grid_z,
+            'x' => $gridx, 'y' => $gridy, 'z' => $gridz,
             'mode' => 'lines',
             'line' => ['color' => self::SCENE_GRID, 'width' => 2],
             'hoverinfo' => 'skip',
@@ -424,18 +424,18 @@ class solution_distance {
     }
 
     /**
-     * @param array[] $distance_subset
+     * @param array[] $distancesubset
      */
     private static function build_distance_3d_figure(
-        array $distance_subset,
-        string $distance_column,
-        string $z_title,
+        array $distancesubset,
+        string $distancecolumn,
+        string $ztitle,
         string $title
     ): array {
-        $student_order = self::compute_question_student_order($distance_subset, $distance_column);
+        $studentorder = self::compute_question_student_order($distancesubset, $distancecolumn);
 
-        $plot_rows = array_values(array_filter($distance_subset, fn($r) => ($r[$distance_column] ?? null) !== null));
-        usort($plot_rows, function ($a, $b) {
+        $plotrows = array_values(array_filter($distancesubset, fn($r) => ($r[$distancecolumn] ?? null) !== null));
+        usort($plotrows, function ($a, $b) {
             $cmp = strcmp((string) $a['student_id'], (string) $b['student_id']);
             if ($cmp !== 0) {
                 return $cmp;
@@ -447,76 +447,76 @@ class solution_distance {
             return $a['attempt_idx'] <=> $b['attempt_idx'];
         });
 
-        $max_value = 0.0;
-        foreach ($plot_rows as $row) {
-            $max_value = max($max_value, (float) $row[$distance_column]);
+        $maxvalue = 0.0;
+        foreach ($plotrows as $row) {
+            $maxvalue = max($maxvalue, (float) $row[$distancecolumn]);
         }
-        $colorscale = self::build_distance_colorscale($max_value);
+        $colorscale = self::build_distance_colorscale($maxvalue);
 
         $groups = [];
-        $group_order = [];
-        foreach ($plot_rows as $row) {
+        $grouporder = [];
+        foreach ($plotrows as $row) {
             $sid = $row['student_id'];
             if (!isset($groups[$sid])) {
                 $groups[$sid] = [];
-                $group_order[] = $sid;
+                $grouporder[] = $sid;
             }
             $groups[$sid][] = $row;
         }
 
         $data = [];
-        $is_first_trace = true;
-        $max_attempts = 1;
-        foreach ($group_order as $student_id) {
-            if (!isset($student_order[$student_id])) {
+        $isfirsttrace = true;
+        $maxattempts = 1;
+        foreach ($grouporder as $studentid) {
+            if (!isset($studentorder[$studentid])) {
                 continue;
             }
-            $group = $groups[$student_id];
-            $max_attempts = max($max_attempts, count($group));
-            $student_name = $group[0]['student_name'] ?? $student_id;
-            $z_values = array_map(fn($r) => (float) $r[$distance_column], $group);
+            $group = $groups[$studentid];
+            $maxattempts = max($maxattempts, count($group));
+            $studentname = $group[0]['student_name'] ?? $studentid;
+            $zvalues = array_map(fn($r) => (float) $r[$distancecolumn], $group);
 
             $marker = [
-                'size' => 5, 'color' => $z_values, 'colorscale' => $colorscale,
-                'cmin' => 0, 'cmax' => $max_value,
+                'size' => 5, 'color' => $zvalues, 'colorscale' => $colorscale,
+                'cmin' => 0, 'cmax' => $maxvalue,
                 'line' => ['width' => 1, 'color' => self::MARKER_OUTLINE],
-                'showscale' => $is_first_trace,
+                'showscale' => $isfirsttrace,
             ];
-            if ($is_first_trace) {
-                $marker['colorbar'] = ['title' => ['text' => $z_title]];
+            if ($isfirsttrace) {
+                $marker['colorbar'] = ['title' => ['text' => $ztitle]];
             }
 
             $data[] = [
                 'type' => 'scatter3d',
-                'x' => array_fill(0, count($group), $student_order[$student_id]),
+                'x' => array_fill(0, count($group), $studentorder[$studentid]),
                 'y' => range(0, count($group) - 1),
-                'z' => $z_values,
+                'z' => $zvalues,
                 'mode' => 'lines+markers',
                 'marker' => $marker,
-                'line' => ['width' => 4, 'color' => $z_values, 'colorscale' => $colorscale, 'cmin' => 0, 'cmax' => $max_value],
+                'line' => ['width' => 4, 'color' => $zvalues, 'colorscale' => $colorscale, 'cmin' => 0, 'cmax' => $maxvalue],
                 'showlegend' => false,
-                'text' => array_fill(0, count($group), (string) $student_name),
+                'text' => array_fill(0, count($group), (string) $studentname),
                 'hovertemplate' => '%{text}<br>Attempt %{y}<br>Rank %{x}<br>Distance %{z}<extra></extra>',
             ];
-            $is_first_trace = false;
+            $isfirsttrace = false;
         }
 
-        $student_count = count($student_order);
-        $x_range = [0.5, max($student_count, 1) + 0.5];
-        $y_range = [-0.5, max($max_attempts - 1, 1) + 0.5];
-        $z_range = [-0.5, max($max_value, 1.0) + 0.5];
+        $studentcount = count($studentorder);
+        $xrange = [0.5, max($studentcount, 1) + 0.5];
+        $yrange = [-0.5, max($maxattempts - 1, 1) + 0.5];
+        $zrange = [-0.5, max($maxvalue, 1.0) + 0.5];
 
-        $x_ticks = self::integer_ticks($x_range, self::nice_step(max($student_count, 1)));
-        $y_ticks = self::integer_ticks($y_range);
-        $z_ticks = self::integer_ticks($z_range);
+        $xticks = self::integer_ticks($xrange, self::nice_step(max($studentcount, 1)));
+        $yticks = self::integer_ticks($yrange);
+        $zticks = self::integer_ticks($zrange);
 
-        $students_axis_range = self::STUDENTS_AXIS_REVERSED ? array_reverse($x_range) : $x_range;
+        $studentsaxisrange = self::STUDENTS_AXIS_REVERSED ? array_reverse($xrange) : $xrange;
 
-        foreach (self::static_backdrop_traces($x_range, $y_range, $z_range, $x_ticks, $y_ticks, $z_ticks) as $trace) {
+        foreach (self::static_backdrop_traces($xrange, $yrange, $zrange, $xticks, $yticks, $zticks) as $trace) {
             $data[] = $trace;
         }
 
-        $axis_common = [
+        $axiscommon = [
             'showbackground' => false, 'showgrid' => false, 'zeroline' => false,
             'showspikes' => false, 'color' => self::SCENE_FONT, 'tickmode' => 'array',
         ];
@@ -526,9 +526,9 @@ class solution_distance {
             'layout' => [
                 'title' => ['text' => $title],
                 'scene' => [
-                    'xaxis' => array_merge(['title' => ['text' => 'Students'], 'range' => $students_axis_range, 'tickvals' => $x_ticks], $axis_common),
-                    'yaxis' => array_merge(['title' => ['text' => 'Attempt'], 'range' => $y_range, 'tickvals' => $y_ticks], $axis_common),
-                    'zaxis' => array_merge(['title' => ['text' => $z_title], 'range' => $z_range, 'tickvals' => $z_ticks], $axis_common),
+                    'xaxis' => array_merge(['title' => ['text' => 'Students'], 'range' => $studentsaxisrange, 'tickvals' => $xticks], $axiscommon),
+                    'yaxis' => array_merge(['title' => ['text' => 'Attempt'], 'range' => $yrange, 'tickvals' => $yticks], $axiscommon),
+                    'zaxis' => array_merge(['title' => ['text' => $ztitle], 'range' => $zrange, 'tickvals' => $zticks], $axiscommon),
                     'aspectmode' => 'cube',
                     'camera' => ['eye' => self::DEFAULT_CAMERA_EYE, 'up' => ['x' => 0, 'y' => 0, 'z' => 1]],
                 ],
@@ -548,23 +548,23 @@ class solution_distance {
         ];
     }
 
-    public static function build_prt_distance_3d_figure(array $response_rows, string $question, int $part_index = 1): array {
-        $subset = self::compute_prt_distance_series($response_rows, $question, $part_index);
+    public static function build_prt_distance_3d_figure(array $responserows, string $question, int $partindex = 1): array {
+        $subset = self::compute_prt_distance_series($responserows, $question, $partindex);
         return self::build_distance_3d_figure(
             $subset,
             'prt_distance',
             'Type of Error (PRT distance)',
-            "PRT-Distance Solution Process — {$question} (part {$part_index})"
+            "PRT-Distance Solution Process — {$question} (part {$partindex})"
         );
     }
 
-    public static function build_ted_distance_3d_figure(array $response_rows, string $question, int $part_index = 1): array {
-        $subset = self::compute_ted_distance_series($response_rows, $question, $part_index);
+    public static function build_ted_distance_3d_figure(array $responserows, string $question, int $partindex = 1): array {
+        $subset = self::compute_ted_distance_series($responserows, $question, $partindex);
         return self::build_distance_3d_figure(
             $subset,
             'ted_distance',
             'Tree Edit Distance',
-            "TED Solution Process — {$question} (part {$part_index})"
+            "TED Solution Process — {$question} (part {$partindex})"
         );
     }
 
@@ -580,36 +580,36 @@ class solution_distance {
      * qualifying attempts — one with a single attempt has no change to show,
      * and is dropped rather than plotted as a lone point.
      *
-     * @param array[] $response_rows
+     * @param array[] $responserows
      * @return array[] one row per qualifying (student, attempt): student_id,
      *         student_name, attempt_number (1-based, sequential within that
      *         student's own attempts on this question), value, completed_dt
      */
     public static function compute_cross_attempt_comparison(
-        array $response_rows,
+        array $responserows,
         string $question,
         string $metric,
-        int $part_index = 1
+        int $partindex = 1
     ): array {
         if (!array_key_exists($metric, self::CROSS_ATTEMPT_METRICS)) {
             throw new \InvalidArgumentException("Unknown Cross-Attempt Comparison metric: {$metric}");
         }
-        if (empty($response_rows)) {
+        if (empty($responserows)) {
             return [];
         }
 
         if ($metric === 'Grade') {
-            $subset = array_values(array_filter($response_rows, fn($r) => $r['question'] === $question));
+            $subset = array_values(array_filter($responserows, fn($r) => $r['question'] === $question));
             foreach ($subset as $i => $row) {
                 $subset[$i]['value'] = $row['grade'] !== null ? $row['grade'] * self::GRADE_DISPLAY_SCALE : null;
             }
         } else if ($metric === 'PRT Distance') {
-            $subset = self::compute_prt_distance_series($response_rows, $question, $part_index);
+            $subset = self::compute_prt_distance_series($responserows, $question, $partindex);
             foreach ($subset as $i => $row) {
                 $subset[$i]['value'] = $row['prt_distance'];
             }
         } else {
-            $subset = self::compute_ted_distance_series($response_rows, $question, $part_index);
+            $subset = self::compute_ted_distance_series($responserows, $question, $partindex);
             foreach ($subset as $i => $row) {
                 $subset[$i]['value'] = $row['ted_distance'];
             }
@@ -639,12 +639,12 @@ class solution_distance {
             $subset[$i]['attempt_number'] = $counts[$sid];
         }
 
-        $max_by_student = [];
+        $maxbystudent = [];
         foreach ($subset as $row) {
             $sid = $row['student_id'];
-            $max_by_student[$sid] = max($max_by_student[$sid] ?? 0, $row['attempt_number']);
+            $maxbystudent[$sid] = max($maxbystudent[$sid] ?? 0, $row['attempt_number']);
         }
-        $subset = array_values(array_filter($subset, fn($r) => $max_by_student[$r['student_id']] >= 2));
+        $subset = array_values(array_filter($subset, fn($r) => $maxbystudent[$r['student_id']] >= 2));
 
         return array_map(fn($r) => [
             'student_id' => $r['student_id'],
@@ -665,30 +665,30 @@ class solution_distance {
      * @param array[] $comparison
      * @return array[]
      */
-    public static function classify_cross_attempt_trends(array $comparison, bool $higher_is_better): array {
+    public static function classify_cross_attempt_trends(array $comparison, bool $higherisbetter): array {
         if (empty($comparison)) {
             return [];
         }
 
-        $by_student = [];
+        $bystudent = [];
         $order = [];
         foreach ($comparison as $row) {
             $sid = $row['student_id'];
-            if (!isset($by_student[$sid])) {
-                $by_student[$sid] = [];
+            if (!isset($bystudent[$sid])) {
+                $bystudent[$sid] = [];
                 $order[] = $sid;
             }
-            $by_student[$sid][] = $row;
+            $bystudent[$sid][] = $row;
         }
 
         $rows = [];
-        foreach ($order as $student_id) {
-            $group = $by_student[$student_id];
+        foreach ($order as $studentid) {
+            $group = $bystudent[$studentid];
             usort($group, fn($a, $b) => $a['attempt_number'] <=> $b['attempt_number']);
-            $first_value = (float) $group[0]['value'];
-            $last_value = (float) end($group)['value'];
-            $raw_delta = $last_value - $first_value;
-            $change = $higher_is_better ? $raw_delta : -$raw_delta;
+            $firstvalue = (float) $group[0]['value'];
+            $lastvalue = (float) end($group)['value'];
+            $rawdelta = $lastvalue - $firstvalue;
+            $change = $higherisbetter ? $rawdelta : -$rawdelta;
             if (abs($change) <= self::FLAT_TOLERANCE) {
                 $trend = 'Flat';
             } else if ($change > 0) {
@@ -696,13 +696,13 @@ class solution_distance {
             } else {
                 $trend = 'Regressed';
             }
-            $max_attempt_number = max(array_map(fn($r) => $r['attempt_number'], $group));
+            $maxattemptnumber = max(array_map(fn($r) => $r['attempt_number'], $group));
             $rows[] = [
-                'student_id' => $student_id,
+                'student_id' => $studentid,
                 'student_name' => $group[0]['student_name'],
-                'attempt_count' => $max_attempt_number,
-                'first_value' => $first_value,
-                'last_value' => $last_value,
+                'attempt_count' => $maxattemptnumber,
+                'first_value' => $firstvalue,
+                'last_value' => $lastvalue,
                 'change' => $change,
                 'trend' => $trend,
             ];
@@ -723,47 +723,47 @@ class solution_distance {
      * @param array[] $comparison
      * @param array[] $trends
      */
-    public static function build_cross_attempt_figure(array $comparison, array $trends, string $metric, bool $colorblind_mode): array {
-        $axis_title = self::CROSS_ATTEMPT_METRICS[$metric]['axis_title'];
-        $palette = chart_helpers::pass_fail_scale($colorblind_mode);
-        $trend_color = array_combine(self::TREND_ORDER, $palette);
+    public static function build_cross_attempt_figure(array $comparison, array $trends, string $metric, bool $colorblindmode): array {
+        $axistitle = self::CROSS_ATTEMPT_METRICS[$metric]['axis_title'];
+        $palette = chart_helpers::pass_fail_scale($colorblindmode);
+        $trendcolor = array_combine(self::TREND_ORDER, $palette);
 
-        $trend_by_student = [];
+        $trendbystudent = [];
         foreach ($trends as $t) {
-            $trend_by_student[$t['student_id']] = $t['trend'];
+            $trendbystudent[$t['student_id']] = $t['trend'];
         }
 
-        $by_student = [];
+        $bystudent = [];
         foreach ($comparison as $row) {
-            $by_student[$row['student_id']][] = $row;
+            $bystudent[$row['student_id']][] = $row;
         }
 
         $data = [];
         foreach (self::TREND_ORDER as $trend) {
-            $student_ids = array_keys(array_filter($trend_by_student, fn($t) => $t === $trend));
-            $is_first_in_group = true;
-            foreach ($student_ids as $student_id) {
-                $group = $by_student[$student_id] ?? [];
+            $studentids = array_keys(array_filter($trendbystudent, fn($t) => $t === $trend));
+            $isfirstingroup = true;
+            foreach ($studentids as $studentid) {
+                $group = $bystudent[$studentid] ?? [];
                 usort($group, fn($a, $b) => $a['attempt_number'] <=> $b['attempt_number']);
                 if (empty($group)) {
                     continue;
                 }
-                $student_name = $group[0]['student_name'];
+                $studentname = $group[0]['student_name'];
                 $data[] = [
                     'type' => 'scatter',
                     'x' => array_map(fn($r) => $r['attempt_number'], $group),
                     'y' => array_map(fn($r) => $r['value'], $group),
                     'mode' => 'lines+markers',
-                    'line' => ['color' => $trend_color[$trend], 'width' => 2],
-                    'marker' => ['size' => 6, 'color' => $trend_color[$trend]],
+                    'line' => ['color' => $trendcolor[$trend], 'width' => 2],
+                    'marker' => ['size' => 6, 'color' => $trendcolor[$trend]],
                     'opacity' => 0.8,
                     'name' => $trend,
                     'legendgroup' => $trend,
-                    'showlegend' => $is_first_in_group,
-                    'text' => array_fill(0, count($group), (string) $student_name),
-                    'hovertemplate' => "%{text}<br>Attempt %{x}<br>{$axis_title}: %{y}<extra></extra>",
+                    'showlegend' => $isfirstingroup,
+                    'text' => array_fill(0, count($group), (string) $studentname),
+                    'hovertemplate' => "%{text}<br>Attempt %{x}<br>{$axistitle}: %{y}<extra></extra>",
                 ];
-                $is_first_in_group = false;
+                $isfirstingroup = false;
             }
         }
 
@@ -774,7 +774,7 @@ class solution_distance {
                 'legend' => ['title' => ['text' => 'Trend (first → last attempt)']],
                 'template' => 'plotly',
                 'xaxis' => ['title' => ['text' => 'Attempt'], 'dtick' => 1],
-                'yaxis' => ['title' => ['text' => $axis_title]],
+                'yaxis' => ['title' => ['text' => $axistitle]],
             ],
         ];
     }
@@ -787,15 +787,15 @@ class solution_distance {
      */
     public static function build_single_student_attempt_figure(
         array $detail,
-        string $student_name,
+        string $studentname,
         string $metric,
         string $trend,
-        bool $colorblind_mode
+        bool $colorblindmode
     ): array {
-        $axis_title = self::CROSS_ATTEMPT_METRICS[$metric]['axis_title'];
-        $palette = chart_helpers::pass_fail_scale($colorblind_mode);
-        $trend_color = array_combine(self::TREND_ORDER, $palette);
-        $color = $trend_color[$trend] ?? $trend_color['Flat'];
+        $axistitle = self::CROSS_ATTEMPT_METRICS[$metric]['axis_title'];
+        $palette = chart_helpers::pass_fail_scale($colorblindmode);
+        $trendcolor = array_combine(self::TREND_ORDER, $palette);
+        $color = $trendcolor[$trend] ?? $trendcolor['Flat'];
 
         $ordered = $detail;
         usort($ordered, fn($a, $b) => $a['attempt_number'] <=> $b['attempt_number']);
@@ -808,14 +808,14 @@ class solution_distance {
                 'mode' => 'lines+markers',
                 'line' => ['color' => $color, 'width' => 3],
                 'marker' => ['size' => 10, 'color' => $color],
-                'hovertemplate' => "Attempt %{x}<br>{$axis_title}: %{y}<extra></extra>",
+                'hovertemplate' => "Attempt %{x}<br>{$axistitle}: %{y}<extra></extra>",
             ]],
             'layout' => [
-                'title' => ['text' => "{$student_name} — {$metric} across attempts"],
+                'title' => ['text' => "{$studentname} — {$metric} across attempts"],
                 'template' => 'plotly',
                 'showlegend' => false,
                 'xaxis' => ['title' => ['text' => 'Attempt'], 'dtick' => 1],
-                'yaxis' => ['title' => ['text' => $axis_title]],
+                'yaxis' => ['title' => ['text' => $axistitle]],
             ],
         ];
     }

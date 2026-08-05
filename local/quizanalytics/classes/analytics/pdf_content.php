@@ -70,8 +70,8 @@ class pdf_content {
         $sections = [];
         foreach ($selectedids as $id) {
             if ($id === 'summary') {
-                $response_rows = parser::build_response_rows($records, $quizname);
-                $qmetrics = question_metrics::compute_question_metrics($response_rows);
+                $responserows = parser::build_response_rows($records, $quizname);
+                $qmetrics = question_metrics::compute_question_metrics($responserows);
                 $rows = array_map(fn($r) => [
                     'question' => $r['question'], 'attempts' => $r['attempts'], 'students' => $r['students'],
                     'percent_valid' => $r['percent_valid'], 'percent_invalid' => $r['percent_invalid'],

@@ -36,19 +36,19 @@ class course_analysis {
      * @return array{summary: array, sections: array[]}
      */
     public static function build_analysis(
-        string $course_name,
+        string $coursename,
         array $quizzes,
-        bool $colorblind_mode = false,
-        ?array $selected_stats = null,
-        ?array $selected_metrics = null,
-        string $grade_type = self::DEFAULT_GRADE_TYPE
+        bool $colorblindmode = false,
+        ?array $selectedstats = null,
+        ?array $selectedmetrics = null,
+        string $gradetype = self::DEFAULT_GRADE_TYPE
     ): array {
         $combined = [];
-        foreach ($quizzes as $quiz_name => $records) {
+        foreach ($quizzes as $quizname => $records) {
             if (empty($records)) {
                 continue;
             }
-            $rows = parser::build_response_rows($records, $quiz_name);
+            $rows = parser::build_response_rows($records, $quizname);
             if (!empty($rows)) {
                 $combined = array_merge($combined, $rows);
             }
@@ -58,12 +58,12 @@ class course_analysis {
             throw new \InvalidArgumentException('No gradable attempts parsed for any quiz.');
         }
 
-        $attempt_frame = quiz_metrics::build_quiz_attempt_frame($combined);
+        $attemptframe = quiz_metrics::build_quiz_attempt_frame($combined);
 
-        $selected_stats = !empty($selected_stats) ? $selected_stats : self::DEFAULT_QUIZ_STATS;
-        $selected_metrics = !empty($selected_metrics) ? $selected_metrics : self::DEFAULT_QUIZ_METRICS;
+        $selectedstats = !empty($selectedstats) ? $selectedstats : self::DEFAULT_QUIZ_STATS;
+        $selectedmetrics = !empty($selectedmetrics) ? $selectedmetrics : self::DEFAULT_QUIZ_METRICS;
 
-        $stats_rows = quiz_metrics::compute_quiz_stats($attempt_frame, $selected_stats);
+        $statsrows = quiz_metrics::compute_quiz_stats($attemptframe, $selectedstats);
 
         $sections = [];
 
@@ -71,59 +71,59 @@ class course_analysis {
             'id' => 'attempt-list',
             'title' => '1. Merged List of Users and Files',
             'caption' => 'Every parsed quiz attempt row, combined across every STACK quiz in the course.',
-            'table' => table_helpers::to_table($attempt_frame),
+            'table' => table_helpers::to_table($attemptframe),
         ];
 
         $sections[] = [
             'id' => 'quiz-stats',
             'title' => '2. Summary of Quiz Stats',
             'caption' => 'Aggregated statistics per quiz, combined across the course.',
-            'table' => table_helpers::to_table($stats_rows),
+            'table' => table_helpers::to_table($statsrows),
         ];
 
-        $box_fig = quiz_metrics::build_boxplot_figure($attempt_frame, $colorblind_mode);
+        $boxfig = quiz_metrics::build_boxplot_figure($attemptframe, $colorblindmode);
         $sections[] = [
             'id' => 'boxplot',
             'title' => '3. Quiz Grade Distribution (Box Plot)',
             'caption' => 'Spread of grades per quiz, with mean grade overlay.',
-            'charts' => [['id' => 'boxplot-fig', 'title' => null, 'plotly_json' => $box_fig]],
+            'charts' => [['id' => 'boxplot-fig', 'title' => null, 'plotly_json' => $boxfig]],
         ];
 
-        $engagement_fig = quiz_metrics::build_engagement_figure($attempt_frame, $colorblind_mode);
-        if ($engagement_fig !== null) {
+        $engagementfig = quiz_metrics::build_engagement_figure($attemptframe, $colorblindmode);
+        if ($engagementfig !== null) {
             $sections[] = [
                 'id' => 'engagement',
                 'title' => '4. Engagement Over Time',
                 'caption' => 'Density of quiz attempt start times per quiz, combined across the course.',
-                'charts' => [['id' => 'engagement-fig', 'title' => null, 'plotly_json' => $engagement_fig]],
+                'charts' => [['id' => 'engagement-fig', 'title' => null, 'plotly_json' => $engagementfig]],
             ];
         }
 
-        $scatter_result = quiz_metrics::build_scatter_figure($attempt_frame, $grade_type, $colorblind_mode);
-        if ($scatter_result !== null) {
-            $correlation_str = is_nan($scatter_result['correlation']) ? 'nan' : sprintf('%.2f', $scatter_result['correlation']);
+        $scatterresult = quiz_metrics::build_scatter_figure($attemptframe, $gradetype, $colorblindmode);
+        if ($scatterresult !== null) {
+            $correlationstr = is_nan($scatterresult['correlation']) ? 'nan' : sprintf('%.2f', $scatterresult['correlation']);
             $sections[] = [
                 'id' => 'scatter',
                 'title' => '5. Scatter Plot: Attempts vs Grades',
-                'caption' => "Correlation between number of attempts and quiz {$scatter_result['y_label']}: r = {$correlation_str}",
-                'charts' => [['id' => 'scatter-fig', 'title' => null, 'plotly_json' => $scatter_result['plotly_json']]],
+                'caption' => "Correlation between number of attempts and quiz {$scatterresult['y_label']}: r = {$correlationstr}",
+                'charts' => [['id' => 'scatter-fig', 'title' => null, 'plotly_json' => $scatterresult['plotly_json']]],
             ];
         }
 
-        $trend_data = quiz_metrics::build_metric_trend_data($attempt_frame, $selected_metrics);
-        if (!empty($trend_data)) {
-            $trend_fig = quiz_metrics::build_line_graph_figure($trend_data, $colorblind_mode);
+        $trenddata = quiz_metrics::build_metric_trend_data($attemptframe, $selectedmetrics);
+        if (!empty($trenddata)) {
+            $trendfig = quiz_metrics::build_line_graph_figure($trenddata, $colorblindmode);
             $sections[] = [
                 'id' => 'trend',
                 'title' => '6. Line Graph of Various Metrics',
                 'caption' => 'Trend of selected metrics across quizzes.',
-                'table' => table_helpers::to_table($trend_data),
-                'charts' => [['id' => 'trend-fig', 'title' => null, 'plotly_json' => $trend_fig]],
+                'table' => table_helpers::to_table($trenddata),
+                'charts' => [['id' => 'trend-fig', 'title' => null, 'plotly_json' => $trendfig]],
             ];
         }
 
         return [
-            'summary' => ['course_name' => $course_name],
+            'summary' => ['course_name' => $coursename],
             'sections' => $sections,
         ];
     }

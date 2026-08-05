@@ -35,17 +35,17 @@ class spv_charts {
      * The three in/out/degree-centrality bar charts, one per node, in
      * prt_transitions::compute_network_features()'s node order.
      *
-     * @param array[] $network_features
+     * @param array[] $networkfeatures
      * @return array{metric: string, label: string, plotly_json: array}[]
      */
-    public static function build_centrality_bar_figures(array $network_features): array {
-        $node_order = array_map(fn($r) => $r['node'], $network_features);
+    public static function build_centrality_bar_figures(array $networkfeatures): array {
+        $nodeorder = array_map(fn($r) => $r['node'], $networkfeatures);
         $charts = [];
         foreach (self::CENTRALITY_METRICS as [$metric, $label]) {
             $data = [[
                 'type' => 'bar',
-                'x' => $node_order,
-                'y' => array_map(fn($r) => $r[$metric], $network_features),
+                'x' => $nodeorder,
+                'y' => array_map(fn($r) => $r[$metric], $networkfeatures),
                 'marker' => ['color' => '#3b82f6'],
             ]];
             $charts[] = [
