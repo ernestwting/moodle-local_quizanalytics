@@ -1,14 +1,30 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * PHP port of analytics-service/analytics/solution_distance.py.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
 
 class solution_distance {
-
     const ANS_PATTERN = '/ans(\d+):\s*(.*?)\s*\[(score|valid|invalid)\]/';
 
     const MAX_TED_DISPLAY = 20;
@@ -326,8 +342,12 @@ class solution_distance {
      * @return array[] Plotly trace dicts (mesh3d walls + one scatter3d gridline trace)
      */
     private static function static_backdrop_traces(
-        array $x_range, array $y_range, array $z_range,
-        array $x_ticks, array $y_ticks, array $z_ticks
+        array $x_range,
+        array $y_range,
+        array $z_range,
+        array $x_ticks,
+        array $y_ticks,
+        array $z_ticks
     ): array {
         [$x0, $x1] = $x_range;
         [$y0, $y1] = $y_range;
@@ -366,9 +386,15 @@ class solution_distance {
         $grid_y = [];
         $grid_z = [];
         $segment = function ($start, $end) use (&$grid_x, &$grid_y, &$grid_z) {
-            $grid_x[] = $start[0]; $grid_x[] = $end[0]; $grid_x[] = null;
-            $grid_y[] = $start[1]; $grid_y[] = $end[1]; $grid_y[] = null;
-            $grid_z[] = $start[2]; $grid_z[] = $end[2]; $grid_z[] = null;
+            $grid_x[] = $start[0];
+            $grid_x[] = $end[0];
+            $grid_x[] = null;
+            $grid_y[] = $start[1];
+            $grid_y[] = $end[1];
+            $grid_y[] = null;
+            $grid_z[] = $start[2];
+            $grid_z[] = $end[2];
+            $grid_z[] = null;
         };
 
         foreach ($x_ticks as $x_value) {
@@ -401,7 +427,10 @@ class solution_distance {
      * @param array[] $distance_subset
      */
     private static function build_distance_3d_figure(
-        array $distance_subset, string $distance_column, string $z_title, string $title
+        array $distance_subset,
+        string $distance_column,
+        string $z_title,
+        string $title
     ): array {
         $student_order = self::compute_question_student_order($distance_subset, $distance_column);
 
@@ -522,7 +551,9 @@ class solution_distance {
     public static function build_prt_distance_3d_figure(array $response_rows, string $question, int $part_index = 1): array {
         $subset = self::compute_prt_distance_series($response_rows, $question, $part_index);
         return self::build_distance_3d_figure(
-            $subset, 'prt_distance', 'Type of Error (PRT distance)',
+            $subset,
+            'prt_distance',
+            'Type of Error (PRT distance)',
             "PRT-Distance Solution Process — {$question} (part {$part_index})"
         );
     }
@@ -530,7 +561,9 @@ class solution_distance {
     public static function build_ted_distance_3d_figure(array $response_rows, string $question, int $part_index = 1): array {
         $subset = self::compute_ted_distance_series($response_rows, $question, $part_index);
         return self::build_distance_3d_figure(
-            $subset, 'ted_distance', 'Tree Edit Distance',
+            $subset,
+            'ted_distance',
+            'Tree Edit Distance',
             "TED Solution Process — {$question} (part {$part_index})"
         );
     }
@@ -553,7 +586,10 @@ class solution_distance {
      *         student's own attempts on this question), value, completed_dt
      */
     public static function compute_cross_attempt_comparison(
-        array $response_rows, string $question, string $metric, int $part_index = 1
+        array $response_rows,
+        string $question,
+        string $metric,
+        int $part_index = 1
     ): array {
         if (!array_key_exists($metric, self::CROSS_ATTEMPT_METRICS)) {
             throw new \InvalidArgumentException("Unknown Cross-Attempt Comparison metric: {$metric}");
@@ -750,7 +786,11 @@ class solution_distance {
      * @param array[] $detail
      */
     public static function build_single_student_attempt_figure(
-        array $detail, string $student_name, string $metric, string $trend, bool $colorblind_mode
+        array $detail,
+        string $student_name,
+        string $metric,
+        string $trend,
+        bool $colorblind_mode
     ): array {
         $axis_title = self::CROSS_ATTEMPT_METRICS[$metric]['axis_title'];
         $palette = chart_helpers::pass_fail_scale($colorblind_mode);

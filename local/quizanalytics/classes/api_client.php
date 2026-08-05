@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * Runs all the STACK/Maxima response analytics (see classes/analytics/) and
  * returns them in the {summary, sections} shape classes/output/
@@ -10,12 +25,13 @@
  * place that mapping lives.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
 class local_quizanalytics_api_client {
-
     /**
      * Question Analytics for a single quiz, for the per-quiz drill-down view.
      *
@@ -31,11 +47,15 @@ class local_quizanalytics_api_client {
     public function analyze(string $quizname, array $records, bool $colorblindmode = false): ?array {
         try {
             return \local_quizanalytics\analytics\question_analysis::build_analysis(
-                $records, $quizname, $colorblindmode
+                $records,
+                $quizname,
+                $colorblindmode
             );
         } catch (\Throwable $e) {
-            debugging('local_quizanalytics: error building question analytics: ' . $e->getMessage(),
-                DEBUG_DEVELOPER);
+            debugging(
+                'local_quizanalytics: error building question analytics: ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
             return null;
         }
     }
@@ -67,8 +87,10 @@ class local_quizanalytics_api_client {
                 $gradetype ?? \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE
             );
         } catch (\Throwable $e) {
-            debugging('local_quizanalytics: error building course analysis: ' . $e->getMessage(),
-                DEBUG_DEVELOPER);
+            debugging(
+                'local_quizanalytics: error building course analysis: ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
             return null;
         }
     }
@@ -85,8 +107,10 @@ class local_quizanalytics_api_client {
         try {
             return \local_quizanalytics\analytics\solution_process_analysis::build_meta($records, $quizname);
         } catch (\Throwable $e) {
-            debugging('local_quizanalytics: error building solution process meta: ' . $e->getMessage(),
-                DEBUG_DEVELOPER);
+            debugging(
+                'local_quizanalytics: error building solution process meta: ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
             return null;
         }
     }
@@ -113,11 +137,18 @@ class local_quizanalytics_api_client {
     ): ?array {
         try {
             return \local_quizanalytics\analytics\solution_process_analysis::build_analysis(
-                $records, $quizname, $question, $partindex, $studentid, $colorblindmode
+                $records,
+                $quizname,
+                $question,
+                $partindex,
+                $studentid,
+                $colorblindmode
             );
         } catch (\Throwable $e) {
-            debugging('local_quizanalytics: error building solution process analysis: ' . $e->getMessage(),
-                DEBUG_DEVELOPER);
+            debugging(
+                'local_quizanalytics: error building solution process analysis: ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
             return null;
         }
     }
@@ -156,7 +187,10 @@ class local_quizanalytics_api_client {
         try {
             $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('question');
             $content = \local_quizanalytics\analytics\pdf_content::build_question_content(
-                $records, $quizname, $labels, $colorblindmode
+                $records,
+                $quizname,
+                $labels,
+                $colorblindmode
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {
@@ -189,12 +223,19 @@ class local_quizanalytics_api_client {
         try {
             $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('solutionprocess');
             $content = \local_quizanalytics\analytics\pdf_content::build_solutionprocess_content(
-                $records, $quizname, $question, $partindex, $labels, $colorblindmode
+                $records,
+                $quizname,
+                $question,
+                $partindex,
+                $labels,
+                $colorblindmode
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {
-            debugging('local_quizanalytics: error building solution process PDF: ' . $e->getMessage(),
-                DEBUG_DEVELOPER);
+            debugging(
+                'local_quizanalytics: error building solution process PDF: ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
             return null;
         }
     }
@@ -219,7 +260,11 @@ class local_quizanalytics_api_client {
         try {
             $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('quiz');
             $content = \local_quizanalytics\analytics\pdf_content::build_quiz_content(
-                $coursename, $quizzes, $labels, $colorblindmode, 'Average Grade'
+                $coursename,
+                $quizzes,
+                $labels,
+                $colorblindmode,
+                'Average Grade'
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {

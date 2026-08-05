@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * The canonical PDF section checkbox list for each of the three report
  * kinds, mapped to the section id each one corresponds to in the matching
@@ -17,12 +32,13 @@
  * data and $result['questions'] respectively — see pdf_content.php.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
 
 class pdf_sections {
-
     const QUESTION = [
         '1. Question Summary' => 'summary',
         '2. Question Difficulty Analysis' => 'difficulty',

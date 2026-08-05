@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * Renders a pdf_content.php payload to PDF bytes via TCPDF (vendored at
  * classes/vendor/tcpdf/) — the PHP port's equivalent of
@@ -20,6 +35,8 @@
  *   navigation nicety, not core report content.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
@@ -31,12 +48,16 @@ require_once(__DIR__ . '/../vendor/tcpdf/tcpdf.php');
  * NumberedCanvas drew directly on the reportlab canvas.
  */
 class quizanalytics_tcpdf extends \TCPDF {
-
     public string $reportheading = 'Moodle STACK Analytics Hub — Performance Report';
 
     public function __construct(
-        $orientation = 'P', $unit = 'mm', $format = 'A4', $unicode = true,
-        $encoding = 'UTF-8', $diskcache = false, $pdfa = false
+        $orientation = 'P',
+        $unit = 'mm',
+        $format = 'A4',
+        $unicode = true,
+        $encoding = 'UTF-8',
+        $diskcache = false,
+        $pdfa = false
     ) {
         parent::__construct($orientation, $unit, $format, $unicode, $encoding, $diskcache, $pdfa);
         // Suppress TCPDF's own "Powered by TCPDF" link, appended to the last
@@ -70,7 +91,6 @@ class quizanalytics_tcpdf extends \TCPDF {
 }
 
 class pdf_builder {
-
     const MAX_CHART_HEIGHT_MM = 90.0;
 
     // Column-width weighting, matching pdf_export.py's _compute_column_widths.
@@ -123,7 +143,10 @@ class pdf_builder {
     }
 
     private static function render_section(
-        quizanalytics_tcpdf $pdf, array $section, array $chart_images, bool $isfirst
+        quizanalytics_tcpdf $pdf,
+        array $section,
+        array $chart_images,
+        bool $isfirst
     ): void {
         // Don't strand a section's divider/heading alone at the very bottom
         // of a page with no room for anything under it.
@@ -140,8 +163,10 @@ class pdf_builder {
             $pdf->SetDrawColor(0xe2, 0xe8, 0xf0);
             $pdf->SetLineWidth(0.2);
             $pdf->Line(
-                $pdf->getMargins()['left'], $pdf->GetY(),
-                $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()
+                $pdf->getMargins()['left'],
+                $pdf->GetY(),
+                $pdf->getPageWidth() - $pdf->getMargins()['right'],
+                $pdf->GetY()
             );
             $pdf->Ln(5);
         }

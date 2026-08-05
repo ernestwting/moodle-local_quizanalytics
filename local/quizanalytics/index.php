@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * The "Analytics" page: course-wide cross-quiz comparison by default, or a
  * single STACK quiz's Question Analytics or Solution Process Visualization
@@ -13,6 +28,8 @@
  * /local/quizanalytics/index.php?id=<courseid>.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 require_once(__DIR__ . '/../../config.php');
@@ -212,18 +229,32 @@ if ($quizid) {
         ]);
 
         echo sections_renderer::render_solutionprocess_selector_form(
-            $PAGE->url, $meta, $spvquestion, $spvpartsforquestion, $spvpart, $spvstudentid
+            $PAGE->url,
+            $meta,
+            $spvquestion,
+            $spvpartsforquestion,
+            $spvpart,
+            $spvstudentid
         );
 
         $resultcache = cache::make('local_quizanalytics', 'solutionprocess');
         $resultkey = local_quizanalytics_cache_helper::build_key(
-            $selectedquiz->id, $stats->fingerprint, $spvquestion, $spvpart, $spvstudentid, $colorblind
+            $selectedquiz->id,
+            $stats->fingerprint,
+            $spvquestion,
+            $spvpart,
+            $spvstudentid,
+            $colorblind
         );
         $result = $resultcache->get($resultkey);
         if ($result === false) {
             $result = $client->solution_process_analyze(
-                $selectedquiz->name, $fetchrecords(), $spvquestion, $spvpart,
-                $spvstudentid !== '' ? $spvstudentid : null, $colorblind
+                $selectedquiz->name,
+                $fetchrecords(),
+                $spvquestion,
+                $spvpart,
+                $spvstudentid !== '' ? $spvstudentid : null,
+                $colorblind
             );
             if ($result !== null) {
                 $resultcache->set($resultkey, $result);

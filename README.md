@@ -73,7 +73,8 @@ data.
 
 ## Installation
 
-See [INSTALL.md](INSTALL.md) for the full step-by-step setup.
+See [INSTALL.md](INSTALL.md) for the full step-by-step setup. See
+[CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Reference
 

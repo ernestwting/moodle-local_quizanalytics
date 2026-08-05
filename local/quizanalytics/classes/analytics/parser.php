@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * PHP port of analytics-service/analytics/parser.py — scoped to what the Moodle
  * plugin's data path actually needs. The Python module also handles parsing raw
@@ -23,12 +38,13 @@
  * scoping needed) correct in both the Python original and this port.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
 
 class parser {
-
     /**
      * Strip HTML tags/entities from a Moodle question/answer cell, leaving LaTeX
      * delimiters intact (they're backslash-escape sequences, not HTML tags, so
@@ -49,7 +65,8 @@ class parser {
         }
         $cleaned = preg_replace(
             '/<(\w+)[^>]*\bstyle\s*=\s*"[^"]*display\s*:\s*none[^"]*"[^>]*>.*?<\/\1>/is',
-            ' ', $text
+            ' ',
+            $text
         );
         $cleaned = html_entity_decode($cleaned, ENT_QUOTES | ENT_HTML5);
         $cleaned = preg_replace('/<[^>]+>/', ' ', $cleaned);

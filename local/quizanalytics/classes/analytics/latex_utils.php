@@ -1,4 +1,19 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * PHP port of analytics-service/analytics/latex_utils.py — see that file for the
  * full rationale behind each transformation; comments here focus on anything that
@@ -14,12 +29,13 @@
  * Moodle's PSR-4 autoloader from classes/analytics/latex_utils.php).
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
 
 class latex_utils {
-
     // Detects a Maxima "question variables" debug/error dump that has leaked into
     // rendered question text — see latex_utils.py's own comment on _MAXIMA_DUMP_RE
     // for the full story on why chain length 2+ is the signal.
@@ -80,11 +96,11 @@ class latex_utils {
         $cleaned = preg_replace('/\\\\\)\s*\\\\\(/', ' ', $cleaned);
 
         // 2. Display block math: `\[ ... \]` -> `$$ ... $$` (or `$ ... $` for headers).
-        //    preg_replace_callback rather than preg_replace's own $1 backreference
-        //    syntax: PHP's replacement-string backslash/dollar escaping rules for
-        //    literal "$$" adjacent to a backreference are easy to get subtly wrong
-        //    (verified the hard way while writing this) — a callback's return value
-        //    is used verbatim, with no special-character reinterpretation at all.
+        // preg_replace_callback rather than preg_replace's own $1 backreference
+        // syntax: PHP's replacement-string backslash/dollar escaping rules for
+        // literal "$$" adjacent to a backreference are easy to get subtly wrong
+        // (verified the hard way while writing this) — a callback's return value
+        // is used verbatim, with no special-character reinterpretation at all.
         if ($is_header) {
             $cleaned = preg_replace_callback('/\\\\\[(.*?)\\\\\]/s', fn($m) => '$' . $m[1] . '$', $cleaned);
         } else {
@@ -95,9 +111,9 @@ class latex_utils {
         $cleaned = preg_replace_callback('/\\\\\((.*?)\\\\\)/s', fn($m) => '$' . $m[1] . '$', $cleaned);
 
         // 4. Clean up leftover collisions from adjacency types step 1 doesn't cover
-        //    (e.g. a display block immediately followed by an inline run, `\]\(`,
-        //    converts to a run of 3-4 `$`). A legitimate lone display-block boundary
-        //    is exactly 2 `$` and must survive this — only collapse runs of 3+.
+        // (e.g. a display block immediately followed by an inline run, `\]\(`,
+        // converts to a run of 3-4 `$`). A legitimate lone display-block boundary
+        // is exactly 2 `$` and must survive this — only collapse runs of 3+.
         $cleaned = preg_replace('/(?:\$\s*){3,}/', '$$', $cleaned);
 
         if ($is_header) {
@@ -571,7 +587,8 @@ class latex_utils {
         // boundary can't fall between "sin" and the "h" of "sinh").
         $out = preg_replace(
             '/\\\\(arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|sec|csc|cot|log|ln|exp)\b/',
-            '$1', $out
+            '$1',
+            $out
         );
 
         return $out;

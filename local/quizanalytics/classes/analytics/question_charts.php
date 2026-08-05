@@ -1,14 +1,30 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * PHP port of analytics-service/analytics/question_charts.py.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
 
 class question_charts {
-
     /**
      * "Top Difficult Questions by Average Score" — hardest 10 questions;
      * $ranked_difficulty is already sorted ascending by avg_score (see
@@ -22,7 +38,12 @@ class question_charts {
         $values = array_map(fn($r) => $r['avg_score'], $top10);
         $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_SET2);
         return chart_helpers::build_bar_figure(
-            $categories, $values, 'Top Difficult Questions by Average Score', 'Question', 'Average score', $palette
+            $categories,
+            $values,
+            'Top Difficult Questions by Average Score',
+            'Question',
+            'Average score',
+            $palette
         );
     }
 
@@ -47,8 +68,12 @@ class question_charts {
         }
         $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_SET2);
         return chart_helpers::build_box_figure(
-            $questions, $values_by_question,
-            'Score Distribution by Question (Best Attempt per Student)', 'Question', 'Score (0-10)', $palette
+            $questions,
+            $values_by_question,
+            'Score Distribution by Question (Best Attempt per Student)',
+            'Question',
+            'Score (0-10)',
+            $palette
         );
     }
 
@@ -66,7 +91,12 @@ class question_charts {
         ];
         $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_VIVID);
         return chart_helpers::build_grouped_bar_figure(
-            $categories, $series, 'Response Outcome Percentages (Best Attempts)', 'Question', 'Percent', $palette
+            $categories,
+            $series,
+            'Response Outcome Percentages (Best Attempts)',
+            'Question',
+            'Percent',
+            $palette
         );
     }
 
@@ -85,7 +115,12 @@ class question_charts {
         ];
         $palette = chart_helpers::qualitative_colors($colorblind_mode, chart_helpers::PALETTE_VIVID);
         return chart_helpers::build_grouped_bar_figure(
-            $categories, $series, 'Valid vs Invalid Attempts (All Attempts)', 'Question', 'Percent', $palette
+            $categories,
+            $series,
+            'Valid vs Invalid Attempts (All Attempts)',
+            'Question',
+            'Percent',
+            $palette
         );
     }
 
@@ -142,8 +177,14 @@ class question_charts {
         }
         $height = max(400, 24 * count($students));
         return chart_helpers::build_heatmap_figure(
-            $z, $questions, $students,
-            'Student-by-Question Performance Matrix (Best Attempts)', 'Viridis', null, null, $height
+            $z,
+            $questions,
+            $students,
+            'Student-by-Question Performance Matrix (Best Attempts)',
+            'Viridis',
+            null,
+            null,
+            $height
         );
     }
 

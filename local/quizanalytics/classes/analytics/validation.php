@@ -1,14 +1,30 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * PHP port of analytics-service/analytics/validation.py.
  *
  * @package local_quizanalytics
+ * @copyright  2026 Ernest Ting <eting@caltech.edu>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 namespace local_quizanalytics\analytics;
 
 class validation {
-
     /**
      * Validate that the parsed response data contains the fields needed for
      * the dashboard, and cross-check each attempt's calculated average
@@ -63,7 +79,10 @@ class validation {
                     $student_name = $group[0]['student_name'];
                     $mismatches[] = sprintf(
                         'Student: %s (Row %s) - Calculated=%.2f, Moodle=%.2f',
-                        $student_name, $attempt_id, $calculated_grade, $actual_grade
+                        $student_name,
+                        $attempt_id,
+                        $calculated_grade,
+                        $actual_grade
                     );
                     // grade is null (excluded from the mean above) for any
                     // question left in a "validated, not (re-)graded" state —
