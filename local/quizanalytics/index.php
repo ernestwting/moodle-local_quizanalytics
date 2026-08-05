@@ -260,6 +260,12 @@ if ($quizid) {
     // --- Course-wide: cross-quiz comparison across every STACK quiz. ---
     echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3);
 
+    // Combines every STACK quiz's attempts into one computation — the one
+    // path in this plugin whose cost genuinely scales with the whole
+    // course rather than a single quiz, so it's the one raising PHP's own
+    // execution time limit (see settings.php).
+    core_php_time_limit::raise((int) get_config('local_quizanalytics', 'computetimelimit'));
+
     // Cheap fingerprint across every STACK quiz in the course at once (the
     // course-wide result depends on all of their attempts together) — the
     // empty-course check below uses this instead of the expensive per-quiz

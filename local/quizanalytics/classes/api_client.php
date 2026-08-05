@@ -1,11 +1,13 @@
 <?php
 /**
- * Talks to the local analytics microservice (a small FastAPI app wrapping
- * the analytics/ Python package — see analytics-service/ at the repo root).
+ * Runs all the STACK/Maxima response analytics (see classes/analytics/) and
+ * returns them in the {summary, sections} shape classes/output/
+ * sections_renderer.php and js/vendor-shared/sections-renderer.js expect.
  *
- * Deliberately dumb: no retries, no queuing. If it fails, the page shows a
- * friendly error rather than a stack trace, and nothing about a failure here
- * ever sends data anywhere else — it just doesn't get an answer back.
+ * Kept as its own class — rather than having index.php/pdf.php call
+ * classes/analytics/*.php directly — so those two entry points don't need
+ * to know which analytics class computes which view; this is the one
+ * place that mapping lives.
  *
  * @package local_quizanalytics
  */
@@ -13,56 +15,6 @@
 defined('MOODLE_INTERNAL') || die();
 
 class local_quizanalytics_api_client {
-
-    /**
-     * @param string $endpointpath e.g. '/analyze', '/analyze-course', '/solution-process/meta'
-     * @param array  $payload      request body matching that endpoint's schema
-     * @return array|null          Decoded JSON response, or null on any failure.
-     */
-    protected function post(string $endpointpath, array $payload): ?array {
-        $config = get_config('local_quizanalytics');
-        $base = !empty($config->apibaseurl) ? rtrim($config->apibaseurl, '/') : 'http://127.0.0.1:8600';
-        $timeout = !empty($config->apitimeout) ? (int) $config->apitimeout : 30;
-        $endpoint = $base . $endpointpath;
-
-        $curl = curl_init($endpoint);
-        curl_setopt_array($curl, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $timeout,
-            // Belt-and-braces: this only ever calls the configured internal
-            // endpoint (default localhost). Remove this only if you have a
-            // specific reason the service isn't on localhost/private network.
-        ]);
-
-        $response = curl_exec($curl);
-        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $curlerror = curl_error($curl);
-        curl_close($curl);
-
-        if ($response === false) {
-            debugging('local_quizanalytics: curl error contacting analytics service (' . $endpointpath . '): ' .
-                $curlerror, DEBUG_DEVELOPER);
-            return null;
-        }
-
-        if ($httpcode !== 200) {
-            debugging('local_quizanalytics: analytics service returned HTTP ' . $httpcode . ' for ' . $endpointpath,
-                DEBUG_DEVELOPER);
-            return null;
-        }
-
-        $decoded = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            debugging('local_quizanalytics: could not decode analytics service response: ' .
-                json_last_error_msg(), DEBUG_DEVELOPER);
-            return null;
-        }
-
-        return $decoded;
-    }
 
     /**
      * Question Analytics for a single quiz, for the per-quiz drill-down view.

@@ -9,9 +9,10 @@
  * admin_settingpage and add it to the tree itself. Verified against
  * public/lib/classes/plugininfo/local.php in the installed Moodle core.
  *
- * Points at the local analytics microservice's base URL — this plugin
- * appends /analyze, /analyze-course, /solution-process, and the PDF export
- * paths itself.
+ * All the STACK/Maxima response analytics run in-process (see classes/
+ * analytics/) rather than calling a separate service, so the only setting
+ * left is how long PHP itself is allowed to spend on the heaviest of those
+ * computations.
  *
  * @package local_quizanalytics
  */
@@ -27,26 +28,10 @@ if ($hassiteconfig) {
     $ADMIN->add('localplugins', $settings);
 
     $settings->add(new admin_setting_configtext(
-        'local_quizanalytics/apibaseurl',
-        get_string('apibaseurl', 'local_quizanalytics'),
-        get_string('apibaseurl_desc', 'local_quizanalytics'),
-        'http://127.0.0.1:8600',
-        PARAM_URL
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'local_quizanalytics/apitimeout',
-        get_string('apitimeout', 'local_quizanalytics'),
-        get_string('apitimeout_desc', 'local_quizanalytics'),
-        30,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'local_quizanalytics/apipdftimeout',
-        get_string('apipdftimeout', 'local_quizanalytics'),
-        get_string('apipdftimeout_desc', 'local_quizanalytics'),
-        90,
+        'local_quizanalytics/computetimelimit',
+        get_string('computetimelimit', 'local_quizanalytics'),
+        get_string('computetimelimit_desc', 'local_quizanalytics'),
+        120,
         PARAM_INT
     ));
 

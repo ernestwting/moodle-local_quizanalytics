@@ -31,6 +31,13 @@ require_login($course);
 $context = context_course::instance($course->id);
 require_capability('local/quizanalytics:view', $context);
 
+// PDF generation redoes the full analytics computation (re-derived
+// server-side, never trusting the client beyond the chart images — see
+// below) on top of drawing the document itself, so it can run longer than
+// a normal page load, especially for a course-wide report — see
+// settings.php.
+core_php_time_limit::raise((int) get_config('local_quizanalytics', 'computetimelimit'));
+
 $colorblind = (bool) optional_param('colorblind', 0, PARAM_INT);
 $sections = optional_param_array('sections', [], PARAM_RAW);
 $selectedsections = !empty($sections) ? $sections : null;
