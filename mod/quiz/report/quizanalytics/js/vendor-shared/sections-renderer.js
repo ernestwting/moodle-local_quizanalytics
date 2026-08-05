@@ -40,9 +40,23 @@
         'ted': 'TED', 'stack': 'STACK', 'url': 'URL',
     };
 
+    // A few raw column names abbreviate in a way that word-by-word
+    // capitalization can't fix on its own ("attempt_idx" -> "Attempt Idx",
+    // not the "Attempt Number" a reader actually wants) — matched against
+    // the whole key, case-insensitively, before falling through to the
+    // generic word-splitting logic below.
+    var FULL_LABEL_OVERRIDES = {
+        'attempt_idx': 'Attempt Number',
+        'completed_dt': 'Completed On',
+    };
+
     function humanizeLabel(key) {
         if (typeof key !== 'string' || !key) {
             return key;
+        }
+        var fullOverride = FULL_LABEL_OVERRIDES[key.toLowerCase()];
+        if (fullOverride) {
+            return fullOverride;
         }
         return key
             .replace(/[_\-]+/g, ' ')
@@ -58,6 +72,26 @@
             .join(' ');
     }
 
+    // Matches the ISO-ish timestamps pandas emits for datetime columns
+    // (completed_dt, started_on, ...), e.g. "2026-06-03T10:53:29.000" or
+    // "2026-06-03 10:53:29" — reformatted to the reader's own locale instead
+    // of shown as a raw sortable-but-not-readable timestamp string.
+    var ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?$/;
+
+    function formatDateTimeValue(value) {
+        if (typeof value !== 'string' || !ISO_DATETIME_RE.test(value)) {
+            return null;
+        }
+        var parsed = new Date(value.replace(' ', 'T'));
+        if (isNaN(parsed.getTime())) {
+            return null;
+        }
+        return parsed.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+        });
+    }
+
     // Long floating-point results (grade_variance, attempt_rate, and similar
     // computed stats) come through with full binary-float precision (e.g.
     // 1.2962962963) — displayed values are capped to 2 decimal places.
@@ -66,6 +100,10 @@
     function formatCellValue(value) {
         if (typeof value === 'number' && !Number.isInteger(value)) {
             return String(Math.round(value * 100) / 100);
+        }
+        var asDateTime = formatDateTimeValue(value);
+        if (asDateTime !== null) {
+            return asDateTime;
         }
         return (value === null || value === undefined) ? '' : String(value);
     }
