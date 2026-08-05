@@ -33,12 +33,25 @@ class parser {
      * Strip HTML tags/entities from a Moodle question/answer cell, leaving LaTeX
      * delimiters intact (they're backslash-escape sequences, not HTML tags, so
      * the tag-stripping regex below never touches them).
+     *
+     * Elements with an inline `display: none` style are dropped entirely
+     * (tag and content) before the generic tag-stripping pass below —
+     * some STACK question authoring leaves hidden markers like
+     * `<p style="display: none;">\({\mathbf{True}}\)</p>` in the rendered
+     * question HTML (seemingly an authoring/versioning artifact, invisible
+     * in a real browser), which the plain "strip the tags, keep the text"
+     * approach below would otherwise surface as visible, confusing bold
+     * "True"/"False" text with no connection to the actual question.
      */
     public static function clean_html_text(?string $text): string {
         if ($text === null || $text === '') {
             return '';
         }
-        $cleaned = html_entity_decode($text, ENT_QUOTES | ENT_HTML5);
+        $cleaned = preg_replace(
+            '/<(\w+)[^>]*\bstyle\s*=\s*"[^"]*display\s*:\s*none[^"]*"[^>]*>.*?<\/\1>/is',
+            ' ', $text
+        );
+        $cleaned = html_entity_decode($cleaned, ENT_QUOTES | ENT_HTML5);
         $cleaned = preg_replace('/<[^>]+>/', ' ', $cleaned);
         return trim(preg_replace('/\s+/', ' ', $cleaned));
     }
