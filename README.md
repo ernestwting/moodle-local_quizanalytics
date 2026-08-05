@@ -5,21 +5,19 @@ Brings the analytics from the companion Streamlit app
 Moodle, scoped correctly per quiz and per course, with no CSV export/upload
 step — data is read straight out of Moodle's own database.
 
-This repository contains three Moodle plugins and one small backend service.
+This repository contains one Moodle plugin and one small backend service.
 Nothing here ever sends data to the public internet: the backend is a local
-microservice the plugins talk to over `127.0.0.1` (or a private network),
+microservice the plugin talks to over `127.0.0.1` (or a private network),
 and student response data never leaves that boundary.
 
 ## What's included
 
 | Component | Path | What it does |
 |---|---|---|
-| `quiz_quizanalytics` | `mod/quiz/report/quizanalytics/` | Adds a **Question Analytics** tab to a quiz's results page (next to Grades/Responses/Statistics): difficulty analysis, response distribution, per-question error drill-down, student performance matrix, question metrics. |
-| `quiz_solutionprocess` | `mod/quiz/report/solutionprocess/` | Adds a **Solution Process Visualization** tab next to it: PRT transition graphs, network features, PRT/TED 3D distance charts, cross-attempt comparison with clickable per-student drill-down. Depends on `quiz_quizanalytics`. |
-| `local_quizanalytics` | `local/quizanalytics/` | Adds a course-level **Analytics** entry to the course navigation: cross-quiz comparison across every STACK quiz in the course, or drill into one quiz to see the same Question Analytics + Solution Process Visualization as the per-quiz tabs. Depends on both plugins above. |
-| analytics service | `analytics-service/` | A small FastAPI app wrapping the `analytics/` Python package (shared, byte-for-byte where possible, with the Streamlit app — see "Keeping this in sync" below). Runs as a local Docker container or systemd service; the three plugins above are its only clients. |
+| `local_quizanalytics` | `local/quizanalytics/` | One "Analytics" entry point, reached three ways: the course's secondary navigation (course-wide cross-quiz comparison, or drill into any one quiz), a link this plugin adds to each STACK quiz's own settings menu (jumps straight to that quiz's drill-down), and — once on a quiz's drill-down — a "View:" selector between **Question Analytics** (difficulty analysis, response distribution, per-question error drill-down, student performance matrix, question metrics) and **Solution Process Visualization** (PRT transition graphs, network features, PRT/TED 3D distance charts, cross-attempt comparison with clickable per-student drill-down). |
+| analytics service | `analytics-service/` | A small FastAPI app wrapping the `analytics/` Python package (shared, byte-for-byte where possible, with the Streamlit app — see "Keeping this in sync" below). Runs as a local Docker container or systemd service; the plugin above is its only client. |
 
-Every surface also has a **Generate PDF Report** button (section checkboxes,
+Every view also has a **Generate PDF Report** button (section checkboxes,
 colorblind-mode toggle) that renders the same charts to a downloadable PDF.
 
 ## Architecture
@@ -34,12 +32,11 @@ Moodle (PHP)  --HTTP, localhost only-->  analytics-service (FastAPI)  -->  analy
                                           already done at attempt time
 ```
 
-- **No CSV round-trip.** `classes/data_fetcher.php` in `quiz_quizanalytics`
-  reads finished attempts straight out of `{quiz_attempts}` via Moodle's
-  question engine (`question_engine::load_questions_usage_by_activity()`),
-  reconstructing the same row shape the Streamlit app expects from an
-  uploaded Moodle CSV export — the two other plugins reuse this same class
-  rather than re-implementing attempt extraction.
+- **No CSV round-trip.** `classes/data_fetcher.php` reads finished attempts
+  straight out of `{quiz_attempts}` via Moodle's question engine
+  (`question_engine::load_questions_usage_by_activity()`), reconstructing
+  the same row shape the Streamlit app expects from an uploaded Moodle CSV
+  export.
 - **STACK question text is rendered through STACK's own CAS engine**
   (`castext2_qa_processor`), not read as the raw stored `questiontext` —
   otherwise you'd see unresolved `@variable@` placeholders and every
@@ -49,12 +46,20 @@ Moodle (PHP)  --HTTP, localhost only-->  analytics-service (FastAPI)  -->  analy
   not a CDN, and not routed through Moodle's `$PAGE->requires->js()`/`->css()`
   (that path re-minifies already-minified vendor bundles and has been
   observed to corrupt them). Same reasoning for the vendored Plotly.js.
-- **Caching**: each of the three plugins' data-fetch paths is backed by a
-  Moodle MUC cache area (`mod/quiz/report/quizanalytics/db/caches.php`),
-  keyed on a cheap SQL fingerprint (attempt count + latest `timefinish` +
-  summed grades) rather than a fixed TTL alone — a cache entry is only ever
-  served while that fingerprint still matches, so new or regraded attempts
-  are reflected immediately rather than waiting out the 1-hour TTL backstop.
+- **Caching**: every data-fetch path is backed by a Moodle MUC cache area
+  (`db/caches.php`), keyed on a cheap SQL fingerprint (attempt count +
+  latest `timefinish` + summed grades) rather than a fixed TTL alone — a
+  cache entry is only ever served while that fingerprint still matches, so
+  new or regraded attempts are reflected immediately rather than waiting
+  out the 1-hour TTL backstop.
+- **One plugin, not three.** Question Analytics and Solution Process
+  Visualization used to be separate `mod_quiz` report subplugins (each its
+  own tab on a quiz's results page). Moodle's quiz-report system doesn't
+  let a `local_` plugin add a tab to that strip, so instead this plugin adds
+  a link to each STACK quiz's own settings/administration menu that jumps
+  to the same drill-down reachable from the course-level page — one plugin
+  to install, configure, and submit to the Plugins directory, at the cost
+  of one extra click from a quiz's own page instead of a dedicated tab.
 
 ## Keeping this in sync with the Streamlit app
 
@@ -87,17 +92,16 @@ projects — that's the whole point of the split.
 ## Installation
 
 See [INSTALL.md](INSTALL.md) for the full step-by-step setup (the analytics
-service, then the three plugins in dependency order, then how to verify each
-one against a real quiz).
+service, then the plugin, then how to verify it against a real quiz).
 
 ## Reference
 
-- `mod/quiz/report/quizanalytics/thirdpartylibs.xml` — vendored library
-  manifest (Plotly.js, KaTeX), required by the Moodle Plugins directory.
-- Every quiz-report and local plugin here follows Moodle's standard
-  subplugin/local-plugin conventions (`version.php`, `db/access.php`,
-  `lang/en/*.php`, `settings.php`) — nothing here needs a custom install
-  script beyond Moodle's own "Site administration" upgrade screen.
+- `local/quizanalytics/thirdpartylibs.xml` — vendored library manifest
+  (Plotly.js, KaTeX), required by the Moodle Plugins directory.
+- Standard Moodle `local_` plugin conventions throughout (`version.php`,
+  `db/access.php`, `db/caches.php`, `lang/en/*.php`, `settings.php`,
+  `lib.php`'s navigation hooks) — nothing here needs a custom install script
+  beyond Moodle's own "Site administration" upgrade screen.
 - License: GNU GPL v3 or later (see `LICENSE`), matching Moodle core's own
   license — required for anything distributed through the Moodle Plugins
   directory.

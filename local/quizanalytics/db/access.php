@@ -2,10 +2,11 @@
 /**
  * Capabilities for local_quizanalytics.
  *
- * Unlike the per-quiz quiz_quizanalytics report (a CONTEXT_MODULE capability
- * checked on one quiz), this capability is checked at CONTEXT_COURSE, since
- * the "Analytics" tab lives on the course's secondary navigation and can show
- * data from every STACK quiz in the course at once.
+ * Checked at CONTEXT_COURSE rather than CONTEXT_MODULE — the course-level
+ * "Analytics" page can show data from every STACK quiz in the course at
+ * once, and the per-quiz link this plugin adds to a quiz's own settings menu
+ * (see lib.php) checks this same capability against that quiz's enclosing
+ * course context.
  *
  * @package    local_quizanalytics
  */

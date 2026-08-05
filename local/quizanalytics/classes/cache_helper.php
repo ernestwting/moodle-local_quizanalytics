@@ -13,12 +13,12 @@
  * calls question_engine::load_questions_usage_by_activity() once per
  * attempt, which is the actual expensive step).
  *
- * @package quiz_quizanalytics
+ * @package local_quizanalytics
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-class quiz_quizanalytics_cache_helper {
+class local_quizanalytics_cache_helper {
 
     /**
      * @param int[] $quizids
@@ -47,9 +47,8 @@ class quiz_quizanalytics_cache_helper {
     }
 
     /**
-     * Fingerprint for one quiz's finished attempts — used by
-     * quiz_quizanalytics's questionanalysis cache area and
-     * quiz_solutionprocess's solutionprocessmeta/solutionprocess areas.
+     * Fingerprint for one quiz's finished attempts — used by the
+     * questionanalysis, solutionprocessmeta, and solutionprocess cache areas.
      *
      * @param stdClass $quiz row from mdl_quiz
      * @return stdClass {count: int, fingerprint: string}
@@ -59,10 +58,9 @@ class quiz_quizanalytics_cache_helper {
     }
 
     /**
-     * Fingerprint across every quiz in a set — used by
-     * local_quizanalytics's quizanalysiscoursewide cache area, where the
-     * course-wide result depends on the attempts of every STACK quiz in the
-     * course at once.
+     * Fingerprint across every quiz in a set — used by the
+     * quizanalysiscoursewide cache area, where the course-wide result
+     * depends on the attempts of every STACK quiz in the course at once.
      *
      * @param stdClass[] $quizzes rows from mdl_quiz (or anything with ->id)
      * @return stdClass {count: int, fingerprint: string}

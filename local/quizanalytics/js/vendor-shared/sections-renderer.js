@@ -1,5 +1,6 @@
-// Generic renderer for the {summary, sections} contract shared by
-// quiz_quizanalytics, quiz_solutionprocess, and local_quizanalytics.
+// Generic renderer for the {summary, sections} contract used by every view
+// local_quizanalytics renders: course-wide comparison, per-quiz Question
+// Analytics, and per-quiz Solution Process Visualization.
 //
 // Expected shape of a `result` object passed to QuizAnalyticsRenderer.render():
 // {

@@ -71,9 +71,11 @@ def audit_question_data(response_df: pd.DataFrame) -> dict[str, Any]:
             )
         else:
             issues.append("Grade validation notice: Mismatches between calculated question-average scores and Moodle's overall attempt grades were found (likely due to manual grading overrides or regrades in Moodle):")
-        for m in mismatches[:10]:  # Show first 10 to avoid UI clutter
+        # Full list, not just the first 10: the caller's UI is expected to
+        # cap this to a scrollable viewport itself (see sections-renderer.js's
+        # renderNotes()) rather than have the data already truncated before
+        # it gets there.
+        for m in mismatches:
             issues.append(f"  • {m}")
-        if len(mismatches) > 10:
-            issues.append(f"  • ... and {len(mismatches) - 10} more rows.")
 
     return {"checks": checks, "issues": issues, "is_valid": len(issues) == 0}

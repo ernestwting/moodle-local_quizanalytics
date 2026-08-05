@@ -1,7 +1,9 @@
 <?php
 /**
  * Shared rendering scaffolding for the {summary, sections} JSON contract,
- * used by quiz_quizanalytics, quiz_solutionprocess, and local_quizanalytics.
+ * used across every view local_quizanalytics renders: course-wide
+ * comparison, per-quiz Question Analytics, and per-quiz Solution Process
+ * Visualization.
  *
  * Deliberately NOT using $PAGE->requires->js()/->css() for the vendored
  * libraries (Plotly, KaTeX): that path routes every file through
@@ -19,19 +21,17 @@
  * convention is for classic directly-included files; this is loaded via
  * Moodle's PSR-4 autoloader from classes/output/sections_renderer.php).
  *
- * @package quiz_quizanalytics
+ * @package local_quizanalytics
  */
 
-namespace quiz_quizanalytics\output;
+namespace local_quizanalytics\output;
 
 class sections_renderer {
 
     /**
      * Echoes the empty container divs a payload gets rendered into.
      * Callers must use a unique $prefix per page when more than one
-     * independent result is rendered on the same page (e.g. Question
-     * Analysis + Solution Process Visualization together on
-     * local_quizanalytics's per-quiz view).
+     * independent result is rendered on the same page.
      *
      * @param string $prefix DOM id prefix, e.g. "qa", "spv", "qw".
      * @return string
@@ -58,17 +58,14 @@ class sections_renderer {
      * @return string
      */
     public static function render_vendor_and_payload(string $prefix, array $result, bool $include_vendor = true): string {
-        global $CFG;
-
-        $base = new \moodle_url('/mod/quiz/report/quizanalytics/js');
         $html = '';
 
         if ($include_vendor) {
-            $plotlyurl = new \moodle_url('/mod/quiz/report/quizanalytics/js/vendor/plotly.min.js');
-            $katexcssurl = new \moodle_url('/mod/quiz/report/quizanalytics/js/vendor/katex/katex.min.css');
-            $katexjsurl = new \moodle_url('/mod/quiz/report/quizanalytics/js/vendor/katex/katex.min.js');
-            $katexautorenderurl = new \moodle_url('/mod/quiz/report/quizanalytics/js/vendor/katex/contrib/auto-render.min.js');
-            $sectionsrendererurl = new \moodle_url('/mod/quiz/report/quizanalytics/js/vendor-shared/sections-renderer.js');
+            $plotlyurl = new \moodle_url('/local/quizanalytics/js/vendor/plotly.min.js');
+            $katexcssurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/katex.min.css');
+            $katexjsurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/katex.min.js');
+            $katexautorenderurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/contrib/auto-render.min.js');
+            $sectionsrendererurl = new \moodle_url('/local/quizanalytics/js/vendor-shared/sections-renderer.js');
 
             $html .= \html_writer::empty_tag('link', ['rel' => 'stylesheet', 'href' => $katexcssurl->out(false)]);
             $html .= \html_writer::tag('script', '', ['src' => $plotlyurl->out(false)]);
@@ -86,29 +83,27 @@ class sections_renderer {
 
     /**
      * Reads (and, if a new value was submitted, persists) the colorblind
-     * display preference. Shared across Question Analysis, Solution Process
-     * Visualization, and the course-wide view — one preference key so a
-     * teacher's choice is consistent everywhere rather than set per-page.
+     * display preference. Shared across every view so a teacher's choice is
+     * consistent everywhere rather than set per-page.
      *
      * @return bool
      */
     public static function resolve_colorblind_mode(): bool {
         $param = optional_param('colorblind', null, PARAM_INT);
         if ($param !== null) {
-            \set_user_preference('quiz_quizanalytics_colorblind', (bool) $param);
+            \set_user_preference('local_quizanalytics_colorblind', (bool) $param);
             return (bool) $param;
         }
         // Note: Moodle's getter is the plural get_user_preferences(), despite
         // the setter being the singular set_user_preference() above — a real
         // asymmetry in core's own API, not a typo.
-        return (bool) \get_user_preferences('quiz_quizanalytics_colorblind', false);
+        return (bool) \get_user_preferences('local_quizanalytics_colorblind', false);
     }
 
     /**
      * A small GET-reload checkbox form for the colorblind toggle, preserving
      * every other current query parameter (quiz id, question/part selectors,
-     * etc.) — same plain-reload pattern already used for local_quizanalytics's
-     * quiz selector, so every distinct view stays a cacheable URL.
+     * etc.) so every distinct view stays a cacheable URL.
      *
      * @return string
      */
@@ -138,9 +133,108 @@ class sections_renderer {
             $checkboxattrs['checked'] = 'checked';
         }
         $html .= \html_writer::empty_tag('input', $checkboxattrs);
-        $html .= ' ' . \html_writer::label(\get_string('colorblindmode', 'quiz_quizanalytics'), 'qa-colorblind-toggle');
+        $html .= ' ' . \html_writer::label(\get_string('colorblindmode', 'local_quizanalytics'), 'qa-colorblind-toggle');
         $html .= ' ' . \html_writer::empty_tag('input', [
             'type' => 'submit', 'value' => \get_string('apply', 'moodle'), 'class' => 'btn btn-secondary btn-sm',
+        ]);
+        $html .= \html_writer::end_tag('form');
+        return $html;
+    }
+
+    /**
+     * The per-quiz "View:" selector between Question Analytics and Solution
+     * Process Visualization — a plain GET-reload, like everything else here,
+     * so only the selected view's data ever gets fetched/computed (picking a
+     * view is a page reload with &view=..., not a client-side tab swap that
+     * would need both already computed).
+     *
+     * @param string $current 'question' or 'solutionprocess'
+     * @return string
+     */
+    public static function render_view_selector_form(string $current): string {
+        global $PAGE;
+
+        $options = [
+            'question'        => \get_string('viewquestionanalytics', 'local_quizanalytics'),
+            'solutionprocess' => \get_string('viewsolutionprocess', 'local_quizanalytics'),
+        ];
+
+        $html = \html_writer::start_tag('form', [
+            'method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-3',
+        ]);
+        foreach ($PAGE->url->params() as $name => $value) {
+            if ($name === 'view') {
+                continue;
+            }
+            $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
+        }
+        $html .= \html_writer::label(\get_string('viewselectlabel', 'local_quizanalytics'), 'qa-view-select');
+        $html .= ' ' . \html_writer::select($options, 'view', $current, false, ['id' => 'qa-view-select']);
+        $html .= ' ' . \html_writer::empty_tag('input', [
+            'type' => 'submit', 'value' => \get_string('gobutton', 'local_quizanalytics'), 'class' => 'btn btn-secondary',
+        ]);
+        $html .= \html_writer::end_tag('form');
+        return $html;
+    }
+
+    /**
+     * The Solution Process Visualization question/part/student selector — a
+     * plain GET-reload form, matching the "view" selector above.
+     *
+     * @param \moodle_url $url
+     * @param array $meta {questions: [{name, parts}], students: [{id, name}]}
+     * @param string $question
+     * @param int $partsforquestion
+     * @param int $part
+     * @param string $studentid
+     * @return string
+     */
+    public static function render_solutionprocess_selector_form(
+        \moodle_url $url,
+        array $meta,
+        string $question,
+        int $partsforquestion,
+        int $part,
+        string $studentid
+    ): string {
+        $ownparams = ['spvquestion', 'spvpart', 'spvstudent'];
+
+        $html = \html_writer::start_tag('form', [
+            'method' => 'get', 'action' => $url->out_omit_querystring(), 'class' => 'mb-3',
+        ]);
+        foreach ($url->params() as $name => $value) {
+            if (in_array($name, $ownparams, true)) {
+                continue;
+            }
+            $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
+        }
+
+        $questionoptions = [];
+        foreach ($meta['questions'] as $q) {
+            $questionoptions[$q['name']] = $q['name'];
+        }
+        $html .= \html_writer::label(\get_string('selectquestion', 'local_quizanalytics'), 'spv-question-select');
+        $html .= ' ' . \html_writer::select($questionoptions, 'spvquestion', $question, false, ['id' => 'spv-question-select']);
+        $html .= ' ';
+
+        $partoptions = [];
+        for ($i = 1; $i <= $partsforquestion; $i++) {
+            $partoptions[$i] = $i;
+        }
+        $html .= \html_writer::label(\get_string('selectpart', 'local_quizanalytics'), 'spv-part-select');
+        $html .= ' ' . \html_writer::select($partoptions, 'spvpart', $part, false, ['id' => 'spv-part-select']);
+        $html .= ' ';
+
+        $studentoptions = ['' => \get_string('selectstudentnone', 'local_quizanalytics')];
+        foreach ($meta['students'] as $s) {
+            $studentoptions[$s['id']] = $s['name'];
+        }
+        $html .= \html_writer::label(\get_string('selectstudent', 'local_quizanalytics'), 'spv-student-select');
+        $html .= ' ' . \html_writer::select($studentoptions, 'spvstudent', $studentid, false, ['id' => 'spv-student-select']);
+        $html .= ' ';
+
+        $html .= \html_writer::empty_tag('input', [
+            'type' => 'submit', 'value' => \get_string('gobutton', 'local_quizanalytics'), 'class' => 'btn btn-secondary',
         ]);
         $html .= \html_writer::end_tag('form');
         return $html;
@@ -151,7 +245,7 @@ class sections_renderer {
      * checked by default, matching Streamlit's export-everything default),
      * plus whatever hidden params the target pdf.php needs to re-derive the
      * quiz/course/selection server-side. Deliberately GET, like every other
-     * form in this plugin family, so each distinct export stays a plain link.
+     * form in this plugin, so each distinct export stays a plain link.
      *
      * If $sectionnames is empty (e.g. the report-sections lookup itself
      * failed), the form still renders with just the submit button — pdf.php
@@ -163,8 +257,7 @@ class sections_renderer {
      * @param string[] $sectionnames Section names from GET /report-sections/{kind}.
      * @param string $buttonlabel
      * @param string $idprefix       Unique per rendered form, so checkbox ids never collide
-     *        when this is called more than once on one page (e.g. local_quizanalytics's
-     *        per-quiz view has both a Question Analysis and an SPV PDF form).
+     *        when this is called more than once on one page.
      * @return string
      */
     public static function render_pdf_form(

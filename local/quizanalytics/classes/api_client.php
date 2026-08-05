@@ -1,9 +1,7 @@
 <?php
 /**
- * Talks to the same local analytics microservice quiz_quizanalytics uses
- * (see mod/quiz/report/quizanalytics/classes/api_client.php for the per-quiz
- * version this is adapted from) — there is only ever one analytics-service
- * process; this plugin just calls two of its endpoints instead of one.
+ * Talks to the local analytics microservice (a small FastAPI app wrapping
+ * the analytics/ Python package — see analytics-service/ at the repo root).
  *
  * Deliberately dumb: no retries, no queuing. If it fails, the page shows a
  * friendly error rather than a stack trace, and nothing about a failure here
@@ -17,7 +15,7 @@ defined('MOODLE_INTERNAL') || die();
 class local_quizanalytics_api_client {
 
     /**
-     * @param string $endpointpath either '/analyze' or '/analyze-course'
+     * @param string $endpointpath e.g. '/analyze', '/analyze-course', '/solution-process/meta'
      * @param array  $payload      request body matching that endpoint's schema
      * @return array|null          Decoded JSON response, or null on any failure.
      */
@@ -67,8 +65,7 @@ class local_quizanalytics_api_client {
     }
 
     /**
-     * Single-quiz analysis, for the drill-down view. Same request shape as
-     * quiz_quizanalytics_api_client::analyze().
+     * Question Analytics for a single quiz, for the per-quiz drill-down view.
      *
      * @param string $quizname
      * @param array  $records
@@ -112,11 +109,57 @@ class local_quizanalytics_api_client {
     }
 
     /**
-     * GET /report-sections/{kind} — the section names available for one PDF
-     * kind, driving the "Generate PDF Report" checkbox list. Returns [] on
-     * any failure (the form still works, it just renders with no checkboxes).
+     * Cheap Solution Process Visualization metadata (question/part/student
+     * lists) for populating the selector form.
      *
-     * @param string $kind 'question' or 'quiz'
+     * @param string $quizname
+     * @param array  $records
+     * @return array|null
+     */
+    public function solution_process_meta(string $quizname, array $records): ?array {
+        return $this->post('/solution-process/meta', [
+            'quiz_name' => $quizname,
+            'records'   => $records,
+        ]);
+    }
+
+    /**
+     * The full Solution Process Visualization for one (question, part),
+     * optionally scoped further to one student's own drill-down.
+     *
+     * @param string      $quizname
+     * @param array       $records
+     * @param string      $question
+     * @param int         $partindex
+     * @param string|null $studentid
+     * @param bool        $colorblindmode
+     * @return array|null
+     */
+    public function solution_process_analyze(
+        string $quizname,
+        array $records,
+        string $question,
+        int $partindex = 1,
+        ?string $studentid = null,
+        bool $colorblindmode = false
+    ): ?array {
+        return $this->post('/solution-process', [
+            'quiz_name'       => $quizname,
+            'records'         => $records,
+            'question'        => $question,
+            'part_index'      => $partindex,
+            'student_id'      => $studentid,
+            'colorblind_mode' => $colorblindmode,
+        ]);
+    }
+
+    /**
+     * GET /report-sections/{kind} — the section names available for one PDF
+     * kind, driving the "Generate PDF Report" checkbox list so it can never
+     * drift from what the PDF route actually includes. Returns [] on any
+     * failure (the form still works, it just renders with no checkboxes).
+     *
+     * @param string $kind 'question', 'solutionprocess', or 'quiz'
      * @return string[]
      */
     public function report_sections(string $kind): array {
@@ -140,12 +183,11 @@ class local_quizanalytics_api_client {
     }
 
     /**
-     * Downloads raw PDF bytes from any /pdf/* endpoint. Shared by
-     * download_pdf_question() and download_pdf_quiz() below — the request
-     * shape differs per kind, but the transport (POST JSON, expect
-     * application/pdf back) is identical.
+     * Downloads raw PDF bytes from any /pdf/* endpoint. Shared by the three
+     * download_pdf_*() methods below — the request shape differs per kind,
+     * but the transport (POST JSON, expect application/pdf back) is identical.
      *
-     * @param string $endpointpath e.g. '/pdf/question' or '/pdf/quiz'
+     * @param string $endpointpath e.g. '/pdf/question', '/pdf/solution-process', '/pdf/quiz'
      * @param array  $payload
      * @return string|null Raw PDF bytes, or null on any failure.
      */
@@ -177,8 +219,7 @@ class local_quizanalytics_api_client {
     }
 
     /**
-     * Question Analysis PDF for one quiz, matching quiz_quizanalytics's own
-     * /pdf/question call.
+     * Question Analytics PDF for one quiz.
      *
      * @param string $quizname
      * @param array  $records
@@ -195,6 +236,35 @@ class local_quizanalytics_api_client {
         return $this->post_pdf('/pdf/question', [
             'quiz_name'         => $quizname,
             'records'           => $records,
+            'selected_sections' => $selectedsections,
+            'colorblind_mode'   => $colorblindmode,
+        ]);
+    }
+
+    /**
+     * Solution Process Visualization PDF for one (quiz, question, part).
+     *
+     * @param string $quizname
+     * @param array  $records
+     * @param string $question
+     * @param int    $partindex
+     * @param array|null $selectedsections
+     * @param bool   $colorblindmode
+     * @return string|null
+     */
+    public function download_pdf_solutionprocess(
+        string $quizname,
+        array $records,
+        string $question,
+        int $partindex,
+        ?array $selectedsections,
+        bool $colorblindmode = false
+    ): ?string {
+        return $this->post_pdf('/pdf/solution-process', [
+            'quiz_name'         => $quizname,
+            'records'           => $records,
+            'question'          => $question,
+            'part_index'        => $partindex,
             'selected_sections' => $selectedsections,
             'colorblind_mode'   => $colorblindmode,
         ]);

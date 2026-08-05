@@ -1,9 +1,9 @@
 <?php
 /**
- * Streams a PDF report from the course-level "Analytics" page: the
- * per-quiz Question Analysis or Solution Process Visualization PDF
- * (?kind=question|solutionprocess&quizid=...), or the course-wide
- * cross-quiz Quiz Analysis PDF (?kind=quiz).
+ * Streams a PDF report from the "Analytics" page: the per-quiz Question
+ * Analytics or Solution Process Visualization PDF
+ * (?kind=question|solutionprocess&quizid=...), or the course-wide cross-quiz
+ * Quiz Analysis PDF (?kind=quiz).
  *
  * A separate entry point from index.php, gated by the same
  * local/quizanalytics:view capability that governs everything else shown on
@@ -18,7 +18,6 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/filelib.php'); // send_file() lives here, not autoloaded for a lean entry point like this.
 require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/api_client.php');
-require_once($CFG->dirroot . '/mod/quiz/report/solutionprocess/classes/api_client.php');
 
 $courseid = required_param('id', PARAM_INT);
 $kind     = required_param('kind', PARAM_ALPHA); // 'question' | 'solutionprocess' | 'quiz'
@@ -69,17 +68,15 @@ if ($kind === 'quiz') {
         $pdf = $client->download_pdf_question($selectedquiz->name, $records, $selectedsections, $colorblind);
         $filename = clean_filename($selectedquiz->name . '-question-analysis.pdf');
     } else {
-        $spvclient = new quiz_solutionprocess_api_client();
-
-        $meta = $spvclient->meta($selectedquiz->name, $records);
+        $meta = $client->solution_process_meta($selectedquiz->name, $records);
         if ($meta === null || empty($meta['questions'])) {
-            throw new \moodle_exception('servererror', 'quiz_solutionprocess');
+            throw new \moodle_exception('servererror', 'local_quizanalytics');
         }
 
         $questionnames = array_column($meta['questions'], 'name');
         $spvquestion = required_param('spvquestion', PARAM_RAW);
         if (!in_array($spvquestion, $questionnames, true)) {
-            throw new \moodle_exception('servererror', 'quiz_solutionprocess'); // Stale/tampered selection — fail closed.
+            throw new \moodle_exception('servererror', 'local_quizanalytics'); // Stale/tampered selection — fail closed.
         }
 
         $partsforquestion = 1;
@@ -94,7 +91,7 @@ if ($kind === 'quiz') {
             $spvpart = 1;
         }
 
-        $pdf = $spvclient->download_pdf(
+        $pdf = $client->download_pdf_solutionprocess(
             $selectedquiz->name, $records, $spvquestion, $spvpart, $selectedsections, $colorblind
         );
         $filename = clean_filename(

@@ -68,3 +68,58 @@ function local_quizanalytics_extend_navigation_course($navigation, $course, $con
         new pix_icon('i/report', '')
     );
 }
+
+/**
+ * Adds an "Analytics" link to a STACK quiz's own settings/administration
+ * menu, jumping straight to this plugin's course-level page pre-scoped to
+ * that quiz (index.php?id=<courseid>&quizid=<quizid>) — the same page and
+ * URL a teacher would reach by picking that quiz from the course-level
+ * quiz selector, just one click closer from the quiz itself. Since a local
+ * plugin can't add a tab to the quiz results page's own Grades/Responses/
+ * Statistics strip (that strip is built exclusively from mod_quiz report
+ * subplugins), this is the closest equivalent: a link on the quiz page.
+ *
+ * Called by core for every settings-navigation build, at every context
+ * level (see lib/navigationlib.php's load_local_plugin_settings(), which
+ * calls every local_*_extend_settings_navigation() unconditionally) — so
+ * this returns immediately for anything that isn't a quiz's own page.
+ *
+ * @param \settings_navigation $settingsnav
+ * @param \context $context the current page's context
+ */
+function local_quizanalytics_extend_settings_navigation($settingsnav, $context) {
+    global $CFG;
+
+    if ($context->contextlevel != CONTEXT_MODULE) {
+        return;
+    }
+
+    $cm = get_coursemodule_from_id('quiz', $context->instanceid, 0, false, IGNORE_MISSING);
+    if (!$cm) {
+        return; // Not a quiz module.
+    }
+
+    $coursecontext = context_course::instance($cm->course);
+    if (!has_capability('local/quizanalytics:view', $coursecontext)) {
+        return;
+    }
+
+    require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
+    if (!local_quizanalytics_data_fetcher::quiz_has_stack_question($cm->instance)) {
+        return;
+    }
+
+    $url = new moodle_url('/local/quizanalytics/index.php', [
+        'id'     => $cm->course,
+        'quizid' => $cm->instance,
+    ]);
+
+    $settingsnav->add(
+        get_string('pluginname', 'local_quizanalytics'),
+        $url,
+        navigation_node::TYPE_SETTING,
+        null,
+        'quizanalyticsquiz',
+        new pix_icon('i/report', '')
+    );
+}

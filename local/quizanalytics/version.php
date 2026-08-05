@@ -12,23 +12,21 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_quizanalytics';  // Must match the folder: local/quizanalytics.
-$plugin->version   = 2026080300;             // YYYYMMDDXX — bump this every time you push an update.
+$plugin->version   = 2026080500;             // YYYYMMDDXX — bump this every time you push an update.
 $plugin->requires  = 2022041900;             // Moodle 4.0.0 — lower this if you're on an older Moodle,
                                               // raise it if you use APIs from a newer one. Check your
                                               // target Moodle's own version.php for the right number.
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.1.0';
+$plugin->release   = '1.0.0';
 
-// This plugin depends on mod_quiz (obviously), on the quiz_quizanalytics
-// report subplugin (its data_fetcher deliberately calls into
-// quiz_quizanalytics_data_fetcher::get_response_records() rather than
-// reimplementing attempt/response extraction a second time), and on
-// quiz_solutionprocess (index.php embeds its Solution Process Visualization
-// selector form and api_client for the per-quiz view). Moodle refuses to
-// enable this plugin if any of these is missing or too old, rather than
-// failing confusingly at runtime.
+// This plugin depends on mod_quiz (obviously) and nothing else — as of
+// version 2026080500 this is the only plugin in the STACK Quiz Analytics
+// suite. Question Analytics and Solution Process Visualization used to be
+// separate quiz-report subplugins (quiz_quizanalytics, quiz_solutionprocess);
+// their code now lives in this plugin's own classes/, reached via the
+// per-quiz drill-down (index.php's "view" selector) and a link this plugin
+// adds to each STACK quiz's settings menu (see lib.php), rather than as
+// separate tabs on the quiz results page.
 $plugin->dependencies = [
-    'mod_quiz'             => 2022041900,
-    'quiz_quizanalytics'   => 2026080300,
-    'quiz_solutionprocess' => 2026080300,
+    'mod_quiz' => 2022041900,
 ];

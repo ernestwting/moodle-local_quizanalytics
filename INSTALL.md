@@ -1,20 +1,16 @@
 # Installing STACK Quiz Analytics — full stack
 
-Four pieces, installed in this order — each later plugin depends on the ones
-before it, and Moodle's own upgrade screen will refuse to enable a plugin
-whose declared dependency is missing or too old, so this order isn't just a
-suggestion:
+Two pieces, installed in this order — the plugin depends on the microservice
+being reachable, so it's easiest to bring the service up first, confirm it
+with `curl`, then install the plugin:
 
 1. **The analytics microservice** (`analytics-service/`) — a small Python
    process on the same server (or private network) as Moodle.
-2. **`quiz_quizanalytics`** (`mod/quiz/report/quizanalytics/`) — the
-   per-quiz **Question Analytics** tab. Everything else depends on this.
-3. **`quiz_solutionprocess`** (`mod/quiz/report/solutionprocess/`) — the
-   per-quiz **Solution Process Visualization** tab. Depends on (2).
-4. **`local_quizanalytics`** (`local/quizanalytics/`) — the course-level
-   **Analytics** page. Depends on (2) and (3).
+2. **`local_quizanalytics`** (`local/quizanalytics/`) — the one Moodle
+   plugin, covering course-wide comparison, per-quiz Question Analytics, and
+   per-quiz Solution Process Visualization.
 
-All four live on the same machine (or same private network) as your Moodle
+Both live on the same machine (or same private network) as your Moodle
 install. Nothing here talks to the public internet.
 
 ---
@@ -23,9 +19,9 @@ install. Nothing here talks to the public internet.
 
 - Admin access to the Moodle site, plus shell/SFTP access to the Moodle
   codebase (not just the web UI).
-- Moodle 4.0+ (adjust each plugin's `version.php`'s `requires` value if
-  you're on something else — check your target Moodle's own `version.php`
-  for the right number).
+- Moodle 4.0+ (adjust `version.php`'s `requires` value if you're on
+  something else — check your target Moodle's own `version.php` for the
+  right number).
 - Docker + Docker Compose (recommended for the analytics service), or Python
   3.11+ if you'd rather run it directly via systemd.
 
@@ -59,7 +55,7 @@ The `-p 127.0.0.1:8600:8600` is the important part — it only publishes the
 port to the host's loopback interface, so nothing outside the machine can
 reach it. If Moodle runs in a *different* container on the same Docker
 network instead of directly on the host, use `--network <that-network>`
-instead of `-p 127.0.0.1:...` and point the plugins at the container's
+instead of `-p 127.0.0.1:...` and point the plugin at the container's
 service name (e.g. `http://quiz-quizanalytics-service:8600`) rather than
 `127.0.0.1`.
 
@@ -109,120 +105,83 @@ depends on that port never being reachable from outside the server.
 
 ---
 
-## Part 2 — `quiz_quizanalytics` (Question Analytics)
+## Part 2 — `local_quizanalytics`
 
 ### 2.1 Place the files
 
 ```bash
-cp -r mod/quiz/report/quizanalytics <moodleroot>/mod/quiz/report/quizanalytics
-chown -R www-data:www-data <moodleroot>/mod/quiz/report/quizanalytics
+cp -r local/quizanalytics <moodleroot>/local/quizanalytics
+chown -R www-data:www-data <moodleroot>/local/quizanalytics
 # (use whatever user your web server actually runs as)
 ```
 
 The folder name must stay exactly `quizanalytics` — Moodle derives the
-component name `quiz_quizanalytics` from that path. Plotly.js and KaTeX are
+component name `local_quizanalytics` from that path. Plotly.js and KaTeX are
 already vendored inside `js/vendor/`; no separate download step is needed.
 
 ### 2.2 Run the Moodle upgrade
 
 Log in as an admin and go to **Site administration**. Moodle detects the new
 plugin and shows the plugins-check/upgrade screen — click through it. This
-registers the `quiz/quizanalytics:view` capability from `db/access.php` and
+registers the `local/quizanalytics:view` capability from `db/access.php` and
 the cache areas from `db/caches.php`; no separate manual step is needed for
 either.
 
 If the upgrade screen doesn't appear automatically, force it by visiting
 `<yoursite>/admin/index.php`.
 
-### 2.3 Confirm the report is enabled
+### 2.3 Point the plugin at your analytics service
 
-**Site administration → Plugins → Activity modules → Quiz → Quiz reports** —
-find "Question Analytics" in the list and make sure it isn't disabled.
+**Site administration → Plugins → Local plugins → Analytics**:
 
-### 2.4 Point the plugin at your analytics service
-
-**Site administration → Plugins → Quiz reports → Question Analytics**:
-
-- **Analytics service URL** → `http://127.0.0.1:8600/analyze` (or your
+- **Analytics service base URL** → `http://127.0.0.1:8600` (or your
   container's internal address if you used the Docker+network route above).
-- **Analytics service timeout** → 30 is a reasonable default.
+  Just the base — the plugin appends `/analyze`, `/analyze-course`,
+  `/solution-process`, and the PDF export paths itself.
+- **Analytics service timeout** → 30 is a reasonable default; course-wide
+  requests bundle every STACK quiz's attempts into one call, so raise this
+  on courses with many large quizzes if you see timeouts there specifically.
 - **PDF export timeout** → 90 by default; raise it for quizzes with a lot of
   attempts/questions, since PDF generation rasterizes every chart.
 
-### 2.5 Test on a real quiz
-
-1. Go to a course with a STACK quiz that has at least one **finished**
-   attempt.
-2. Open the quiz → **Results**. You should see a **Question Analytics** tab.
-3. First load computes everything fresh (a few seconds); reloading the same
-   page should be near-instant (cache hit) until a new attempt is submitted.
-4. Try **Generate PDF Report** at the bottom of the page.
-
-If you see "No attempts yet," check that the quiz has attempts in the
-`state = finished` state, not just in-progress ones. If you see "The
-analytics service could not be reached," re-check 2.4's URL against the
-`curl` test from 1.4.
-
----
-
-## Part 3 — `quiz_solutionprocess` (Solution Process Visualization)
-
-Requires Part 2 to already be installed and working.
-
-```bash
-cp -r mod/quiz/report/solutionprocess <moodleroot>/mod/quiz/report/solutionprocess
-chown -R www-data:www-data <moodleroot>/mod/quiz/report/solutionprocess
-```
-
-Then repeat 2.2–2.4 for this plugin: run the Moodle upgrade (if it blocks
-with a "missing dependency" error, `quiz_quizanalytics` isn't installed or is
-older than this plugin's declared dependency — go fix Part 2 first), confirm
-it's enabled under **Quiz reports**, and set **Analytics service base URL**
-(just the base, e.g. `http://127.0.0.1:8600` — this plugin appends
-`/solution-process/meta` and `/solution-process` itself, unlike
-`quiz_quizanalytics`'s single-endpoint setting) plus the timeout settings
-under **Site administration → Plugins → Quiz reports → Solution Process
-Visualization**.
-
-**Test:** open the same quiz's **Solution Process Visualization** tab, pick a
-question/part with STACK PRTs, and confirm the transition graph and 3D charts
-render. In the **Cross-Attempt Comparison** table, click a student's name —
-you should land on their own attempt-by-attempt drill-down.
-
----
-
-## Part 4 — `local_quizanalytics` (course-level Analytics)
-
-Requires Parts 2 and 3 to already be installed and working.
-
-```bash
-cp -r local/quizanalytics <moodleroot>/local/quizanalytics
-chown -R www-data:www-data <moodleroot>/local/quizanalytics
-```
-
-Run the Moodle upgrade (again, it'll block on a missing-dependency error if
-either plugin above isn't installed yet), then set **Analytics service base
-URL**/timeouts under **Site administration → Plugins → Local plugins →
-Analytics**.
-
-**Test — the tab appearing at all is the highest-risk step, verify it
-directly:**
+### 2.4 Test the course-level page
 
 1. Go to a course with **at least one quiz containing a STACK question**
    (added directly to a slot, not pulled in only via "random question from
    category" — that's a deliberately narrow, fast detection query, not a
-   bug).
+   bug), with at least one **finished** attempt.
 2. Look at the course's secondary navigation bar
    (`Course | Settings | Participants | Grades | Reports | ...`) for an
    **Analytics** entry — check inside **More** too if the bar is full;
    Moodle caps visible entries and collapses the rest there.
-3. Click it. You should land on the course-wide cross-quiz view, with a
-   dropdown to drill into any single quiz (showing the same Question
-   Analytics + Solution Process Visualization as the per-quiz tabs, plus
-   their own PDF export buttons).
-4. Confirm it's correctly **hidden** on a course with no STACK quizzes, and
-   that a student account gets Moodle's standard permission-denied error if
-   they navigate to `local/quizanalytics/index.php?id=<courseid>` directly.
+3. Click it. You should land on the course-wide cross-quiz comparison, with
+   a dropdown to drill into any single quiz.
+4. Pick a quiz. You should see a "View:" selector — **Question Analytics**
+   is the default; picking **Solution Process Visualization** reloads the
+   page showing that instead (only the selected view's data is fetched per
+   load, not both at once).
+5. Try **Generate PDF Report** at the bottom of whichever view is showing.
+6. Confirm the page is correctly **hidden** on a course with no STACK
+   quizzes, and that a student account gets Moodle's standard
+   permission-denied error if they navigate to
+   `local/quizanalytics/index.php?id=<courseid>` directly.
+
+### 2.5 Test the per-quiz shortcut
+
+1. Open a STACK quiz directly (not through the course-level page) and find
+   its settings/administration menu (the gear icon, or wherever your theme
+   surfaces activity settings).
+2. You should see an **Analytics** entry there too — it jumps straight to
+   this same quiz's drill-down on the course-level page (step 2.4.4 above),
+   just reached in one click from the quiz itself instead of via the course
+   nav and its quiz selector.
+
+If either entry point doesn't appear at all, check that the quiz actually
+has finished attempts and a STACK question added directly to a slot — first
+load computes everything fresh (a few seconds); reloading the same page
+should be near-instant afterward (cache hit) until a new attempt is
+submitted. If you see "The analytics service could not be reached," re-check
+2.3's URL against the `curl` test from 1.4.
 
 ---
 
@@ -230,8 +189,7 @@ directly:**
 
 | Symptom | Likely cause |
 |---|---|
-| A tab/nav entry doesn't appear at all | Plugin not installed, or disabled under **Quiz reports** / no STACK quiz in the course (`local_quizanalytics` only) |
-| Upgrade blocks with a dependency error | Install the plugin it depends on first (Part 2 before 3, Parts 2+3 before 4) |
+| "Analytics" doesn't appear anywhere, course nav or quiz settings menu | Plugin not installed, or no STACK quiz/finished attempts (both entry points are gated on this) |
 | "The analytics service could not be reached" | URL/port mismatch, service not running (`docker ps` / `systemctl status quizanalytics`), or a firewall blocking even localhost |
 | "No attempts yet" / "...has no finished attempts" | No attempts in `state = finished` for the quiz(zes) in question |
 | Charts blank / JS console errors | Check the browser console for a 404 on `js/vendor/plotly.min.js` or `js/vendor/katex/*` — those ship inside this repo already, so a 404 usually means the plugin folder wasn't copied completely |

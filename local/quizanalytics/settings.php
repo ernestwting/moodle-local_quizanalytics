@@ -9,11 +9,9 @@
  * admin_settingpage and add it to the tree itself. Verified against
  * public/lib/classes/plugininfo/local.php in the installed Moodle core.
  *
- * This points at the SAME analytics microservice quiz_quizanalytics already
- * uses — there is only ever one instance of that service running. The two
- * plugins store the setting slightly differently (this one stores just the
- * base URL, since it needs to call both /analyze and /analyze-course) but
- * both should point at the same host:port.
+ * Points at the local analytics microservice's base URL — this plugin
+ * appends /analyze, /analyze-course, /solution-process, and the PDF export
+ * paths itself.
  *
  * @package local_quizanalytics
  */
