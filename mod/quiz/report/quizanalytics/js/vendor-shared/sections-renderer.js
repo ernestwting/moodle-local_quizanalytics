@@ -58,6 +58,18 @@
             .join(' ');
     }
 
+    // Long floating-point results (grade_variance, attempt_rate, and similar
+    // computed stats) come through with full binary-float precision (e.g.
+    // 1.2962962963) — displayed values are capped to 2 decimal places.
+    // Integers (attempt counts, ids that happen to be numeric, etc.) are
+    // left exactly as-is rather than padded to "4.00".
+    function formatCellValue(value) {
+        if (typeof value === 'number' && !Number.isInteger(value)) {
+            return String(Math.round(value * 100) / 100);
+        }
+        return (value === null || value === undefined) ? '' : String(value);
+    }
+
     // Long tables (many student rows especially) get capped to a scrollable
     // viewport instead of pushing the rest of the page down — same idea as
     // the fixed-height, scrollable dataframe viewer in the Streamlit app this
@@ -87,8 +99,7 @@
         Object.keys(summary).forEach(function (key) {
             var row = table.insertRow();
             row.insertCell().textContent = humanizeLabel(key);
-            var value = summary[key];
-            row.insertCell().textContent = (value === null || value === undefined) ? '' : String(value);
+            row.insertCell().textContent = formatCellValue(summary[key]);
         });
         root.appendChild(table);
     }
@@ -111,7 +122,7 @@
             var row = tbody.insertRow();
             rowValues.forEach(function (value) {
                 var cell = row.insertCell();
-                cell.innerHTML = (value === null || value === undefined) ? '' : String(value);
+                cell.innerHTML = formatCellValue(value);
             });
         });
         root.appendChild(wrapScrollable(el, table.rows.length));
