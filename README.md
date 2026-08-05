@@ -64,14 +64,6 @@ Plotly.js / KaTeX (client-side rendering) or TCPDF (server-side PDF)
   alone — a cache entry is only ever served while that fingerprint still
   matches, so new or regraded attempts are reflected immediately rather than
   waiting out the 1-hour TTL backstop.
-- **One plugin, not three.** Question Analytics and Solution Process
-  Visualization used to be separate `mod_quiz` report subplugins (each its
-  own tab on a quiz's results page). Moodle's quiz-report system doesn't
-  let a `local_` plugin add a tab to that strip, so instead this plugin adds
-  a link to each STACK quiz's own settings/administration menu that jumps
-  to the same drill-down reachable from the course-level page — one plugin
-  to install, configure, and submit to the Plugins directory, at the cost
-  of one extra click from a quiz's own page instead of a dedicated tab.
 
 ## Where this came from
 
