@@ -478,4 +478,118 @@ class latex_utils {
         }
         return implode('; ', $parts);
     }
+
+    /**
+     * Balanced-brace replacement of `\macro{...}` with $openwrap ... $closewrap,
+     * recursing into the inner content so nested occurrences of the same macro
+     * convert correctly — the `{...}` counterpart of convert_bracket_call()'s
+     * `(...)` scanning.
+     */
+    protected static function convert_braced_call(string $expr, string $macro, string $openwrap, string $closewrap): string {
+        $marker = $macro . '{';
+        $markerlen = strlen($marker);
+        $out = '';
+        $i = 0;
+        $n = strlen($expr);
+        while ($i < $n) {
+            if (substr($expr, $i, $markerlen) === $marker) {
+                $depth = 1;
+                $j = $i + $markerlen;
+                $start = $j;
+                while ($j < $n && $depth > 0) {
+                    if ($expr[$j] === '{') {
+                        $depth++;
+                    } else if ($expr[$j] === '}') {
+                        $depth--;
+                    }
+                    $j++;
+                }
+                $inner = substr($expr, $start, $j - 1 - $start);
+                $out .= $openwrap . self::convert_braced_call($inner, $macro, $openwrap, $closewrap) . $closewrap;
+                $i = $j;
+            } else {
+                $out .= $expr[$i];
+                $i++;
+            }
+        }
+        return $out;
+    }
+
+    // Simple, no-braces LaTeX-macro -> plain-text/Unicode substitutions for
+    // latex_to_plain_text() below, applied after the balanced-brace macros
+    // (\sqrt, ^, \operatorname, \text, \mathrm) have already been unwrapped —
+    // order matters here since e.g. \pi nested inside a \sqrt{...} is only
+    // reachable as plain text once the braces around it are gone.
+    const PLAIN_TEXT_REPLACEMENTS = [
+        '\cdot' => "\u{00B7}", '\pi' => "\u{03C0}", '\varphi' => "\u{03C6}",
+        '\gamma' => "\u{03B3}", '\infty' => "\u{221E}", '\neq' => "\u{2260}",
+        '\leq' => "\u{2264}", '\geq' => "\u{2265}", '\%' => '%',
+        '\lfloor ' => "\u{230A}", ' \rfloor' => "\u{230B}",
+        '\lceil ' => "\u{2308}", ' \rceil' => "\u{2309}",
+    ];
+
+    /**
+     * Best-effort rendering of one LaTeX math fragment (the content between a
+     * pair of `$` delimiters, e.g. `9 \cdot \mathrm{i} \cdot
+     * \sin((7 \cdot \pi)/12)`) as plain, readable text/Unicode — used only for
+     * the PDF export, which has no LaTeX typesetting engine of its own
+     * (KaTeX renders the same `$...$` string as real math on screen). Not a
+     * full LaTeX parser, same "best-effort, common STACK patterns only"
+     * scope as maxima_expr_to_latex() itself — this is that function's
+     * approximate inverse.
+     */
+    protected static function convert_latex_fragment_to_plain(string $expr): string {
+        $out = $expr;
+        // \sqrt[n]{x} first (a regex, not convert_braced_call, since its
+        // degree argument sits in its own `[...]` before the `{...}`) —
+        // fine for STACK's typical simple-degree output; see this
+        // function's own "best-effort" scope note above.
+        $out = preg_replace('/\\\\sqrt\[(.*?)\]\{(.*?)\}/s', 'root($2, $1)', $out);
+
+        $out = self::convert_braced_call($out, '\sqrt', "\u{221A}(", ')');
+        $out = self::convert_braced_call($out, '\operatorname', '', '');
+        $out = self::convert_braced_call($out, '\text', '', '');
+        $out = self::convert_braced_call($out, '\mathrm', '', '');
+        $out = self::convert_braced_call($out, '^', '^(', ')');
+
+        // \left[\substack{row \\ row}\right] matrix -> [cell, cell; cell, cell].
+        $out = preg_replace_callback('/\\\\left\[\\\\substack\{(.*?)\}\\\\right\]/s', function ($m) {
+            $rows = array_map(function ($row) {
+                $cells = array_map('trim', explode('\quad', $row));
+                return implode(', ', $cells);
+            }, explode(' \\\\ ', $m[1]));
+            return '[' . implode('; ', $rows) . ']';
+        }, $out);
+
+        foreach (self::PLAIN_TEXT_REPLACEMENTS as $macro => $replacement) {
+            $out = str_replace($macro, $replacement, $out);
+        }
+
+        // Trig/log/exp operator macros: \arcsin(, \sin(, ... -> just drop the
+        // backslash — longest-alternative-first isn't needed here (\bsinh\b
+        // and \bsin\b never both match the same position, since a word
+        // boundary can't fall between "sin" and the "h" of "sinh").
+        $out = preg_replace(
+            '/\\\\(arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|sec|csc|cot|log|ln|exp)\b/',
+            '$1', $out
+        );
+
+        return $out;
+    }
+
+    /**
+     * Renders every `$...$`-delimited math fragment in $text as plain,
+     * readable text via convert_latex_fragment_to_plain(), leaving
+     * surrounding non-math text (e.g. "ans1: ", "; ", a frequency count in
+     * parens) untouched. For PDF cell display only — the on-screen page
+     * still gets the real `$...$` string for KaTeX to typeset.
+     */
+    public static function latex_to_plain_text(string $text): string {
+        if (!str_contains($text, '$')) {
+            return $text;
+        }
+        return preg_replace_callback('/\$(.*?)\$/s', function ($m) {
+            return self::convert_latex_fragment_to_plain($m[1]);
+        }, $text);
+    }
 }

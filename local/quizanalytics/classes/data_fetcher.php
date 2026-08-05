@@ -168,9 +168,17 @@ class local_quizanalytics_data_fetcher {
                 'first_name'     => $user->firstname,
                 'email'          => $user->email,
                 'state'          => $attempt->state,
-                'started_on'     => userdate($attempt->timestart, '%Y-%m-%d %H:%M:%S'),
+                // $fixday=false: userdate()'s default (true) strips the
+                // leading zero from the day ("2026-6-3" instead of
+                // "2026-06-03"), which breaks sections-renderer.js's
+                // ISO_DATETIME_RE match for single-digit days — that row
+                // then fell back to showing this raw string unformatted
+                // while every other row displayed nicely, which is exactly
+                // the inconsistent Completed On/Started On formatting
+                // reported against this page.
+                'started_on'     => userdate($attempt->timestart, '%Y-%m-%d %H:%M:%S', 99, false),
                 'completed'      => $attempt->timefinish
-                    ? userdate($attempt->timefinish, '%Y-%m-%d %H:%M:%S') : '',
+                    ? userdate($attempt->timefinish, '%Y-%m-%d %H:%M:%S', 99, false) : '',
                 'time_taken_secs' => $attempt->timefinish
                     ? ($attempt->timefinish - $attempt->timestart) : null,
                 'grade'          => $attempt->sumgrades,

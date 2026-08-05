@@ -44,7 +44,7 @@ class quizanalytics_tcpdf extends \TCPDF {
     }
 
     public function Header(): void {
-        $this->SetFont('helvetica', '', 9);
+        $this->SetFont('dejavusans', '', 9);
         $this->SetTextColor(0x64, 0x74, 0x8b);
         $this->SetDrawColor(0xcb, 0xd5, 0xe1);
         $this->SetLineWidth(0.2);
@@ -55,7 +55,7 @@ class quizanalytics_tcpdf extends \TCPDF {
     }
 
     public function Footer(): void {
-        $this->SetFont('helvetica', '', 9);
+        $this->SetFont('dejavusans', '', 9);
         $this->SetTextColor(0x64, 0x74, 0x8b);
         $this->SetDrawColor(0xcb, 0xd5, 0xe1);
         $this->SetLineWidth(0.2);
@@ -97,56 +97,87 @@ class pdf_builder {
         $pdf->setFontSubsetting(true);
         $pdf->AddPage();
 
-        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->SetFont('dejavusans', 'B', 18);
         $pdf->SetTextColor(0x1e, 0x3c, 0x72);
         $pdf->MultiCell(0, 8, $content['title'], 0, 'L');
 
         if (!empty($content['subtitle'])) {
-            $pdf->SetFont('helvetica', '', 9);
+            $pdf->SetFont('dejavusans', '', 9);
             $pdf->SetTextColor(0x47, 0x55, 0x69);
             $pdf->MultiCell(0, 5, $content['subtitle'], 0, 'L');
         }
         $pdf->Ln(4);
 
         if (empty($content['sections'])) {
-            $pdf->SetFont('helvetica', 'I', 10);
+            $pdf->SetFont('dejavusans', 'I', 10);
             $pdf->SetTextColor(0x64, 0x74, 0x8b);
             $pdf->MultiCell(0, 6, 'No sections were selected for this report.', 0, 'L');
         }
 
-        foreach ($content['sections'] as $section) {
-            self::render_section($pdf, $section, $chart_images);
+        foreach ($content['sections'] as $i => $section) {
+            self::render_section($pdf, $section, $chart_images, $i === 0);
         }
 
         return $pdf->Output($content['title'] . '.pdf', 'S');
     }
 
-    private static function render_section(quizanalytics_tcpdf $pdf, array $section, array $chart_images): void {
-        $pdf->SetFont('helvetica', 'B', 12);
+    private static function render_section(
+        quizanalytics_tcpdf $pdf, array $section, array $chart_images, bool $isfirst
+    ): void {
+        // Don't strand a section's divider/heading alone at the very bottom
+        // of a page with no room for anything under it.
+        if ($pdf->GetY() > $pdf->getPageHeight() - $pdf->getMargins()['bottom'] - 20) {
+            $pdf->AddPage();
+        }
+
+        // A light rule between sections (skipped before the very first one,
+        // where the title/subtitle block already separates it from the
+        // page header) — on-screen, each section is visually its own
+        // <div>/heading; the PDF had nothing marking that boundary beyond
+        // whatever whitespace Ln() happened to leave.
+        if (!$isfirst) {
+            $pdf->SetDrawColor(0xe2, 0xe8, 0xf0);
+            $pdf->SetLineWidth(0.2);
+            $pdf->Line(
+                $pdf->getMargins()['left'], $pdf->GetY(),
+                $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()
+            );
+            $pdf->Ln(5);
+        }
+
+        $pdf->SetFont('dejavusans', 'B', 12);
         $pdf->SetTextColor(0x1e, 0x29, 0x3b);
         $pdf->MultiCell(0, 6, $section['title'], 0, 'L');
 
         if (!empty($section['caption'])) {
-            $pdf->SetFont('helvetica', 'I', 8.5);
+            $pdf->SetFont('dejavusans', 'I', 8.5);
             $pdf->SetTextColor(0x64, 0x74, 0x8b);
             $pdf->MultiCell(0, 4, $section['caption'], 0, 'L');
         }
-        $pdf->Ln(1);
+        $pdf->Ln(2);
 
         if (!empty($section['table']) && !empty($section['table']['rows'])) {
             self::render_table($pdf, $section['table']);
-            $pdf->Ln(2);
+            $pdf->Ln(3);
         }
 
         foreach ($section['charts'] as $chart) {
             self::render_chart($pdf, $chart, $chart_images);
         }
 
-        $pdf->Ln(4);
+        $pdf->Ln(7);
     }
 
     /** @param array{columns: string[], rows: array[], truncated_from?: int} $table */
     private static function render_table(quizanalytics_tcpdf $pdf, array $table): void {
+        // writeHTML() below has no explicit font-family in its inline CSS,
+        // so it inherits whatever font was last set on the document — set
+        // explicitly here (not just relying on the caption/heading font
+        // that happened to run before this) since table cells are the one
+        // place converted math symbols (√, π, ·, ...) can appear, and
+        // 'helvetica' (a core PDF font, Latin-1 only) shows those as
+        // missing-glyph boxes; 'dejavusans' has full Unicode coverage.
+        $pdf->SetFont('dejavusans', '', 7.5);
         $usablewidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         $widths = self::compute_column_widths($table['columns'], $usablewidth);
 
@@ -154,7 +185,7 @@ class pdf_builder {
         $html .= '<thead><tr style="background-color:#1e3c72;color:#ffffff;font-weight:bold;">';
         foreach ($table['columns'] as $i => $col) {
             $html .= '<td width="' . $widths[$i] . 'mm"><span style="font-size:7.5pt;">'
-                . htmlspecialchars((string) $col, ENT_QUOTES) . '</span></td>';
+                . htmlspecialchars(chart_helpers::humanize_label((string) $col), ENT_QUOTES) . '</span></td>';
         }
         $html .= '</tr></thead><tbody>';
         foreach ($table['rows'] as $rowindex => $row) {
@@ -171,12 +202,16 @@ class pdf_builder {
         $pdf->writeHTML($html, true, false, false, false, '');
 
         if (!empty($table['truncated_from'])) {
-            $pdf->SetFont('helvetica', 'I', 8);
+            $pdf->SetFont('dejavusans', 'I', 8);
             $pdf->SetTextColor(0x64, 0x74, 0x8b);
             $shown = count($table['rows']);
             $pdf->MultiCell(0, 5, "Showing the first {$shown} of {$table['truncated_from']} rows.", 0, 'L');
         }
     }
+
+    // Matches sections-renderer.js's ISO_DATETIME_RE — the same
+    // "Y-m-d H:i:s" shape data_fetcher.php's userdate() calls produce.
+    const ISO_DATETIME_RE = '/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?$/';
 
     private static function format_cell($value): string {
         if ($value === null) {
@@ -184,6 +219,17 @@ class pdf_builder {
         }
         if (is_float($value)) {
             return rtrim(rtrim(sprintf('%.2f', $value), '0'), '.') ?: '0';
+        }
+        if (is_string($value)) {
+            if (preg_match(self::ISO_DATETIME_RE, $value)) {
+                $formatted = date('M j, Y, g:i A', strtotime(str_replace('T', ' ', $value)));
+                if ($formatted !== false) {
+                    return $formatted;
+                }
+            }
+            if (str_contains($value, '$')) {
+                return latex_utils::latex_to_plain_text($value);
+            }
         }
         return (string) $value;
     }
@@ -215,13 +261,13 @@ class pdf_builder {
         $datauri = $chart_images[$chart['id']] ?? null;
 
         if ($chart['title']) {
-            $pdf->SetFont('helvetica', 'I', 8.5);
+            $pdf->SetFont('dejavusans', 'I', 8.5);
             $pdf->SetTextColor(0x64, 0x74, 0x8b);
             $pdf->MultiCell(0, 4, $chart['title'], 0, 'L');
         }
 
         if ($datauri === null || !preg_match('#^data:image/(png|jpe?g);base64,(.+)$#s', $datauri, $m)) {
-            $pdf->SetFont('helvetica', 'I', 9);
+            $pdf->SetFont('dejavusans', 'I', 9);
             $pdf->SetTextColor(0xb4, 0x54, 0x54);
             $label = $chart['title'] ?: $chart['id'];
             $pdf->MultiCell(0, 5, "{$label} — chart image unavailable (not captured from the page).", 0, 'L');
@@ -250,7 +296,15 @@ class pdf_builder {
         if ($pdf->GetY() + $drawheight > $pdf->getPageHeight() - $pdf->getMargins()['bottom']) {
             $pdf->AddPage();
         }
-        $pdf->Image('@' . $imagedata, '', '', $drawwidth, $drawheight, '', '', '', true, 300);
-        $pdf->Ln(3);
+        // TCPDF's Image() never advances the page cursor itself (unlike
+        // Cell()/MultiCell()/writeHTML()), even with an explicit height —
+        // without this, every chart after the first in a section drew
+        // starting from the same Y as the one before it, stacking directly
+        // on top of each other. $y is passed explicitly (not '') so this
+        // draws from the position already established above, then the
+        // cursor is moved past it by hand.
+        $y = $pdf->GetY();
+        $pdf->Image('@' . $imagedata, $pdf->GetX(), $y, $drawwidth, $drawheight, '', '', '', true, 300);
+        $pdf->SetY($y + $drawheight + 4);
     }
 }

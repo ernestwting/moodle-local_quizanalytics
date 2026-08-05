@@ -233,7 +233,7 @@ class quiz_metrics {
             'type' => 'scatter',
             'x' => $means_x, 'y' => $means_y,
             'mode' => 'lines+markers',
-            'name' => 'mean_grade',
+            'name' => chart_helpers::humanize_label('mean_grade'),
             'line' => ['color' => $accent, 'width' => 2],
             'marker' => ['size' => 8, 'color' => $accent],
         ];
@@ -473,7 +473,7 @@ class quiz_metrics {
                 'mode' => 'lines+markers',
                 'x' => $wrapped_labels,
                 'y' => array_map(fn($r) => $r[$metric], $trend_data),
-                'name' => $metric,
+                'name' => chart_helpers::humanize_label($metric),
                 'line' => ['color' => $palette[$i % count($palette)]],
                 'marker' => ['color' => $palette[$i % count($palette)]],
             ];

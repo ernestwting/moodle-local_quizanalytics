@@ -52,6 +52,45 @@ class chart_helpers {
     // can't reliably tell apart.
     const PASS_FAIL_SCALE_COLORBLIND = ['#0072B2', '#F0E442', '#D55E00'];
 
+    // A handful of keys/columns come through as raw Python/PHP identifiers
+    // (student_count, mean_grade, invalid_rate, ...) since they double as
+    // array keys/column names throughout the analytics code — this turns
+    // those into presentable labels for chart legends and PDF table headers,
+    // matching sections-renderer.js's own humanizeLabel() (used for the
+    // on-screen table headers/summary) exactly, so a key reads identically
+    // wherever it's shown. Applying it to an already-nice string ("Valid %")
+    // is a no-op.
+    const LABEL_OVERRIDES = [
+        'id' => 'ID', 'ids' => 'IDs', 'prt' => 'PRT', 'prts' => 'PRTs',
+        'ted' => 'TED', 'stack' => 'STACK', 'url' => 'URL',
+    ];
+    const FULL_LABEL_OVERRIDES = [
+        'attempt_idx' => 'Attempt Number',
+        'completed_dt' => 'Completed On',
+    ];
+
+    /** PHP port of sections-renderer.js's humanizeLabel() — see that
+     * function's own comment for why this exists. */
+    public static function humanize_label(string $key): string {
+        if ($key === '') {
+            return $key;
+        }
+        $fulloverride = self::FULL_LABEL_OVERRIDES[strtolower($key)] ?? null;
+        if ($fulloverride !== null) {
+            return $fulloverride;
+        }
+        $spaced = trim(preg_replace('/[_\-]+/', ' ', $key));
+        $words = preg_split('/\s+/', $spaced);
+        $out = array_map(function ($word) {
+            $override = self::LABEL_OVERRIDES[strtolower($word)] ?? null;
+            if ($override !== null) {
+                return $override;
+            }
+            return mb_strtoupper(mb_substr($word, 0, 1)) . mb_strtolower(mb_substr($word, 1));
+        }, $words);
+        return implode(' ', $out);
+    }
+
     /** Categorical chart palette: $default normally, or the colorblind-safe Safe palette. */
     public static function qualitative_colors(bool $colorblind_mode, array $default): array {
         return $colorblind_mode ? self::PALETTE_SAFE : $default;
@@ -162,7 +201,7 @@ class chart_helpers {
                 'type' => 'bar',
                 'x' => $categories,
                 'y' => array_values($values),
-                'name' => (string) $name,
+                'name' => self::humanize_label((string) $name),
                 'marker' => ['color' => $palette[$i % count($palette)]],
             ];
             $i++;
@@ -214,20 +253,37 @@ class chart_helpers {
             $trace['zmax'] = $zmax;
         }
 
+        // A long y-label (e.g. a full student email address) needs a wide
+        // left margin to avoid being clipped — automargin lets Plotly grow
+        // the margin to fit whatever the tick labels actually need, and the
+        // explicit margin.l (a rough char-width estimate) gives it a sane
+        // starting point rather than relying on automargin alone, which on
+        // a width-constrained page (Bootstrap container, not the full
+        // viewport) doesn't always reserve enough room on the first layout
+        // pass.
+        $longest_ylabel = 0;
+        foreach ($ylabels as $label) {
+            $longest_ylabel = max($longest_ylabel, strlen((string) $label));
+        }
+        $left_margin = (int) min(320, max(80, 6.5 * $longest_ylabel + 20));
+
         $layout = [
             'title' => ['text' => $title],
             'template' => 'plotly',
+            'margin' => ['l' => $left_margin, 'r' => 40, 't' => 60, 'b' => 60],
             'xaxis' => [
                 'tickmode' => 'array',
                 'tickvals' => count($xlabels) > 0 ? range(0, count($xlabels) - 1) : [],
                 'ticktext' => array_values($xlabels),
                 'range' => [-0.5, count($xlabels) - 0.5],
+                'automargin' => true,
             ],
             'yaxis' => [
                 'tickmode' => 'array',
                 'tickvals' => count($ylabels) > 0 ? range(0, count($ylabels) - 1) : [],
                 'ticktext' => array_values($ylabels),
                 'range' => [-0.5, count($ylabels) - 0.5],
+                'automargin' => true,
             ],
         ];
         if ($height !== null) {
