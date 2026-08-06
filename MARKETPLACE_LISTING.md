@@ -40,13 +40,19 @@ each student's distance from the correct answer across attempts, and a
 cross-attempt comparison highlighting who improved, stayed flat, or
 regressed.
 
-**PDF export** on every view, with section checkboxes and a colorblind
-mode — charts are captured from the already-rendered page and assembled
+**PDF export** on every view, with section checkboxes, a colorblind mode,
+and an anonymize-student-data toggle (replaces real names/emails with
+stable per-student pseudonyms, consistent across every table, chart, and
+PDF) — charts are captured from the already-rendered page and assembled
 into a downloadable PDF entirely server-side, no headless browser or
 external rasterization service involved.
 
 Reachable from a course's own navigation, and from an "Analytics" link
 this plugin adds directly to each STACK quiz's own settings menu.
+
+No external services, subscriptions, or API keys of any kind — every
+computation runs in-process in plain PHP, and nothing ever leaves the
+Moodle server.
 
 Requires `qtype_stack` (the STACK question type) to have anything to show.
 
@@ -61,15 +67,47 @@ Ernest Ting — eting@caltech.edu
 
 ## Supported Moodle versions
 
-Moodle 4.0 and later (`$plugin->requires` in `version.php` — adjust if you
-want to state a narrower/wider range on the listing than what the code
-actually enforces).
+`$plugin->requires` in `version.php` currently states Moodle 4.0.0 as the
+floor; CI (`.github/workflows/moodle-ci.yml`) tests against MOODLE_405_STABLE
+specifically across PHP 8.1/8.2/8.3 and both PostgreSQL and MariaDB — verify
+that branch is still on Moodle's currently-maintained list at submission
+time (see moodledev.io/general/releases) and adjust `requires`/this listing
+if not.
+
+## Dependencies
+
+- `mod_quiz` (core) — this plugin reads finished quiz attempts through
+  mod_quiz's own question engine.
+- `qtype_stack` — required; this plugin exists specifically to analyze
+  STACK/Maxima question responses and has nothing to show without it.
+  Declared in `version.php`'s `$plugin->dependencies` (`ANY_VERSION`, no
+  qtype_stack API added in a specific release is depended on).
 
 ## Repository
 
-https://github.com/ernestwting/quiz-quizanalytics-plugin
+https://github.com/ernestwting/moodle-local_quizanalytics
+
+## Issue tracker
+
+https://github.com/ernestwting/moodle-local_quizanalytics/issues
+
+(Required field — confirm GitHub Issues is enabled for the repo:
+Settings → General → Features → Issues, on github.com.)
+
+## Documentation
+
+https://github.com/ernestwting/moodle-local_quizanalytics#readme
 
 ## License
 
 GNU GPL v3 or later (see `LICENSE`). TCPDF is vendored under LGPLv3
 (GPL-compatible) — see `local/quizanalytics/classes/vendor/tcpdf/LICENSE.TXT`.
+Declared per-library in `local/quizanalytics/thirdpartylibs.xml`.
+
+## Privacy
+
+Implements `\core_privacy\local\metadata\null_provider` — this plugin
+stores no personal data of its own; it only reads data already governed
+by mod_quiz/the question engine/core_user's own privacy providers, and
+its own MUC caches are derived/disposable, not independent storage. See
+`local/quizanalytics/classes/privacy/provider.php`.

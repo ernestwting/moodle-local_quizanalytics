@@ -32,14 +32,22 @@ $plugin->requires  = 2022041900;             // Moodle 4.0.0 — lower this if y
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.0.0';
 
-// This plugin depends on mod_quiz (obviously) and nothing else — as of
-// version 2026080500 this is the only plugin in the STACK Quiz Analytics
-// suite. Question Analytics and Solution Process Visualization used to be
-// separate quiz-report subplugins (quiz_quizanalytics, quiz_solutionprocess);
-// their code now lives in this plugin's own classes/, reached via the
-// per-quiz drill-down (index.php's "view" selector) and a link this plugin
-// adds to each STACK quiz's settings menu (see lib.php), rather than as
-// separate tabs on the quiz results page.
+// This plugin depends on mod_quiz (obviously) and qtype_stack — it exists
+// specifically to analyze STACK/Maxima question responses, so it is a no-op
+// without qtype_stack installed. ANY_VERSION rather than a specific minimum
+// since nothing here calls a qtype_stack API added in a particular release
+// (data_fetcher.php reads finished attempts through mod_quiz's own question
+// engine, and only calls into STACK's castext2_qa_processor for question
+// text rendering — both stable, long-standing entry points).
+//
+// As of version 2026080500 this is the only plugin in the STACK Quiz
+// Analytics suite. Question Analytics and Solution Process Visualization
+// used to be separate quiz-report subplugins (quiz_quizanalytics,
+// quiz_solutionprocess); their code now lives in this plugin's own classes/,
+// reached via the per-quiz drill-down (index.php's "view" selector) and a
+// link this plugin adds to each STACK quiz's settings menu (see lib.php),
+// rather than as separate tabs on the quiz results page.
 $plugin->dependencies = [
     'mod_quiz' => 2022041900,
+    'qtype_stack' => ANY_VERSION,
 ];
