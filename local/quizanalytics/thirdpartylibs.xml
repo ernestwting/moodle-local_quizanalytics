@@ -14,7 +14,7 @@
     <upgradable>true</upgradable>
   </library>
   <library>
-    <location>js/vendor/katex/katex.min.js, js/vendor/katex/katex.min.css, js/vendor/katex/contrib/auto-render.min.js, js/vendor/katex/fonts/*</location>
+    <location>js/vendor/katex/*</location>
     <name>KaTeX</name>
     <description>Client-side rendering of STACK/Maxima LaTeX (\( \), \[ \], and $ ... $ delimited math) in tables, question text, and notes — vendored locally for the same reason as Plotly.js above.</description>
     <version>0.16.x</version>
