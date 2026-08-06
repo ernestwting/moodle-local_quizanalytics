@@ -59,14 +59,15 @@ class pdf_content {
         array $records,
         string $quizname,
         array $selectedlabels,
-        bool $colorblindmode
+        bool $colorblindmode,
+        bool $anonymize = false
     ): array {
         $selectedids = pdf_sections::selected_ids('question', $selectedlabels);
         if (empty($selectedids)) {
             return ['title' => "{$quizname} — Question Analytics", 'subtitle' => '', 'sections' => []];
         }
 
-        $result = question_analysis::build_analysis($records, $quizname, $colorblindmode);
+        $result = question_analysis::build_analysis($records, $quizname, $colorblindmode, $anonymize);
         $sectionsbyid = [];
         foreach ($result['sections'] as $s) {
             $sectionsbyid[$s['id']] = $s;
@@ -75,7 +76,7 @@ class pdf_content {
         $sections = [];
         foreach ($selectedids as $id) {
             if ($id === 'summary') {
-                $responserows = parser::build_response_rows($records, $quizname);
+                $responserows = parser::build_response_rows($records, $quizname, $anonymize);
                 $qmetrics = question_metrics::compute_question_metrics($responserows);
                 $rows = array_map(fn($r) => [
                     'question' => $r['question'], 'attempts' => $r['attempts'], 'students' => $r['students'],
@@ -134,7 +135,8 @@ class pdf_content {
         string $question,
         int $partindex,
         array $selectedlabels,
-        bool $colorblindmode
+        bool $colorblindmode,
+        bool $anonymize = false
     ): array {
         $selectedids = pdf_sections::selected_ids('solutionprocess', $selectedlabels);
         if (empty($selectedids)) {
@@ -147,7 +149,8 @@ class pdf_content {
             $question,
             $partindex,
             null,
-            $colorblindmode
+            $colorblindmode,
+            $anonymize
         );
         $sectionsbyid = [];
         foreach ($result['sections'] as $s) {
@@ -179,14 +182,23 @@ class pdf_content {
         array $quizzes,
         array $selectedlabels,
         bool $colorblindmode,
-        string $gradetype
+        string $gradetype,
+        bool $anonymize = false
     ): array {
         $selectedids = pdf_sections::selected_ids('quiz', $selectedlabels);
         if (empty($selectedids)) {
             return ['title' => "{$coursename} — Quiz Analysis", 'subtitle' => '', 'sections' => []];
         }
 
-        $result = course_analysis::build_analysis($coursename, $quizzes, $colorblindmode, null, null, $gradetype);
+        $result = course_analysis::build_analysis(
+            $coursename,
+            $quizzes,
+            $colorblindmode,
+            null,
+            null,
+            $gradetype,
+            $anonymize
+        );
         $sectionsbyid = [];
         foreach ($result['sections'] as $s) {
             $sectionsbyid[$s['id']] = $s;

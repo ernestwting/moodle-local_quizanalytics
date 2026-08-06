@@ -43,14 +43,21 @@ class local_quizanalytics_api_client {
      * @param string $quizname
      * @param array  $records
      * @param bool   $colorblindmode
+     * @param bool   $anonymize
      * @return array|null
      */
-    public function analyze(string $quizname, array $records, bool $colorblindmode = false): ?array {
+    public function analyze(
+        string $quizname,
+        array $records,
+        bool $colorblindmode = false,
+        bool $anonymize = false
+    ): ?array {
         try {
             return \local_quizanalytics\analytics\question_analysis::build_analysis(
                 $records,
                 $quizname,
-                $colorblindmode
+                $colorblindmode,
+                $anonymize
             );
         } catch (\Throwable $e) {
             debugging(
@@ -70,13 +77,15 @@ class local_quizanalytics_api_client {
      * @param string|null $gradetype One of "Highest Grade"/"Average Grade"/
      *                    "Minimum Grade" — null lets the service apply its
      *                    own default (Average Grade).
+     * @param bool $anonymize
      * @return array|null
      */
     public function analyze_course(
         string $coursename,
         array $quizzes,
         bool $colorblindmode = false,
-        ?string $gradetype = null
+        ?string $gradetype = null,
+        bool $anonymize = false
     ): ?array {
         try {
             return \local_quizanalytics\analytics\course_analysis::build_analysis(
@@ -85,7 +94,8 @@ class local_quizanalytics_api_client {
                 $colorblindmode,
                 null,
                 null,
-                $gradetype ?? \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE
+                $gradetype ?? \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE,
+                $anonymize
             );
         } catch (\Throwable $e) {
             debugging(
@@ -102,11 +112,16 @@ class local_quizanalytics_api_client {
      *
      * @param string $quizname
      * @param array  $records
+     * @param bool   $anonymize
      * @return array|null
      */
-    public function solution_process_meta(string $quizname, array $records): ?array {
+    public function solution_process_meta(string $quizname, array $records, bool $anonymize = false): ?array {
         try {
-            return \local_quizanalytics\analytics\solution_process_analysis::build_meta($records, $quizname);
+            return \local_quizanalytics\analytics\solution_process_analysis::build_meta(
+                $records,
+                $quizname,
+                $anonymize
+            );
         } catch (\Throwable $e) {
             debugging(
                 'local_quizanalytics: error building solution process meta: ' . $e->getMessage(),
@@ -126,6 +141,7 @@ class local_quizanalytics_api_client {
      * @param int         $partindex
      * @param string|null $studentid
      * @param bool        $colorblindmode
+     * @param bool        $anonymize
      * @return array|null
      */
     public function solution_process_analyze(
@@ -134,7 +150,8 @@ class local_quizanalytics_api_client {
         string $question,
         int $partindex = 1,
         ?string $studentid = null,
-        bool $colorblindmode = false
+        bool $colorblindmode = false,
+        bool $anonymize = false
     ): ?array {
         try {
             return \local_quizanalytics\analytics\solution_process_analysis::build_analysis(
@@ -143,7 +160,8 @@ class local_quizanalytics_api_client {
                 $question,
                 $partindex,
                 $studentid,
-                $colorblindmode
+                $colorblindmode,
+                $anonymize
             );
         } catch (\Throwable $e) {
             debugging(
@@ -176,6 +194,7 @@ class local_quizanalytics_api_client {
      * @param bool   $colorblindmode
      * @param array  $chartimages Chart id => data: URL (PNG), captured
      *        client-side from the already-rendered on-screen charts.
+     * @param bool   $anonymize
      * @return string|null Raw PDF bytes, or null on any failure.
      */
     public function download_pdf_question(
@@ -183,7 +202,8 @@ class local_quizanalytics_api_client {
         array $records,
         ?array $selectedsections,
         bool $colorblindmode = false,
-        array $chartimages = []
+        array $chartimages = [],
+        bool $anonymize = false
     ): ?string {
         try {
             $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('question');
@@ -191,7 +211,8 @@ class local_quizanalytics_api_client {
                 $records,
                 $quizname,
                 $labels,
-                $colorblindmode
+                $colorblindmode,
+                $anonymize
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {
@@ -210,6 +231,7 @@ class local_quizanalytics_api_client {
      * @param array|null $selectedsections
      * @param bool   $colorblindmode
      * @param array  $chartimages
+     * @param bool   $anonymize
      * @return string|null
      */
     public function download_pdf_solutionprocess(
@@ -219,7 +241,8 @@ class local_quizanalytics_api_client {
         int $partindex,
         ?array $selectedsections,
         bool $colorblindmode = false,
-        array $chartimages = []
+        array $chartimages = [],
+        bool $anonymize = false
     ): ?string {
         try {
             $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('solutionprocess');
@@ -229,7 +252,8 @@ class local_quizanalytics_api_client {
                 $question,
                 $partindex,
                 $labels,
-                $colorblindmode
+                $colorblindmode,
+                $anonymize
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {
@@ -249,6 +273,7 @@ class local_quizanalytics_api_client {
      * @param array|null $selectedsections
      * @param bool   $colorblindmode
      * @param array  $chartimages
+     * @param bool   $anonymize
      * @return string|null
      */
     public function download_pdf_quiz(
@@ -256,7 +281,8 @@ class local_quizanalytics_api_client {
         array $quizzes,
         ?array $selectedsections,
         bool $colorblindmode = false,
-        array $chartimages = []
+        array $chartimages = [],
+        bool $anonymize = false
     ): ?string {
         try {
             $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('quiz');
@@ -265,7 +291,8 @@ class local_quizanalytics_api_client {
                 $quizzes,
                 $labels,
                 $colorblindmode,
-                'Average Grade'
+                'Average Grade',
+                $anonymize
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {

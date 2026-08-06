@@ -128,13 +128,30 @@ class sections_output_helper {
     }
 
     /**
-     * A small GET-reload checkbox form for the colorblind toggle, preserving
-     * every other current query parameter (quiz id, question/part selectors,
-     * etc.) so every distinct view stays a cacheable URL.
+     * Reads (and, if a new value was submitted, persists) the anonymize
+     * student data preference. Shared across every view so a teacher's
+     * choice is consistent everywhere rather than set per-page.
+     *
+     * @return bool
+     */
+    public static function resolve_anonymize_mode(): bool {
+        $param = optional_param('anonymize', null, PARAM_INT);
+        if ($param !== null) {
+            \set_user_preference('local_quizanalytics_anonymize', (bool) $param);
+            return (bool) $param;
+        }
+        return (bool) \get_user_preferences('local_quizanalytics_anonymize', false);
+    }
+
+    /**
+     * A small GET-reload checkbox form for the colorblind mode and anonymize
+     * student data toggles, preserving every other current query parameter
+     * (quiz id, question/part selectors, etc.) so every distinct view stays
+     * a cacheable URL.
      *
      * @return string
      */
-    public static function render_colorblind_toggle(bool $current): string {
+    public static function render_options_toggles(bool $colorblind, bool $anonymize): string {
         global $PAGE;
 
         $html = \html_writer::start_tag('form', [
@@ -143,24 +160,33 @@ class sections_output_helper {
             'class'  => 'mb-3',
         ]);
         foreach ($PAGE->url->params() as $name => $value) {
-            if ($name === 'colorblind') {
+            if ($name === 'colorblind' || $name === 'anonymize') {
                 continue;
             }
             $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
         }
         // An unchecked HTML checkbox submits nothing at all, which would
-        // leave $param null and fall through to the stored (possibly still
-        // "true") preference — this hidden 0, submitted first, is overridden
-        // by the checkbox's own value only when it's actually checked
-        // (PHP keeps the last of two same-named query params), so unchecking
-        // the box and submitting genuinely clears it.
+        // leave the param null and fall through to the stored (possibly
+        // still "true") preference — this hidden 0, submitted first, is
+        // overridden by the checkbox's own value only when it's actually
+        // checked (PHP keeps the last of two same-named query params), so
+        // unchecking the box and submitting genuinely clears it.
         $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'colorblind', 'value' => '0']);
-        $checkboxattrs = ['type' => 'checkbox', 'name' => 'colorblind', 'value' => '1', 'id' => 'qa-colorblind-toggle'];
-        if ($current) {
-            $checkboxattrs['checked'] = 'checked';
+        $colorblindattrs = ['type' => 'checkbox', 'name' => 'colorblind', 'value' => '1', 'id' => 'qa-colorblind-toggle'];
+        if ($colorblind) {
+            $colorblindattrs['checked'] = 'checked';
         }
-        $html .= \html_writer::empty_tag('input', $checkboxattrs);
+        $html .= \html_writer::empty_tag('input', $colorblindattrs);
         $html .= ' ' . \html_writer::label(\get_string('colorblindmode', 'local_quizanalytics'), 'qa-colorblind-toggle');
+
+        $html .= ' ' . \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'anonymize', 'value' => '0']);
+        $anonymizeattrs = ['type' => 'checkbox', 'name' => 'anonymize', 'value' => '1', 'id' => 'qa-anonymize-toggle'];
+        if ($anonymize) {
+            $anonymizeattrs['checked'] = 'checked';
+        }
+        $html .= \html_writer::empty_tag('input', $anonymizeattrs);
+        $html .= ' ' . \html_writer::label(\get_string('anonymizemode', 'local_quizanalytics'), 'qa-anonymize-toggle');
+
         $html .= ' ' . \html_writer::empty_tag('input', [
             'type' => 'submit', 'value' => \get_string('apply', 'moodle'), 'class' => 'btn btn-secondary btn-sm',
         ]);

@@ -29,6 +29,7 @@ defined('MOODLE_INTERNAL') || die();
 // Reports | More), as the link this plugin adds to each STACK quiz's own
 // settings/administration menu, and in Site Administration > Plugins >
 // Local plugins.
+$string['anonymizemode'] = 'Anonymize student data';
 $string['colorblindmode'] = 'Colorblind mode';
 $string['computetimelimit']      = 'Computation time limit (seconds)';
 $string['computetimelimit_desc'] = 'Raises PHP\'s own execution time limit before the heaviest analytics computations (course-wide analysis, and any PDF export) — these run in-process rather than calling a separate service, so a course with many STACK quizzes/students may need longer than PHP\'s normal max_execution_time allows. 0 leaves PHP\'s own default in place.';

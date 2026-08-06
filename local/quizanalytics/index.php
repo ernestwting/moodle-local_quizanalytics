@@ -85,7 +85,8 @@ echo html_writer::empty_tag('input', [
 echo html_writer::end_tag('form');
 
 $colorblind = sections_output_helper::resolve_colorblind_mode();
-echo sections_output_helper::render_colorblind_toggle($colorblind);
+$anonymize = sections_output_helper::resolve_anonymize_mode();
+echo sections_output_helper::render_options_toggles($colorblind, $anonymize);
 
 $client = new local_quizanalytics_api_client();
 
@@ -137,10 +138,15 @@ if ($quizid) {
 
     if ($view === 'question') {
         $qacache = cache::make('local_quizanalytics', 'questionanalysis');
-        $qakey = local_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint, $colorblind);
+        $qakey = local_quizanalytics_cache_helper::build_key(
+            $selectedquiz->id,
+            $stats->fingerprint,
+            $colorblind,
+            $anonymize
+        );
         $result = $qacache->get($qakey);
         if ($result === false) {
-            $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind);
+            $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind, $anonymize);
             if ($result !== null) {
                 $qacache->set($qakey, $result);
             }
@@ -158,7 +164,13 @@ if ($quizid) {
         echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
         echo sections_output_helper::render_pdf_form(
             new moodle_url('/local/quizanalytics/pdf.php'),
-            ['id' => $courseid, 'kind' => 'question', 'quizid' => $quizid, 'colorblind' => $colorblind ? 1 : 0],
+            [
+                'id' => $courseid,
+                'kind' => 'question',
+                'quizid' => $quizid,
+                'colorblind' => $colorblind ? 1 : 0,
+                'anonymize' => $anonymize ? 1 : 0,
+            ],
             $client->report_sections('question'),
             get_string('downloadpdfbutton', 'local_quizanalytics'),
             'qa-pdf',
@@ -167,10 +179,10 @@ if ($quizid) {
     } else {
         // Solution Process Visualization.
         $metacache = cache::make('local_quizanalytics', 'solutionprocessmeta');
-        $metakey = local_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint);
+        $metakey = local_quizanalytics_cache_helper::build_key($selectedquiz->id, $stats->fingerprint, $anonymize);
         $meta = $metacache->get($metakey);
         if ($meta === false) {
-            $meta = $client->solution_process_meta($selectedquiz->name, $fetchrecords());
+            $meta = $client->solution_process_meta($selectedquiz->name, $fetchrecords(), $anonymize);
             if ($meta !== null) {
                 $metacache->set($metakey, $meta);
             }
@@ -244,7 +256,8 @@ if ($quizid) {
             $spvquestion,
             $spvpart,
             $spvstudentid,
-            $colorblind
+            $colorblind,
+            $anonymize
         );
         $result = $resultcache->get($resultkey);
         if ($result === false) {
@@ -254,7 +267,8 @@ if ($quizid) {
                 $spvquestion,
                 $spvpart,
                 $spvstudentid !== '' ? $spvstudentid : null,
-                $colorblind
+                $colorblind,
+                $anonymize
             );
             if ($result !== null) {
                 $resultcache->set($resultkey, $result);
@@ -280,6 +294,7 @@ if ($quizid) {
                 'spvquestion' => $spvquestion,
                 'spvpart'     => $spvpart,
                 'colorblind'  => $colorblind ? 1 : 0,
+                'anonymize'   => $anonymize ? 1 : 0,
             ],
             $client->report_sections('solutionprocess'),
             get_string('downloadpdfbutton', 'local_quizanalytics'),
@@ -348,10 +363,16 @@ if ($quizid) {
     echo html_writer::end_tag('form');
 
     $qwcache = cache::make('local_quizanalytics', 'quizanalysiscoursewide');
-    $qwkey = local_quizanalytics_cache_helper::build_key($courseid, $coursestats->fingerprint, $gradetype, $colorblind);
+    $qwkey = local_quizanalytics_cache_helper::build_key(
+        $courseid,
+        $coursestats->fingerprint,
+        $gradetype,
+        $colorblind,
+        $anonymize
+    );
     $result = $qwcache->get($qwkey);
     if ($result === false) {
-        $result = $client->analyze_course($course->fullname, $fetchbyquiz(), $colorblind, $gradetype);
+        $result = $client->analyze_course($course->fullname, $fetchbyquiz(), $colorblind, $gradetype, $anonymize);
         if ($result !== null) {
             $qwcache->set($qwkey, $result);
         }
@@ -369,7 +390,7 @@ if ($quizid) {
     echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
     echo sections_output_helper::render_pdf_form(
         new moodle_url('/local/quizanalytics/pdf.php'),
-        ['id' => $courseid, 'kind' => 'quiz', 'colorblind' => $colorblind ? 1 : 0],
+        ['id' => $courseid, 'kind' => 'quiz', 'colorblind' => $colorblind ? 1 : 0, 'anonymize' => $anonymize ? 1 : 0],
         $client->report_sections('quiz'),
         get_string('downloadpdfbutton', 'local_quizanalytics'),
         'qw-pdf',

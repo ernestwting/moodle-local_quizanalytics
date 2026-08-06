@@ -39,8 +39,8 @@ class solution_process_analysis {
      * @param array[] $records
      * @return array{questions: array{name: string, parts: int}[], students: array{id: string, name: string}[]}
      */
-    public static function build_meta(array $records, string $quizname): array {
-        $responserows = parser::build_response_rows($records, $quizname);
+    public static function build_meta(array $records, string $quizname, bool $anonymize = false): array {
+        $responserows = parser::build_response_rows($records, $quizname, $anonymize);
         $pools = parser::get_attempt_pools($responserows);
         $poola = $pools['pool_a'];
 
@@ -80,9 +80,10 @@ class solution_process_analysis {
         string $question,
         int $partindex = 1,
         ?string $studentid = null,
-        bool $colorblindmode = false
+        bool $colorblindmode = false,
+        bool $anonymize = false
     ): array {
-        $responserows = parser::build_response_rows($records, $quizname);
+        $responserows = parser::build_response_rows($records, $quizname, $anonymize);
         $pools = parser::get_attempt_pools($responserows);
         $poola = $pools['pool_a'];
 

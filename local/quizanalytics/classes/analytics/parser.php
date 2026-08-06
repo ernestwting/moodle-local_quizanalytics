@@ -165,9 +165,11 @@ class parser {
      * @param array $records  as returned by
      *              local_quizanalytics_data_fetcher::get_response_records_for_quiz()
      * @param string $quizname
+     * @param bool $anonymize replace real student names/emails with stable per-student
+     *        pseudonyms - see anonymize::anonymize_response_rows()
      * @return array[] list of associative arrays (the "response rows")
      */
-    public static function build_response_rows(array $records, string $quizname): array {
+    public static function build_response_rows(array $records, string $quizname, bool $anonymize = false): array {
         if (empty($records)) {
             return [];
         }
@@ -309,7 +311,7 @@ class parser {
             }
         }
 
-        return $rows;
+        return $anonymize ? anonymize::anonymize_response_rows($rows) : $rows;
     }
 
     /**

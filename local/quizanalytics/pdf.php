@@ -56,6 +56,7 @@ require_capability('local/quizanalytics:view', $context);
 core_php_time_limit::raise((int) get_config('local_quizanalytics', 'computetimelimit'));
 
 $colorblind = (bool) optional_param('colorblind', 0, PARAM_INT);
+$anonymize = (bool) optional_param('anonymize', 0, PARAM_INT);
 $sections = optional_param_array('sections', [], PARAM_RAW);
 $selectedsections = !empty($sections) ? $sections : null;
 
@@ -87,7 +88,7 @@ if ($kind === 'quiz') {
         throw new \moodle_exception('nocourseattempts', 'local_quizanalytics');
     }
 
-    $pdf = $client->download_pdf_quiz($course->fullname, $byquiz, $selectedsections, $colorblind, $chartimages);
+    $pdf = $client->download_pdf_quiz($course->fullname, $byquiz, $selectedsections, $colorblind, $chartimages, $anonymize);
     $filename = clean_filename($course->shortname . '-quiz-analysis.pdf');
 } else if ($kind === 'question' || $kind === 'solutionprocess') {
     $quizid = required_param('quizid', PARAM_INT);
@@ -110,10 +111,17 @@ if ($kind === 'quiz') {
     }
 
     if ($kind === 'question') {
-        $pdf = $client->download_pdf_question($selectedquiz->name, $records, $selectedsections, $colorblind, $chartimages);
+        $pdf = $client->download_pdf_question(
+            $selectedquiz->name,
+            $records,
+            $selectedsections,
+            $colorblind,
+            $chartimages,
+            $anonymize
+        );
         $filename = clean_filename($selectedquiz->name . '-question-analysis.pdf');
     } else {
-        $meta = $client->solution_process_meta($selectedquiz->name, $records);
+        $meta = $client->solution_process_meta($selectedquiz->name, $records, $anonymize);
         if ($meta === null || empty($meta['questions'])) {
             throw new \moodle_exception('servererror', 'local_quizanalytics');
         }
@@ -143,7 +151,8 @@ if ($kind === 'quiz') {
             $spvpart,
             $selectedsections,
             $colorblind,
-            $chartimages
+            $chartimages,
+            $anonymize
         );
         $filename = clean_filename(
             $selectedquiz->name . '-' . $spvquestion . '-part' . $spvpart . '-solution-process.pdf'

@@ -54,14 +54,15 @@ class course_analysis {
         bool $colorblindmode = false,
         ?array $selectedstats = null,
         ?array $selectedmetrics = null,
-        string $gradetype = self::DEFAULT_GRADE_TYPE
+        string $gradetype = self::DEFAULT_GRADE_TYPE,
+        bool $anonymize = false
     ): array {
         $combined = [];
         foreach ($quizzes as $quizname => $records) {
             if (empty($records)) {
                 continue;
             }
-            $rows = parser::build_response_rows($records, $quizname);
+            $rows = parser::build_response_rows($records, $quizname, $anonymize);
             if (!empty($rows)) {
                 $combined = array_merge($combined, $rows);
             }

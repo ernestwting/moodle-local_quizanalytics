@@ -42,10 +42,16 @@ class question_analysis {
      *        local_quizanalytics_data_fetcher::get_response_records_for_quiz()
      * @param string $quizname
      * @param bool $colorblindmode
+     * @param bool $anonymize
      * @return array {quiz_name, summary, sections, questions, audit}
      */
-    public static function build_analysis(array $records, string $quizname, bool $colorblindmode = false): array {
-        $responserows = parser::build_response_rows($records, $quizname);
+    public static function build_analysis(
+        array $records,
+        string $quizname,
+        bool $colorblindmode = false,
+        bool $anonymize = false
+    ): array {
+        $responserows = parser::build_response_rows($records, $quizname, $anonymize);
 
         $pools = parser::get_attempt_pools($responserows);
         $poolb = $pools['pool_b'];
