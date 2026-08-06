@@ -63,7 +63,7 @@ class quizanalytics_tcpdf extends \TCPDF {
     /**
      * Draws the page header band (called back by TCPDF itself on every page).
      */
-    public function Header(): void {
+    public function Header(): void { // phpcs:ignore moodle.NamingConventions.ValidFunctionName.LowercaseMethod
         $this->SetFont('dejavusans', '', 9);
         $this->SetTextColor(0x64, 0x74, 0x8b);
         $this->SetDrawColor(0xcb, 0xd5, 0xe1);
@@ -77,7 +77,7 @@ class quizanalytics_tcpdf extends \TCPDF {
     /**
      * Draws the page footer band (called back by TCPDF itself on every page).
      */
-    public function Footer(): void {
+    public function Footer(): void { // phpcs:ignore moodle.NamingConventions.ValidFunctionName.LowercaseMethod
         $this->SetFont('dejavusans', '', 9);
         $this->SetTextColor(0x64, 0x74, 0x8b);
         $this->SetDrawColor(0xcb, 0xd5, 0xe1);
