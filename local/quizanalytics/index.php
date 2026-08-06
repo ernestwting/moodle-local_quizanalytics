@@ -72,7 +72,7 @@ foreach ($stackquizzes as $quiz) {
     $selectoptions[$quiz->id] = $quiz->name;
 }
 
-echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-3']);
+echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-4']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $courseid]);
 echo html_writer::label(get_string('quizselectlabel', 'local_quizanalytics'), 'qa-quizid-select');
 echo html_writer::select($selectoptions, 'quizid', $quizid, false, ['id' => 'qa-quizid-select']);
@@ -108,7 +108,7 @@ if ($quizid) {
         exit;
     }
 
-    echo $OUTPUT->heading($selectedquiz->name, 3);
+    echo $OUTPUT->heading($selectedquiz->name, 3, 'main mt-4 mb-3');
 
     // Cheap fingerprint first — a cache hit below skips the expensive
     // per-attempt DB fetch entirely. $records is fetched lazily (at most
@@ -161,7 +161,7 @@ if ($quizid) {
         echo sections_output_helper::render_containers('qa');
         echo sections_output_helper::render_vendor_and_payload('qa', $result);
 
-        echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
+        echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3, 'main mt-4 mb-3');
         echo sections_output_helper::render_pdf_form(
             new moodle_url('/local/quizanalytics/pdf.php'),
             [
@@ -284,7 +284,7 @@ if ($quizid) {
         echo sections_output_helper::render_containers('spv');
         echo sections_output_helper::render_vendor_and_payload('spv', $result);
 
-        echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
+        echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3, 'main mt-4 mb-3');
         echo sections_output_helper::render_pdf_form(
             new moodle_url('/local/quizanalytics/pdf.php'),
             [
@@ -304,7 +304,7 @@ if ($quizid) {
     }
 } else {
     // Course-wide: cross-quiz comparison across every STACK quiz.
-    echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3);
+    echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3, 'main mb-3');
 
     // Combines every STACK quiz's attempts into one computation — the one
     // path in this plugin whose cost genuinely scales with the whole
@@ -342,7 +342,7 @@ if ($quizid) {
     }
     $PAGE->url->param('gradetype', $gradetype);
 
-    echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-3']);
+    echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-4']);
     foreach ($PAGE->url->params() as $name => $value) {
         if ($name === 'gradetype') {
             continue;
@@ -387,7 +387,7 @@ if ($quizid) {
     echo sections_output_helper::render_containers('qw');
     echo sections_output_helper::render_vendor_and_payload('qw', $result);
 
-    echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3);
+    echo $OUTPUT->heading(get_string('generatepdfheading', 'local_quizanalytics'), 3, 'main mt-4 mb-3');
     echo sections_output_helper::render_pdf_form(
         new moodle_url('/local/quizanalytics/pdf.php'),
         ['id' => $courseid, 'kind' => 'quiz', 'colorblind' => $colorblind ? 1 : 0, 'anonymize' => $anonymize ? 1 : 0],

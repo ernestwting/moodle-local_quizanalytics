@@ -157,7 +157,7 @@ class sections_output_helper {
         $html = \html_writer::start_tag('form', [
             'method' => 'get',
             'action' => $PAGE->url->out_omit_querystring(),
-            'class'  => 'mb-3',
+            'class'  => 'mb-4',
         ]);
         foreach ($PAGE->url->params() as $name => $value) {
             if ($name === 'colorblind' || $name === 'anonymize') {
@@ -213,7 +213,7 @@ class sections_output_helper {
         ];
 
         $html = \html_writer::start_tag('form', [
-            'method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-3',
+            'method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-4',
         ]);
         foreach ($PAGE->url->params() as $name => $value) {
             if ($name === 'view') {
@@ -253,7 +253,7 @@ class sections_output_helper {
         $ownparams = ['spvquestion', 'spvpart', 'spvstudent'];
 
         $html = \html_writer::start_tag('form', [
-            'method' => 'get', 'action' => $url->out_omit_querystring(), 'class' => 'mb-3',
+            'method' => 'get', 'action' => $url->out_omit_querystring(), 'class' => 'mb-4',
         ]);
         foreach ($url->params() as $name => $value) {
             if (in_array($name, $ownparams, true)) {
