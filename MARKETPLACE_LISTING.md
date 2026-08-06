@@ -56,6 +56,35 @@ Moodle server.
 
 Requires `qtype_stack` (the STACK question type) to have anything to show.
 
+## Release notes (v1.0.0)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Initial release. Everything runs as plain PHP inside the plugin itself —
+no separate service to deploy, no external dependency beyond PHP.
+
+- Course-wide cross-quiz comparison (grade distribution, engagement over
+  time, attempts-vs-grade scatter, per-quiz stats and trend lines) across
+  every STACK quiz in a course.
+- Per-quiz **Question Analytics**: difficulty and discrimination indices,
+  response distribution, a per-question error drill-down, a student
+  performance matrix, and consolidated question metrics.
+- Per-quiz **Solution Process Visualization**: class-wide PRT answer
+  transition graphs, per-node network centrality, PRT/tree-edit-distance
+  3D distance charts, and a cross-attempt comparison with a clickable
+  per-student drill-down.
+- **Generate PDF Report** on every view, with section checkboxes, a
+  colorblind-mode toggle, and an anonymize-student-data toggle (replaces
+  real names/emails with stable per-student pseudonyms, consistent
+  across every table, chart, and PDF) — charts are captured client-side
+  from the already-rendered page and embedded into a PHP-generated PDF
+  (TCPDF).
+- Reachable from a course's secondary navigation, and from an
+  **Analytics** link this plugin adds to each STACK quiz's own settings
+  menu.
+- Colorblind-safe chart palettes throughout.
+
 ## Suggested category
 
 Analytics (or Reports, if "Analytics" isn't offered as a category on the

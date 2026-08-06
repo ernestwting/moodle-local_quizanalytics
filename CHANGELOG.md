@@ -19,10 +19,13 @@ itself — no separate service, no external dependency beyond PHP.
   transition graphs, per-node network centrality, PRT/tree-edit-distance
   3D distance charts, and a cross-attempt comparison with a clickable
   per-student drill-down.
-- **Generate PDF Report** on every view, with section checkboxes and a
-  colorblind-mode toggle — charts are captured client-side from the
-  already-rendered page and embedded into a PHP-generated PDF (TCPDF).
+- **Generate PDF Report** on every view, with section checkboxes, a
+  colorblind-mode toggle, and an anonymize-student-data toggle (replaces
+  real names/emails with stable per-student pseudonyms, consistent
+  across every table, chart, and PDF) — charts are captured client-side
+  from the already-rendered page and embedded into a PHP-generated PDF
+  (TCPDF).
 - Reachable from a course's secondary navigation, and from an **Analytics**
   link this plugin adds to each STACK quiz's own settings menu.
-- Colorblind-safe chart palettes throughout, toggled from the settings
-  navigation.
+- Colorblind-safe chart palettes throughout, toggled next to the
+  anonymize-student-data checkbox.
