@@ -21,16 +21,30 @@ process to keep running.
 
 ## 1. Place the files
 
+This repository's own root **is** the plugin (`version.php`, `classes/`,
+`lang/`, etc. sit directly here) — that's what lets Moodle's own zip
+uploader read it directly, and what a plain GitHub "Download ZIP" produces
+too.
+
+**Option A — Moodle's own plugin installer (easiest, no shell access
+needed):** Site administration → Plugins → Install plugins → upload a zip
+of this repository's contents. Moodle places it at the right path
+(`local/quizanalytics/`) itself.
+
+**Option B — shell/SFTP, for admins who prefer it:**
+
 ```bash
-cp -r local/quizanalytics <moodleroot>/local/quizanalytics
+# From a clone/extract of this repo:
+cp -r . <moodleroot>/local/quizanalytics
 chown -R www-data:www-data <moodleroot>/local/quizanalytics
 # (use whatever user your web server actually runs as)
 ```
 
-The folder name must stay exactly `quizanalytics` — Moodle derives the
-component name `local_quizanalytics` from that path. Plotly.js, KaTeX, and
-TCPDF are already vendored inside `js/vendor/` and `classes/vendor/`; no
-separate download step is needed.
+Either way, the folder Moodle sees it at must be exactly
+`<moodleroot>/local/quizanalytics` — Moodle derives the component name
+`local_quizanalytics` from that path. Plotly.js, KaTeX, and TCPDF are
+already vendored inside `js/vendor/` and `classes/vendor/`; no separate
+download step is needed.
 
 ## 2. Run the Moodle upgrade
 

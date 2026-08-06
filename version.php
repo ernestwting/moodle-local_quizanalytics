@@ -24,7 +24,13 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_quizanalytics';  // Must match the folder: local/quizanalytics.
+$plugin->component = 'local_quizanalytics';  // Must match the folder this unzips into: local/quizanalytics
+                                              // on a Moodle install. This repo's own root IS that folder's
+                                              // contents (no local/quizanalytics/ nesting in the repo itself)
+                                              // so a plain "Download ZIP" of the repo has version.php sitting
+                                              // directly inside the single top-level wrapper folder, which is
+                                              // what the Moodle plugin uploader requires to detect the
+                                              // frankenstyle component, plugin type, and required core version.
 $plugin->version   = 2026080500;             // YYYYMMDDXX — bump this every time you push an update.
 $plugin->requires  = 2022041900;             // Moodle 4.0.0 — lower this if you're on an older Moodle,
                                               // raise it if you use APIs from a newer one. Check your

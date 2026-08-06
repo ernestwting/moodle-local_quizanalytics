@@ -58,11 +58,11 @@ jobs:
           echo $(cd ci/vendor/bin; pwd) >> $GITHUB_PATH
           sudo locale-gen en_AU.UTF-8
           echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
-          # The plugin lives nested at local/quizanalytics/ within this repo,
-          # not at its root - PLUGIN_DIR is what every moodle-plugin-ci
-          # subcommand (phplint, phpcs, ...) defaults its <plugin> argument
-          # to, so this saves passing the path explicitly on every command.
-          echo "PLUGIN_DIR=$(pwd)/plugin/local/quizanalytics" >> $GITHUB_ENV
+          # PLUGIN_DIR is what every moodle-plugin-ci subcommand (phplint,
+          # phpcs, ...) defaults its <plugin> argument to - install's own
+          # --plugin flag only scopes that one command, it doesn't persist
+          # to the separate shell invocations each later step runs in.
+          echo "PLUGIN_DIR=$(pwd)/plugin" >> $GITHUB_ENV
 
       - name: Install moodle-plugin-ci
         run: moodle-plugin-ci install --plugin "$PLUGIN_DIR" --db-host=127.0.0.1

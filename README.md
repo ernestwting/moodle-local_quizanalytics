@@ -16,9 +16,18 @@ the Moodle server itself. Installing `local_quizanalytics` is the only step.
 
 ## What's included
 
-| Component | Path | What it does |
+| Component | Installs at | What it does |
 |---|---|---|
-| `local_quizanalytics` | `local/quizanalytics/` | One "Analytics" entry point, reached three ways: the course's secondary navigation (course-wide cross-quiz comparison, or drill into any one quiz), a link this plugin adds to each STACK quiz's own settings menu (jumps straight to that quiz's drill-down), and — once on a quiz's drill-down — a "View:" selector between **Question Analytics** (difficulty analysis, response distribution, per-question error drill-down, student performance matrix, question metrics) and **Solution Process Visualization** (PRT transition graphs, network features, PRT/TED 3D distance charts, cross-attempt comparison with clickable per-student drill-down). |
+| `local_quizanalytics` | `<moodleroot>/local/quizanalytics/` | One "Analytics" entry point, reached three ways: the course's secondary navigation (course-wide cross-quiz comparison, or drill into any one quiz), a link this plugin adds to each STACK quiz's own settings menu (jumps straight to that quiz's drill-down), and — once on a quiz's drill-down — a "View:" selector between **Question Analytics** (difficulty analysis, response distribution, per-question error drill-down, student performance matrix, question metrics) and **Solution Process Visualization** (PRT transition graphs, network features, PRT/TED 3D distance charts, cross-attempt comparison with clickable per-student drill-down). |
+
+This repository's own root **is** the plugin — `version.php`, `classes/`,
+`lang/`, etc. all sit directly here, with no `local/quizanalytics/`
+subfolder in the repo itself. That's deliberate: it's what lets a plain
+GitHub "Download ZIP" produce a zip Moodle's plugin uploader can read
+directly (it expects `version.php` immediately inside the zip's single
+top-level folder), and it's why the repo itself is named
+`moodle-local_quizanalytics` per Moodle's own `moodle-{plugintype}_{pluginname}`
+convention for single-plugin repos.
 
 Every view also has a **Generate PDF Report** button (section checkboxes,
 colorblind-mode toggle) that renders the same charts to a downloadable PDF.
@@ -33,9 +42,8 @@ Moodle (PHP)
   Moodle DB
      |
      v
-local/quizanalytics/classes/analytics/*.php  (STACK/Maxima response
-     |                                        parsing, statistics, chart
-     |                                        JSON, PDF layout)
+classes/analytics/*.php  (STACK/Maxima response parsing, statistics,
+     |                    chart JSON, PDF layout)
      v
 Plotly.js / KaTeX (client-side rendering) or TCPDF (server-side PDF)
 ```
@@ -82,8 +90,8 @@ See [INSTALL.md](INSTALL.md) for the full step-by-step setup. See
 
 ## Reference
 
-- `local/quizanalytics/thirdpartylibs.xml` — vendored library manifest
-  (Plotly.js, KaTeX, TCPDF), required by the Moodle Plugins directory.
+- `thirdpartylibs.xml` — vendored library manifest (Plotly.js, KaTeX,
+  TCPDF), required by the Moodle Plugins directory.
 - Standard Moodle `local_` plugin conventions throughout (`version.php`,
   `db/access.php`, `db/caches.php`, `lang/en/*.php`, `settings.php`,
   `lib.php`'s navigation hooks) — nothing here needs a custom install script
@@ -91,4 +99,4 @@ See [INSTALL.md](INSTALL.md) for the full step-by-step setup. See
 - License: GNU GPL v3 or later (see `LICENSE`), matching Moodle core's own
   license — required for anything distributed through the Moodle Plugins
   directory. TCPDF is vendored under its own LGPLv3 license (GPL-compatible)
-  — see `local/quizanalytics/classes/vendor/tcpdf/LICENSE.TXT`.
+  — see `classes/vendor/tcpdf/LICENSE.TXT`.

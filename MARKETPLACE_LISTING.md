@@ -101,8 +101,8 @@ https://github.com/ernestwting/moodle-local_quizanalytics#readme
 ## License
 
 GNU GPL v3 or later (see `LICENSE`). TCPDF is vendored under LGPLv3
-(GPL-compatible) — see `local/quizanalytics/classes/vendor/tcpdf/LICENSE.TXT`.
-Declared per-library in `local/quizanalytics/thirdpartylibs.xml`.
+(GPL-compatible) — see `classes/vendor/tcpdf/LICENSE.TXT`.
+Declared per-library in `thirdpartylibs.xml`.
 
 ## Privacy
 
@@ -110,4 +110,4 @@ Implements `\core_privacy\local\metadata\null_provider` — this plugin
 stores no personal data of its own; it only reads data already governed
 by mod_quiz/the question engine/core_user's own privacy providers, and
 its own MUC caches are derived/disposable, not independent storage. See
-`local/quizanalytics/classes/privacy/provider.php`.
+`classes/privacy/provider.php`.
