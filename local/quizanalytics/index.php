@@ -74,7 +74,7 @@ foreach ($stackquizzes as $quiz) {
 
 echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-4']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $courseid]);
-echo html_writer::label(get_string('quizselectlabel', 'local_quizanalytics'), 'qa-quizid-select');
+echo html_writer::label(get_string('quizselectlabel', 'local_quizanalytics'), 'qa-quizid-select', true, ['class' => 'mr-2']);
 echo html_writer::select($selectoptions, 'quizid', $quizid, false, ['id' => 'qa-quizid-select']);
 echo ' ';
 echo html_writer::empty_tag('input', [

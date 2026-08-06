@@ -179,8 +179,10 @@ class sections_output_helper {
         $html .= \html_writer::empty_tag('input', $colorblindattrs);
         $html .= ' ' . \html_writer::label(\get_string('colorblindmode', 'local_quizanalytics'), 'qa-colorblind-toggle');
 
-        $html .= ' ' . \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'anonymize', 'value' => '0']);
-        $anonymizeattrs = ['type' => 'checkbox', 'name' => 'anonymize', 'value' => '1', 'id' => 'qa-anonymize-toggle'];
+        $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'anonymize', 'value' => '0']);
+        $anonymizeattrs = [
+            'type' => 'checkbox', 'name' => 'anonymize', 'value' => '1', 'id' => 'qa-anonymize-toggle', 'class' => 'ml-3',
+        ];
         if ($anonymize) {
             $anonymizeattrs['checked'] = 'checked';
         }
