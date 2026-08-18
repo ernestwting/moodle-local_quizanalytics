@@ -333,12 +333,17 @@ if ($quizid) {
     // else in this plugin.
     $gradetypeoptions = [
         'Highest Grade' => get_string('gradetypehighest', 'local_quizanalytics'),
-        'Average Grade' => get_string('gradetypeaverage', 'local_quizanalytics'),
+        \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE
+            => get_string('gradetypeaverage', 'local_quizanalytics'),
         'Minimum Grade' => get_string('gradetypeminimum', 'local_quizanalytics'),
     ];
-    $gradetype = optional_param('gradetype', 'Average Grade', PARAM_RAW);
+    $gradetype = optional_param(
+        'gradetype',
+        \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE,
+        PARAM_RAW
+    );
     if (!array_key_exists($gradetype, $gradetypeoptions)) {
-        $gradetype = 'Average Grade';
+        $gradetype = \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE;
     }
     $PAGE->url->param('gradetype', $gradetype);
 

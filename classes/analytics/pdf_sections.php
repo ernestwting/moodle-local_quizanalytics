@@ -39,76 +39,90 @@
 namespace local_quizanalytics\analytics;
 
 /**
- * Checkbox label <-> section id maps for the "which sections to include" PDF export forms.
+ * Checkbox id <-> lang-string-key maps for the "which sections to include" PDF export forms.
+ *
+ * The array keys are the stable section ids posted back as each checkbox's
+ * `value` (see sections_output_helper::render_pdf_form()) — never shown to
+ * the user and never translated. The array values are lang string keys in
+ * lang/en/local_quizanalytics.php, resolved through get_string() to build
+ * the localized checkbox label the user actually sees.
  */
 class pdf_sections {
-    /** @var array<string, string> checkbox label => section id, for the Question Analytics PDF. */
+    /** @var array<string, string> section id => lang string key, for the Question Analytics PDF. */
     const QUESTION = [
-        '1. Question Summary' => 'summary',
-        '2. Question Difficulty Analysis' => 'difficulty',
-        '3. Question Item Details & Error Drill-Down' => 'questiondetails',
-        '4. Question Response Distribution' => 'response-distribution',
-        '5. Student Performance Matrix' => 'student-matrix',
-        '6. Question Metrics' => 'metrics',
+        'summary' => 'pdfsectionsummary',
+        'difficulty' => 'pdfsectiondifficulty',
+        'questiondetails' => 'pdfsectionquestiondetails',
+        'response-distribution' => 'pdfsectionresponsedistribution',
+        'student-matrix' => 'pdfsectionstudentmatrix',
+        'metrics' => 'pdfsectionmetrics',
     ];
 
-    /** @var array<string, string> checkbox label => section id, for the Solution Process Visualization PDF. */
+    /** @var array<string, string> section id => lang string key, for the Solution Process Visualization PDF. */
     const SOLUTIONPROCESS = [
-        'Class-Wide Transition Graph' => 'transition-graph',
-        'Network Features per Node' => 'network-features',
-        'PRT-Distance 3D Chart' => 'prt-distance-3d',
-        'Tree Edit Distance 3D Chart' => 'ted-distance-3d',
-        'Cross-Attempt Comparison' => 'cross-attempt',
+        'transition-graph' => 'pdfsectiontransitiongraph',
+        'network-features' => 'pdfsectionnetworkfeatures',
+        'prt-distance-3d' => 'pdfsectionprtdistance3d',
+        'ted-distance-3d' => 'pdfsectiontreeeditdistance3d',
+        'cross-attempt' => 'pdfsectioncrossattempt',
     ];
 
-    /** @var array<string, string> checkbox label => section id, for the Quiz Analysis (course-wide) PDF. */
+    /** @var array<string, string> section id => lang string key, for the Quiz Analysis (course-wide) PDF. */
     const QUIZ = [
-        '1. Merged List of Users and Files' => 'attempt-list',
-        '2. Summary of Quiz Stats' => 'quiz-stats',
-        '3. Quiz Grade Distribution (Box Plot)' => 'boxplot',
-        '4. Engagement Over Time' => 'engagement',
-        '5. Scatter Plot: Attempts vs Grades' => 'scatter',
-        '6. Line Graph of Various Metrics' => 'trend',
+        'attempt-list' => 'pdfsectionattemptlist',
+        'quiz-stats' => 'pdfsectionquizstats',
+        'boxplot' => 'pdfsectionboxplot',
+        'engagement' => 'pdfsectionengagement',
+        'scatter' => 'pdfsectionscatter',
+        'trend' => 'pdfsectiontrend',
     ];
 
     /**
-     * The checkbox label list for one PDF kind.
+     * The id => lang string key map for one PDF kind.
      *
-     * @return string[]
+     * @return array<string, string>
      */
-    public static function labels(string $kind): array {
-        switch ($kind) {
-            case 'question':
-                return array_keys(self::QUESTION);
-            case 'solutionprocess':
-                return array_keys(self::SOLUTIONPROCESS);
-            case 'quiz':
-                return array_keys(self::QUIZ);
-            default:
-                return [];
-        }
-    }
-
-    /**
-     * Maps the checkbox labels the user ticked back to their section ids.
-     *
-     * @param string[] $selectedlabels checkbox labels the user ticked
-     * @return string[] the corresponding section ids, in canonical order
-     *         (not necessarily the order $selectedlabels was posted in)
-     */
-    public static function selected_ids(string $kind, array $selectedlabels): array {
-        $map = match ($kind) {
+    private static function map_for(string $kind): array {
+        return match ($kind) {
             'question' => self::QUESTION,
             'solutionprocess' => self::SOLUTIONPROCESS,
             'quiz' => self::QUIZ,
             default => [],
         };
-        $ids = [];
-        foreach ($map as $label => $id) {
-            if (in_array($label, $selectedlabels, true)) {
-                $ids[] = $id;
-            }
+    }
+
+    /**
+     * The section ids for one PDF kind, in canonical order.
+     *
+     * @return string[]
+     */
+    public static function ids(string $kind): array {
+        return array_keys(self::map_for($kind));
+    }
+
+    /**
+     * The checkbox id => localized label list for one PDF kind.
+     *
+     * @return array<string, string>
+     */
+    public static function labels(string $kind): array {
+        $labels = [];
+        foreach (self::map_for($kind) as $id => $stringkey) {
+            $labels[$id] = get_string($stringkey, 'local_quizanalytics');
         }
-        return $ids;
+        return $labels;
+    }
+
+    /**
+     * Filters the section ids the user posted back down to the ones that
+     * are actually valid for this PDF kind, in canonical order (not
+     * necessarily the order they were posted in).
+     *
+     * @param string[] $postedids section ids ticked in the PDF form
+     * @return string[]
+     */
+    public static function selected_ids(string $kind, array $postedids): array {
+        $valid = self::ids($kind);
+        return array_values(array_intersect($valid, $postedids));
     }
 }

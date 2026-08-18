@@ -50,21 +50,25 @@ class pdf_content {
     const MAX_TABLE_ROWS = 60;
 
     /**
-     * Question Analytics PDF section content for the checkbox labels the teacher selected.
+     * Question Analytics PDF section content for the checkbox ids the teacher selected.
      *
      * @param array[] $records
-     * @param string[] $selectedlabels checkbox labels ticked in the PDF form
+     * @param string[] $selectedsectionids section ids ticked in the PDF form
      */
     public static function build_question_content(
         array $records,
         string $quizname,
-        array $selectedlabels,
+        array $selectedsectionids,
         bool $colorblindmode,
         bool $anonymize = false
     ): array {
-        $selectedids = pdf_sections::selected_ids('question', $selectedlabels);
+        $selectedids = pdf_sections::selected_ids('question', $selectedsectionids);
         if (empty($selectedids)) {
-            return ['title' => "{$quizname} — Question Analytics", 'subtitle' => '', 'sections' => []];
+            return [
+                'title' => get_string('pdftitlequestion', 'local_quizanalytics', $quizname),
+                'subtitle' => '',
+                'sections' => [],
+            ];
         }
 
         $result = question_analysis::build_analysis($records, $quizname, $colorblindmode, $anonymize);
@@ -84,8 +88,8 @@ class pdf_content {
                     'syntax_error_count' => $r['syntax_error_count'],
                 ], $qmetrics);
                 $sections[] = [
-                    'title' => '1. Question Summary',
-                    'caption' => 'Participation and summary statistics',
+                    'title' => get_string('pdfsectionsummary', 'local_quizanalytics'),
+                    'caption' => get_string('pdfsectionsummarycaption', 'local_quizanalytics'),
                     'table' => table_helpers::to_table($rows),
                     'charts' => [],
                 ];
@@ -99,15 +103,18 @@ class pdf_content {
                 if (!empty($rows)) {
                     $firstquestion = $result['questions'][array_key_first($result['questions'])];
                     $table = [
-                        'columns' => array_merge(['Question'], $firstquestion['error_drilldown']['columns']),
+                        'columns' => array_merge(
+                            [get_string('selectquestion', 'local_quizanalytics')],
+                            $firstquestion['error_drilldown']['columns']
+                        ),
                         'rows' => $rows,
                     ];
                 } else {
                     $table = ['columns' => [], 'rows' => []];
                 }
                 $sections[] = [
-                    'title' => '3. Question Item Details & Error Drill-Down',
-                    'caption' => 'Question text, right answer, and wrong-response drill-down (Best Attempt)',
+                    'title' => get_string('pdfsectionquestiondetails', 'local_quizanalytics'),
+                    'caption' => get_string('pdfsectionquestiondetailscaption', 'local_quizanalytics'),
                     'table' => $table,
                     'charts' => [],
                 ];
@@ -117,30 +124,34 @@ class pdf_content {
         }
 
         return [
-            'title' => "{$quizname} — Question Analytics",
+            'title' => get_string('pdftitlequestion', 'local_quizanalytics', $quizname),
             'subtitle' => self::format_summary_subtitle($result['summary']),
             'sections' => $sections,
         ];
     }
 
     /**
-     * Solution Process Visualization PDF section content for the checkbox labels the teacher selected.
+     * Solution Process Visualization PDF section content for the checkbox ids the teacher selected.
      *
      * @param array[] $records
-     * @param string[] $selectedlabels
+     * @param string[] $selectedsectionids section ids ticked in the PDF form
      */
     public static function build_solutionprocess_content(
         array $records,
         string $quizname,
         string $question,
         int $partindex,
-        array $selectedlabels,
+        array $selectedsectionids,
         bool $colorblindmode,
         bool $anonymize = false
     ): array {
-        $selectedids = pdf_sections::selected_ids('solutionprocess', $selectedlabels);
+        $selectedids = pdf_sections::selected_ids('solutionprocess', $selectedsectionids);
         if (empty($selectedids)) {
-            return ['title' => "{$quizname} — Solution Process Visualization", 'subtitle' => '', 'sections' => []];
+            return [
+                'title' => get_string('pdftitlesolutionprocess', 'local_quizanalytics', $quizname),
+                'subtitle' => '',
+                'sections' => [],
+            ];
         }
 
         $result = solution_process_analysis::build_analysis(
@@ -165,29 +176,36 @@ class pdf_content {
         }
 
         return [
-            'title' => "{$quizname} — Solution Process Visualization",
-            'subtitle' => "{$question}, part {$result['part_index']}",
+            'title' => get_string('pdftitlesolutionprocess', 'local_quizanalytics', $quizname),
+            'subtitle' => get_string('pdfsolutionprocesssubtitle', 'local_quizanalytics', (object) [
+                'question' => $question,
+                'part' => $result['part_index'],
+            ]),
             'sections' => $sections,
         ];
     }
 
     /**
-     * Quiz Analysis (course-wide) PDF section content for the checkbox labels the teacher selected.
+     * Quiz Analysis (course-wide) PDF section content for the checkbox ids the teacher selected.
      *
      * @param array<string, array[]> $quizzes quiz_name => records[]
-     * @param string[] $selectedlabels
+     * @param string[] $selectedsectionids section ids ticked in the PDF form
      */
     public static function build_quiz_content(
         string $coursename,
         array $quizzes,
-        array $selectedlabels,
+        array $selectedsectionids,
         bool $colorblindmode,
         string $gradetype,
         bool $anonymize = false
     ): array {
-        $selectedids = pdf_sections::selected_ids('quiz', $selectedlabels);
+        $selectedids = pdf_sections::selected_ids('quiz', $selectedsectionids);
         if (empty($selectedids)) {
-            return ['title' => "{$coursename} — Quiz Analysis", 'subtitle' => '', 'sections' => []];
+            return [
+                'title' => get_string('pdftitlequiz', 'local_quizanalytics', $coursename),
+                'subtitle' => '',
+                'sections' => [],
+            ];
         }
 
         $result = course_analysis::build_analysis(
@@ -212,8 +230,8 @@ class pdf_content {
         }
 
         return [
-            'title' => "{$coursename} — Quiz Analysis",
-            'subtitle' => 'Combined across every STACK quiz in the course',
+            'title' => get_string('pdftitlequiz', 'local_quizanalytics', $coursename),
+            'subtitle' => get_string('pdfquizsubtitle', 'local_quizanalytics'),
             'sections' => $sections,
         ];
     }

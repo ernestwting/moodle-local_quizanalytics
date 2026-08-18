@@ -302,15 +302,18 @@ class sections_output_helper {
      * quiz/course/selection server-side. Deliberately GET, like every other
      * form in this plugin, so each distinct export stays a plain link.
      *
-     * If $sectionnames is empty (e.g. the report-sections lookup itself
+     * If $sections is empty (e.g. the report-sections lookup itself
      * failed), the form still renders with just the submit button — pdf.php
      * treats a request with no `sections[]` at all as "export every section",
      * so this degrades gracefully rather than blocking the download.
      *
      * @param \moodle_url $action    The pdf.php endpoint to submit to.
      * @param array $hiddenparams    name => value pairs pdf.php needs (id, colorblind, etc).
-     * @param string[] $sectionnames Section checkbox labels, from
-     *        local_quizanalytics_api_client::report_sections($kind).
+     * @param array<string, string> $sections Section id => localized checkbox
+     *        label, from local_quizanalytics_api_client::report_sections($kind).
+     *        The id (never the label) is what's posted back as each
+     *        checkbox's value, so the posted selection stays meaningful
+     *        regardless of the site's language.
      * @param string $buttonlabel
      * @param string $idprefix       Unique per rendered form, so checkbox ids never collide
      *        when this is called more than once on one page.
@@ -326,7 +329,7 @@ class sections_output_helper {
     public static function render_pdf_form(
         \moodle_url $action,
         array $hiddenparams,
-        array $sectionnames,
+        array $sections,
         string $buttonlabel,
         string $idprefix,
         string $chartprefix
@@ -344,12 +347,12 @@ class sections_output_helper {
         // pdf.php only ever uses these bytes as-is to embed in the
         // requesting user's own PDF, never to drive any computation.
         $html .= \html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'chart_images', 'value' => '']);
-        foreach ($sectionnames as $section) {
-            $id = $idprefix . '-' . md5($section);
+        foreach ($sections as $sectionid => $label) {
+            $id = $idprefix . '-' . md5($sectionid);
             $html .= \html_writer::empty_tag('input', [
-                'type' => 'checkbox', 'name' => 'sections[]', 'value' => $section, 'id' => $id, 'checked' => 'checked',
+                'type' => 'checkbox', 'name' => 'sections[]', 'value' => $sectionid, 'id' => $id, 'checked' => 'checked',
             ]);
-            $html .= ' ' . \html_writer::label($section, $id) . \html_writer::empty_tag('br');
+            $html .= ' ' . \html_writer::label($label, $id) . \html_writer::empty_tag('br');
         }
         $html .= \html_writer::empty_tag('input', [
             'type' => 'submit', 'value' => $buttonlabel, 'class' => 'btn btn-primary mt-2',

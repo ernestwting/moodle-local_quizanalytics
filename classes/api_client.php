@@ -173,12 +173,13 @@ class local_quizanalytics_api_client {
     }
 
     /**
-     * GET /report-sections/{kind} — the section names available for one PDF
-     * kind, driving the "Generate PDF Report" checkbox list so it can never
-     * drift from what the PDF route actually includes.
+     * GET /report-sections/{kind} — the section id => localized label pairs
+     * available for one PDF kind, driving the "Generate PDF Report"
+     * checkbox list so it can never drift from what the PDF route actually
+     * includes.
      *
      * @param string $kind 'question', 'solutionprocess', or 'quiz'
-     * @return string[]
+     * @return array<string, string> section id => localized checkbox label
      */
     public function report_sections(string $kind): array {
         return \local_quizanalytics\analytics\pdf_sections::labels($kind);
@@ -189,7 +190,7 @@ class local_quizanalytics_api_client {
      *
      * @param string $quizname
      * @param array  $records
-     * @param array|null $selectedsections Checkbox labels ticked in the PDF
+     * @param array|null $selectedsections Section ids ticked in the PDF
      *        form — null (no selection posted) means every section.
      * @param bool   $colorblindmode
      * @param array  $chartimages Chart id => data: URL (PNG), captured
@@ -206,11 +207,11 @@ class local_quizanalytics_api_client {
         bool $anonymize = false
     ): ?string {
         try {
-            $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('question');
+            $ids = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::ids('question');
             $content = \local_quizanalytics\analytics\pdf_content::build_question_content(
                 $records,
                 $quizname,
-                $labels,
+                $ids,
                 $colorblindmode,
                 $anonymize
             );
@@ -245,13 +246,13 @@ class local_quizanalytics_api_client {
         bool $anonymize = false
     ): ?string {
         try {
-            $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('solutionprocess');
+            $ids = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::ids('solutionprocess');
             $content = \local_quizanalytics\analytics\pdf_content::build_solutionprocess_content(
                 $records,
                 $quizname,
                 $question,
                 $partindex,
-                $labels,
+                $ids,
                 $colorblindmode,
                 $anonymize
             );
@@ -285,13 +286,13 @@ class local_quizanalytics_api_client {
         bool $anonymize = false
     ): ?string {
         try {
-            $labels = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::labels('quiz');
+            $ids = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::ids('quiz');
             $content = \local_quizanalytics\analytics\pdf_content::build_quiz_content(
                 $coursename,
                 $quizzes,
-                $labels,
+                $ids,
                 $colorblindmode,
-                'Average Grade',
+                \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE,
                 $anonymize
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);

@@ -92,7 +92,7 @@ class pdf_builder {
         if (empty($content['sections'])) {
             $pdf->SetFont('dejavusans', 'I', 10);
             $pdf->SetTextColor(0x64, 0x74, 0x8b);
-            $pdf->MultiCell(0, 6, 'No sections were selected for this report.', 0, 'L');
+            $pdf->MultiCell(0, 6, get_string('pdfnosections', 'local_quizanalytics'), 0, 'L');
         }
 
         foreach ($content['sections'] as $i => $section) {
@@ -198,7 +198,10 @@ class pdf_builder {
             $pdf->SetFont('dejavusans', 'I', 8);
             $pdf->SetTextColor(0x64, 0x74, 0x8b);
             $shown = count($table['rows']);
-            $pdf->MultiCell(0, 5, "Showing the first {$shown} of {$table['truncated_from']} rows.", 0, 'L');
+            $pdf->MultiCell(0, 5, get_string('pdftruncatedrows', 'local_quizanalytics', (object) [
+                'shown' => $shown,
+                'total' => $table['truncated_from'],
+            ]), 0, 'L');
         }
     }
 
@@ -279,7 +282,7 @@ class pdf_builder {
             $pdf->SetFont('dejavusans', 'I', 9);
             $pdf->SetTextColor(0xb4, 0x54, 0x54);
             $label = $chart['title'] ?: $chart['id'];
-            $pdf->MultiCell(0, 5, "{$label} — chart image unavailable (not captured from the page).", 0, 'L');
+            $pdf->MultiCell(0, 5, get_string('pdfchartunavailable', 'local_quizanalytics', $label), 0, 'L');
             return;
         }
 
