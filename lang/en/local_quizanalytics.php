@@ -30,6 +30,10 @@ defined('MOODLE_INTERNAL') || die();
 // settings/administration menu, and in Site Administration > Plugins >
 // Local plugins.
 $string['anonymizemode'] = 'Anonymize student data';
+$string['cachedef_questionanalysis'] = 'The Question Analytics result for one quiz.';
+$string['cachedef_quizanalysiscoursewide'] = 'The course-wide Quiz Analysis result for one course.';
+$string['cachedef_solutionprocess'] = 'The Solution Process Visualization result for one quiz/question/part/student selection.';
+$string['cachedef_solutionprocessmeta'] = 'The question/part/student lists used to populate the Solution Process Visualization selector form, for one quiz.';
 $string['colorblindmode'] = 'Colorblind mode';
 $string['computetimelimit']      = 'Computation time limit (seconds)';
 $string['computetimelimit_desc'] = 'Raises PHP\'s own execution time limit before the heaviest analytics computations (course-wide analysis, and any PDF export) — these run in-process rather than calling a separate service, so a course with many STACK quizzes/students may need longer than PHP\'s normal max_execution_time allows. 0 leaves PHP\'s own default in place.';
