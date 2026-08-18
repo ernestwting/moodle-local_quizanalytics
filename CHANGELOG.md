@@ -3,6 +3,18 @@
 All notable changes to `local_quizanalytics` are documented here. Version
 numbers match `version.php`'s `$plugin->release`.
 
+## 1.0.1 — Plugins directory review fixes
+
+- Fixed hard-coded language strings: PDF section checkboxes, PDF
+  titles/captions, and PDF body text now go through `get_string()`
+  instead of literal English, so they translate with the site
+  language. The PDF section checkboxes previously posted their own
+  label text as the form value; they now post a stable internal id,
+  independent of the display language.
+- Added the four `cachedef_*` language strings the plugin's MUC cache
+  areas (`db/caches.php`) were missing, so they display properly on
+  the site admin's cache configuration screen.
+
 ## 1.0.0 — Initial release
 
 First public release. Everything runs as plain PHP inside the plugin

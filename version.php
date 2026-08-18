@@ -31,12 +31,12 @@ $plugin->component = 'local_quizanalytics';  // Must match the folder this unzip
                                               // directly inside the single top-level wrapper folder, which is
                                               // what the Moodle plugin uploader requires to detect the
                                               // frankenstyle component, plugin type, and required core version.
-$plugin->version   = 2026080500;             // YYYYMMDDXX — bump this every time you push an update.
+$plugin->version   = 2026081800;             // YYYYMMDDXX — bump this every time you push an update.
 $plugin->requires  = 2022041900;             // Moodle 4.0.0 — lower this if you're on an older Moodle,
                                               // raise it if you use APIs from a newer one. Check your
                                               // target Moodle's own version.php for the right number.
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '1.0.0';
+$plugin->release   = '1.0.1';
 
 // This plugin depends on mod_quiz (obviously) and qtype_stack — it exists
 // specifically to analyze STACK/Maxima question responses, so it is a no-op
