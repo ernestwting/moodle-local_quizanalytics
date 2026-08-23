@@ -128,7 +128,11 @@ class question_difficulty {
         return [
             'id' => 'question-difficulty',
             'title' => 'Moodle Facility Index',
-            'caption' => 'Moodle Facility Index for each question across the STACK quizzes. Formula: average question mark ÷ question maximum mark. Lower values indicate questions where students obtained lower average marks.',
+            'caption' => 'Shows Moodle\'s Facility Index for each question across the STACK quizzes. Lower values indicate more challenging questions.',
+            'caption_link' => [
+                'url' => 'https://docs.moodle.org/en/Quiz_statistics',
+                'label' => 'Moodle Quiz Statistics documentation',
+            ],
             'notes' => $notes,
             'charts' => [[
                 'id' => 'question-difficulty-fig',

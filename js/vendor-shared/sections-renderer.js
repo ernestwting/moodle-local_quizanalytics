@@ -469,6 +469,15 @@
         if (section.caption) {
             var caption = document.createElement('p');
             caption.textContent = section.caption;
+            if (section.caption_link && section.caption_link.url && section.caption_link.label) {
+                caption.appendChild(document.createTextNode(' '));
+                var captionLink = document.createElement('a');
+                captionLink.href = section.caption_link.url;
+                captionLink.target = '_blank';
+                captionLink.rel = 'noopener noreferrer';
+                captionLink.textContent = section.caption_link.label;
+                caption.appendChild(captionLink);
+            }
             wrapper.appendChild(caption);
         }
         if (section.table) {
