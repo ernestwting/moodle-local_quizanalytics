@@ -329,6 +329,7 @@ if ($quizid) {
     };
 
     $gradetype = \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE;
+    $facilitydata = local_quizanalytics_data_fetcher::get_course_question_facility_data($course, $stackquizzes);
 
     $qwcache = cache::make('local_quizanalytics', 'quizanalysiscoursewide');
     $qwkey = local_quizanalytics_cache_helper::build_key(
@@ -336,11 +337,19 @@ if ($quizid) {
         $coursestats->fingerprint,
         $gradetype,
         $colorblind,
-        $anonymize
+        $anonymize,
+        md5(json_encode($facilitydata))
     );
     $result = $qwcache->get($qwkey);
     if ($result === false) {
-        $result = $client->analyze_course($course->fullname, $fetchbyquiz(), $colorblind, $gradetype, $anonymize);
+        $result = $client->analyze_course(
+            $course->fullname,
+            $fetchbyquiz(),
+            $colorblind,
+            $gradetype,
+            $anonymize,
+            $facilitydata
+        );
         if ($result !== null) {
             $qwcache->set($qwkey, $result);
         }

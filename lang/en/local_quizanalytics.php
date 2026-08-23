@@ -59,6 +59,7 @@ $string['pdfsectionattemptlist']       = '1. Student Quiz Summary';
 $string['pdfsectionboxplot']           = '3. Quiz Grade Distribution (Box Plot)';
 $string['pdfsectioncrossattempt']      = 'Cross-Attempt Comparison';
 $string['pdfsectiondifficulty']        = '2. Question Difficulty Analysis';
+$string['pdfsectiondifficultyoverview'] = 'Moodle Facility Index';
 $string['pdfsectionengagement']        = '4. Engagement Over Time';
 $string['pdfsectionmetrics']           = '6. Question Metrics';
 $string['pdfsectionnetworkfeatures']   = 'Network Features per Node';
