@@ -197,8 +197,7 @@ class pdf_content {
         array $selectedsectionids,
         bool $colorblindmode,
         string $gradetype,
-        bool $anonymize = false,
-        ?array $facilitydata = null
+        bool $anonymize = false
     ): array {
         $selectedids = pdf_sections::selected_ids('quiz', $selectedsectionids);
         if (empty($selectedids)) {
@@ -216,8 +215,7 @@ class pdf_content {
             null,
             null,
             $gradetype,
-            $anonymize,
-            $facilitydata
+            $anonymize
         );
         $sectionsbyid = [];
         foreach ($result['sections'] as $s) {

@@ -83,21 +83,12 @@ $client = new local_quizanalytics_api_client();
 if ($kind === 'quiz') {
     $stackquizzes = local_quizanalytics_data_fetcher::get_course_stack_quizzes($course->id);
     $byquiz = local_quizanalytics_data_fetcher::get_course_response_records($course, $stackquizzes);
-    $facilitydata = local_quizanalytics_data_fetcher::get_course_question_facility_data($course, $stackquizzes);
     $byquiz = array_filter($byquiz, fn($records) => !empty($records));
     if (empty($byquiz)) {
         throw new \moodle_exception('nocourseattempts', 'local_quizanalytics');
     }
 
-    $pdf = $client->download_pdf_quiz(
-        $course->fullname,
-        $byquiz,
-        $selectedsections,
-        $colorblind,
-        $chartimages,
-        $anonymize,
-        $facilitydata
-    );
+    $pdf = $client->download_pdf_quiz($course->fullname, $byquiz, $selectedsections, $colorblind, $chartimages, $anonymize);
     $filename = clean_filename($course->shortname . '-quiz-analysis.pdf');
 } else if ($kind === 'question' || $kind === 'solutionprocess') {
     $quizid = required_param('quizid', PARAM_INT);

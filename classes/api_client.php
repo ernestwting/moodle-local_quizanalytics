@@ -85,8 +85,7 @@ class local_quizanalytics_api_client {
         array $quizzes,
         bool $colorblindmode = false,
         ?string $gradetype = null,
-        bool $anonymize = false,
-        ?array $facilitydata = null
+        bool $anonymize = false
     ): ?array {
         try {
             return \local_quizanalytics\analytics\course_analysis::build_analysis(
@@ -96,8 +95,7 @@ class local_quizanalytics_api_client {
                 null,
                 null,
                 $gradetype ?? \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE,
-                $anonymize,
-                $facilitydata
+                $anonymize
             );
         } catch (\Throwable $e) {
             debugging(
@@ -245,8 +243,7 @@ class local_quizanalytics_api_client {
         ?array $selectedsections,
         bool $colorblindmode = false,
         array $chartimages = [],
-        bool $anonymize = false,
-        ?array $facilitydata = null
+        bool $anonymize = false
     ): ?string {
         try {
             $ids = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::ids('solutionprocess');
@@ -257,8 +254,7 @@ class local_quizanalytics_api_client {
                 $partindex,
                 $ids,
                 $colorblindmode,
-                $anonymize,
-                $facilitydata
+                $anonymize
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {
@@ -287,8 +283,7 @@ class local_quizanalytics_api_client {
         ?array $selectedsections,
         bool $colorblindmode = false,
         array $chartimages = [],
-        bool $anonymize = false,
-        ?array $facilitydata = null
+        bool $anonymize = false
     ): ?string {
         try {
             $ids = $selectedsections ?? \local_quizanalytics\analytics\pdf_sections::ids('quiz');
@@ -298,8 +293,7 @@ class local_quizanalytics_api_client {
                 $ids,
                 $colorblindmode,
                 \local_quizanalytics\analytics\course_analysis::DEFAULT_GRADE_TYPE,
-                $anonymize,
-                $facilitydata
+                $anonymize
             );
             return \local_quizanalytics\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {
