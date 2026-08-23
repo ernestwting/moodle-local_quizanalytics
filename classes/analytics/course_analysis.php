@@ -86,7 +86,7 @@ class course_analysis {
         $sections[] = [
             'id' => 'boxplot',
             'title' => '3. Quiz Grade Distribution (Box Plot)',
-            'caption' => 'Spread of grades per quiz, with mean grade overlay.',
+            'caption' => 'Shows the distribution of quiz grades for each quiz, including the median, spread, outliers, and mean grade.',
             'charts' => [['id' => 'boxplot-fig', 'title' => null, 'plotly_json' => $boxfig]],
         ];
 
