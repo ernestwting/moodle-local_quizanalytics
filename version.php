@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details for the course-level Interactive Quiz Analytics plugin.
+ * Version details for the STACK q-type Analytics plugin.
  *
  * @package    local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
@@ -24,35 +24,46 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_quizanalytics';  // Must match the folder this unzips into: local/quizanalytics
-                                              // on a Moodle install. This repo's own root IS that folder's
-                                              // contents (no local/quizanalytics/ nesting in the repo itself)
-                                              // so a plain "Download ZIP" of the repo has version.php sitting
-                                              // directly inside the single top-level wrapper folder, which is
-                                              // what the Moodle plugin uploader requires to detect the
-                                              // frankenstyle component, plugin type, and required core version.
-$plugin->version   = 2026081800;             // YYYYMMDDXX — bump this every time you push an update.
-$plugin->requires  = 2022041900;             // Moodle 4.0.0 — lower this if you're on an older Moodle,
-                                              // raise it if you use APIs from a newer one. Check your
-                                              // target Moodle's own version.php for the right number.
-$plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '1.0.1';
+$plugin->component = 'local_quizanalytics'; // Must match the folder this unzips into:
+                                                  // local/quizanalytics on a Moodle install. This
+                                                  // is the original, standalone local_quizanalytics
+                                                  // plugin's own frankenstyle name — this merged
+                                                  // plugin replaces that listing rather than the
+                                                  // other source plugin's (local_stackanalytics),
+                                                  // uploaded as a new version of it. This repo's own
+                                                  // root IS that folder's contents (no
+                                                  // local/quizanalytics/ nesting in the repo itself),
+                                                  // so a plain "Download ZIP" of the repo has
+                                                  // version.php sitting directly inside the single
+                                                  // top-level wrapper folder, which is what the Moodle
+                                                  // plugin uploader requires to detect the frankenstyle
+                                                  // component, plugin type, and required core version.
+$plugin->version   = 2026082017;                 // YYYYMMDDXX — bump this every time you push an update.
+$plugin->requires  = 2022041900;                 // Moodle 4.0.0 — matches both source plugins' own
+                                                  // requirement (the analyser/target/indicator base
+                                                  // classes the original local_stackanalytics used are
+                                                  // present since Moodle 3.4 and stable through 4.x/5.x).
+$plugin->maturity  = MATURITY_STABLE;            // Bumped from MATURITY_ALPHA: this plugin has now been
+                                                  // through extensive real-course testing (see CHANGELOG.md
+                                                  // 2.4.0-2.4.1's stress testing) and several rounds of real-
+                                                  // world bug fixes. Also affects whether Moodle sites see
+                                                  // this as an available update at all — a site's own Update
+                                                  // notifications maturity filter (Site administration >
+                                                  // Server > Update notifications) commonly excludes alpha
+                                                  // releases by default.
+$plugin->release   = '2.4.15';
 
-// This plugin depends on mod_quiz (obviously) and qtype_stack — it exists
-// specifically to analyze STACK/Maxima question responses, so it is a no-op
-// without qtype_stack installed. ANY_VERSION rather than a specific minimum
-// since nothing here calls a qtype_stack API added in a particular release
-// (data_fetcher.php reads finished attempts through mod_quiz's own question
-// engine, and only calls into STACK's castext2_qa_processor for question
-// text rendering — both stable, long-standing entry points).
-//
-// As of version 2026080500 this is the only plugin in the STACK Quiz
-// Analytics suite. Question Analytics and Solution Process Visualization
-// used to be separate quiz-report subplugins (quiz_quizanalytics,
-// quiz_solutionprocess); their code now lives in this plugin's own classes/,
-// reached via the per-quiz drill-down (index.php's "view" selector) and a
-// link this plugin adds to each STACK quiz's settings menu (see lib.php),
-// rather than as separate tabs on the quiz results page.
+// This plugin is the merger of two previously-standalone plugins:
+// local_quizanalytics (course-wide/question/solution-process STACK response
+// analytics, PDF export) and local_stackanalytics (the Analytics API's
+// Model 1/Model 2 + the non-ML Diagnostics Dashboard). Both are STACK
+// (qtype_stack) specific and depend on mod_quiz as the vehicle for STACK
+// question attempts. ANY_VERSION for qtype_stack since nothing here calls
+// an API added in a particular STACK release — both source plugins read
+// finished attempts through mod_quiz's own question engine, and qtype_stack
+// is only touched for question text rendering (castext2_qa_processor) and
+// PRT tree definitions (the long-standing, stable mdl_qtype_stack_prts /
+// mdl_qtype_stack_prt_nodes tables), never a version-specific PHP API.
 $plugin->dependencies = [
     'mod_quiz' => 2022041900,
     'qtype_stack' => ANY_VERSION,

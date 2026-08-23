@@ -5,50 +5,72 @@ plugin itself — delete or ignore this file when packaging a release ZIP.
 
 ## Plugin name
 
-Quiz Analytics for STACK
+STACK q-type Analytics
 
 ## Component / Frankenstyle name
 
 `local_quizanalytics`
 
+(Matches plugin id 3995 on the Marketplace — https://marketplace.moodle.com/plugins/3995
+— the listing this replaces. That listing's own display title read
+"STACK Analytics" as of the last time it was checked, not the current
+"STACK q-type Analytics" above; worth reconciling manually when
+submitting, since that's a listing-level field this doc can't confirm
+gets overwritten by a version upload alone.)
+
 ## Short description (1–2 sentences)
 
-Question-level and course-wide analytics for STACK (Maxima CAS) quizzes —
-difficulty, response, and solution-process visualizations, computed
-directly from Moodle's own database with no separate service to install.
+Question-level, course-wide, and Analytics-API-backed analytics for STACK
+(Maxima CAS) quizzes — statistics, solution-process visualizations, and
+risk/review prediction models, computed directly from Moodle's own
+database with no separate service to install.
 
 ## Long description
 
-Quiz Analytics brings detailed, question-by-question insight to STACK
-(Maxima CAS) quizzes, without any CSV export/upload step or separate
-server to configure — everything reads straight out of Moodle's own
-database and runs in-process, in plain PHP.
+STACK q-type Analytics brings four sections of insight to STACK
+(Maxima CAS) quizzes under one installable plugin, without any CSV
+export/upload step or separate server to configure — everything reads
+straight out of Moodle's own database and runs in-process, in plain PHP.
 
-**Course-wide view**: compare every STACK quiz in a course side by side —
-grade distributions, engagement over time, an attempts-vs-grade scatter
-plot, and a trend line across whichever stats matter most.
+**Quiz Analytics** — course-wide view: compare every STACK quiz in a
+course side by side (grade distributions, engagement over time, an
+attempts-vs-grade scatter plot, trend lines).
 
-**Question Analytics** (per quiz): difficulty and discrimination indices,
+**Question Analytics** — per quiz: difficulty and discrimination indices,
 response outcome distribution, a student performance matrix, consolidated
-question metrics, and a per-question error drill-down showing exactly
-what each student submitted next to the correct answer.
+question metrics, and a per-question error drill-down showing exactly what
+each student submitted next to the correct answer. Also includes
+**Solution Process Visualization**: class-wide answer transition graphs
+showing how students moved through a question's Potential Response Tree,
+per-node network centrality, 3D charts plotting each student's distance
+from the correct answer across attempts, and a cross-attempt comparison
+highlighting who improved, stayed flat, or regressed. PDF export on every
+view in both of these sections, with section checkboxes, a colorblind
+mode, and an anonymize-student-data toggle.
 
-**Solution Process Visualization** (per quiz, per question): class-wide
-answer transition graphs showing how students moved through a question's
-Potential Response Tree, per-node network centrality, 3D charts plotting
-each student's distance from the correct answer across attempts, and a
-cross-attempt comparison highlighting who improved, stayed flat, or
-regressed.
+**Model Analytics** — built on Moodle's own Analytics API.
+**Model 1 (Student risk)**: a target predicting whether a student is at
+risk of not achieving course success, fed by five behavioral indicators
+(grade trajectory, response-latency anomaly, disengagement entropy,
+help-seeking gap, feedback-revision distance). **Model 2 (Question/PRT
+review)**: a target predicting whether a STACK question's Potential
+Response Tree needs instructor review, fed by four indicators (IRT-inspired
+difficulty, syntax-error rate, unreached-node ratio, feedback-
+ineffectiveness). Both models ship **disabled** by default — what this
+section shows is each model's live indicator reading, not a trained
+prediction, until an administrator reviews the thresholds and
+enables/trains a model under Site Administration → Analytics → Models.
 
-**PDF export** on every view, with section checkboxes, a colorblind mode,
-and an anonymize-student-data toggle (replaces real names/emails with
-stable per-student pseudonyms, consistent across every table, chart, and
-PDF) — charts are captured from the already-rendered page and assembled
-into a downloadable PDF entirely server-side, no headless browser or
-external rasterization service involved.
+**Diagnostics Analytics** — seed-bias (one-way ANOVA) and PRT
+branch-coverage reports, kept outside the ML pipeline since they have no
+natural ground-truth label: direct calculations, not model predictions.
+PDF export re-derives whichever sections are ticked, in both Model
+Analytics and Diagnostics Analytics, as a landscape report.
 
-Reachable from a course's own navigation, and from an "Analytics" link
-this plugin adds directly to each STACK quiz's own settings menu.
+One "Analytics" nav entry (reachable from a course's own navigation, and
+from an "Analytics" link this plugin adds directly to each STACK quiz's
+own settings menu) with a "Section:" switcher between all four sections at
+the top of every page — previously two separate plugins, now one install.
 
 No external services, subscriptions, or API keys of any kind — every
 computation runs in-process in plain PHP, and nothing ever leaves the
@@ -56,34 +78,92 @@ Moodle server.
 
 Requires `qtype_stack` (the STACK question type) to have anything to show.
 
+## Release notes (v2.4.13)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Readability and consistency pass, prompted by real user reports: a
+multi-part STACK question's text and its Right Answer/error drill-down
+values now render with a visible line break between parts/answers instead
+of running together on one line, and orphaned `[[validation:...]]` markup
+no longer leaks into the displayed question text. Course-wide charts now
+plot quizzes left-to-right in the order they were actually taught (by quiz
+open date, falling back to creation order) instead of alphabetically. Every
+user-facing message was rewritten as plain sentences instead of
+em-dash/semicolon run-ons. All four sections' PDF downloads now show a
+"this may take a while for a large course" notice, and a course-wide line
+chart wide enough to need it now prints on a landscape page instead of
+shrinking its labels past legible. Every section's header now follows the
+same selector order (Course, then Quiz, then View, then colorblind/
+anonymize toggles), the same "Quiz:"/"Apply" labeling, and the same "may
+take a while" loading notice — shown reliably regardless of cache state,
+not just on a cold view, and now disappearing on its own once the real
+results have finished rendering below it. Maturity is now Stable.
+
+## Release notes (v2.3.0)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Internal housekeeping release: no functional or UI changes. Aligns the
+plugin's internal component identifier with this Marketplace listing so
+future versions install as an update rather than a separate plugin.
+
+## Release notes (v2.1.0)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Split the plugin's two combined pages into four independently-reachable
+sections: **Quiz Analytics** (course-wide comparison only) and **Question
+Analytics** (the per-quiz drill-down, split out so picking a quiz doesn't
+silently swap you into a different report), and **Model Analytics** (Model
+1 + Model 2) and **Diagnostics Analytics** (the Diagnostics Dashboard,
+split out since it's direct calculations, not a model). Each section gets
+its own PDF export entry point. Also: side-by-side Course/quiz selectors,
+a consistent "STACK Analytics" page heading across every section, and
+visual quiz-grouping dividers in Model 2's table and the Diagnostics list.
+
+## Release notes (v2.0.0)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Post-merge polish, ahead of submission: wording fixes throughout (title
+case on the view/quiz selectors, plain-sentence intro text with no dashes
+or semicolons, American spelling), the Model & Diagnostics PDF export now
+colors each cell to match the on-screen good/watch bands, descriptive
+per-download PDF filenames (course, scope, date) across all four PDF
+export entry points, and a new "Anonymize student data" toggle on the
+Model 1 view (shared with Quiz Analytics's existing one) that replaces
+student names with stable pseudonyms on-screen and in the PDF alike.
+
 ## Release notes (v1.0.0)
 
 Copy-paste source for the "Plugin versions" tab (Edit plugin page →
 Versions) when uploading this release.
 
-Initial release. Everything runs as plain PHP inside the plugin itself —
-no separate service to deploy, no external dependency beyond PHP.
+Initial release, merging the previously-separate `local_quizanalytics` and
+`local_stackanalytics` plugins into one. Everything runs as plain PHP
+inside the plugin itself — no separate service to deploy, no external
+dependency beyond PHP.
 
-- Course-wide cross-quiz comparison (grade distribution, engagement over
-  time, attempts-vs-grade scatter, per-quiz stats and trend lines) across
-  every STACK quiz in a course.
-- Per-quiz **Question Analytics**: difficulty and discrimination indices,
-  response distribution, a per-question error drill-down, a student
-  performance matrix, and consolidated question metrics.
-- Per-quiz **Solution Process Visualization**: class-wide PRT answer
-  transition graphs, per-node network centrality, PRT/tree-edit-distance
-  3D distance charts, and a cross-attempt comparison with a clickable
-  per-student drill-down.
-- **Generate PDF Report** on every view, with section checkboxes, a
-  colorblind-mode toggle, and an anonymize-student-data toggle (replaces
-  real names/emails with stable per-student pseudonyms, consistent
-  across every table, chart, and PDF) — charts are captured client-side
-  from the already-rendered page and embedded into a PHP-generated PDF
-  (TCPDF).
-- Reachable from a course's secondary navigation, and from an
-  **Analytics** link this plugin adds to each STACK quiz's own settings
-  menu.
-- Colorblind-safe chart palettes throughout.
+- **Quiz Analytics**: course-wide cross-quiz comparison, per-quiz Question
+  Analytics (difficulty/discrimination, response distribution, error
+  drill-down, student performance matrix, question metrics), and per-quiz
+  Solution Process Visualization (PRT transition graphs, network
+  centrality, 3D distance charts, cross-attempt comparison). PDF export
+  with colorblind-mode and anonymize-student-data toggles.
+- **Model & Diagnostics Analytics**: two Moodle Analytics API prediction
+  models (Student risk, Question/PRT review) plus a non-ML Diagnostics
+  Dashboard (seed-bias ANOVA, PRT branch coverage), ships with both models
+  disabled pending administrator review. PDF export of whichever sections
+  are selected.
+- One course-level "Analytics" nav entry and per-quiz settings-menu link,
+  with a "Section:" switcher between the two halves at the top of every
+  page.
+- Colorblind-safe chart palettes throughout Quiz Analytics.
 
 ## Suggested category
 
@@ -114,29 +194,43 @@ if not.
 
 ## Repository
 
-https://github.com/ernestwting/moodle-local_quizanalytics
+https://github.com/ernestwting/moodle-local_stackanalytics
+
+<!-- TODO before submitting: this repo is currently named
+     moodle-local_stackanalytics on GitHub (renamed once already this
+     session), but the plugin's frankenstyle component is now
+     local_quizanalytics (see CHANGELOG.md's rename entries) — they no
+     longer match. Renaming the repo again to moodle-local_quizanalytics
+     is blocked: that name is already taken by the original, separate
+     standalone local_quizanalytics plugin's own repo
+     (~/Desktop/moodle-local_quizanalytics on this machine). Resolve that
+     collision first (e.g. archive/rename the old standalone repo, since
+     this plugin replaces its Marketplace listing anyway) before renaming
+     this one to match and updating this URL and the two below. -->
 
 ## Issue tracker
 
-https://github.com/ernestwting/moodle-local_quizanalytics/issues
+https://github.com/ernestwting/moodle-local_stackanalytics/issues
 
 (Required field — confirm GitHub Issues is enabled for the repo:
 Settings → General → Features → Issues, on github.com.)
 
 ## Documentation
 
-https://github.com/ernestwting/moodle-local_quizanalytics#readme
+https://github.com/ernestwting/moodle-local_stackanalytics#readme
 
 ## License
 
-GNU GPL v3 or later (see `LICENSE`). TCPDF is vendored under LGPLv3
-(GPL-compatible) — see `classes/vendor/tcpdf/LICENSE.TXT`.
-Declared per-library in `thirdpartylibs.xml`.
+GNU GPL v3 or later (see `LICENSE`). TCPDF is vendored (for Quiz
+Analytics/Question Analytics's PDF exports only) under LGPLv3
+(GPL-compatible) — see `classes/quiz/vendor/tcpdf/LICENSE.TXT`. Declared
+per-library in `thirdpartylibs.xml`.
 
 ## Privacy
 
 Implements `\core_privacy\local\metadata\null_provider` — this plugin
-stores no personal data of its own; it only reads data already governed
-by mod_quiz/the question engine/core_user's own privacy providers, and
-its own MUC caches are derived/disposable, not independent storage. See
+stores no personal data of its own; every section only reads data already
+governed by mod_quiz/the question engine/gradelib/logstore_standard_log's
+own privacy providers, and Quiz Analytics/Question Analytics's own MUC
+caches are derived/disposable, not independent storage. See
 `classes/privacy/provider.php`.
