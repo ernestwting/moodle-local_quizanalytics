@@ -30,11 +30,6 @@ namespace local_quizanalytics\analytics;
  * Assembles the Course-Wide Analytics {summary, sections} payload across every STACK quiz in a course.
  */
 class course_analysis {
-    /** @var string[] Default "Summary of Quiz Stats" columns when the teacher hasn't picked any. */
-    const DEFAULT_QUIZ_STATS = [
-        'student_count', 'attempt_rate', 'mean_grade', 'grade_variance', 'mean_highest_grade', 'attempt_count',
-    ];
-
     /** @var string[] Default "Line Graph of Various Metrics" series when the teacher hasn't picked any. */
     const DEFAULT_QUIZ_METRICS = ['student_count', 'attempt_rate', 'mean_grade', 'grade_variance'];
 
@@ -42,7 +37,7 @@ class course_analysis {
     const DEFAULT_GRADE_TYPE = 'Average Grade';
 
     /**
-     * Builds the full Course-Wide Analytics payload: attempt list, quiz stats, boxplot,
+     * Builds the full Course-Wide Analytics payload: student summary, boxplot,
      * engagement, scatter, and metric-trend sections across every quiz passed in.
      *
      * @param array<string, array[]> $quizzes quiz_name => records[]
@@ -74,10 +69,7 @@ class course_analysis {
 
         $attemptframe = quiz_metrics::build_quiz_attempt_frame($combined);
 
-        $selectedstats = !empty($selectedstats) ? $selectedstats : self::DEFAULT_QUIZ_STATS;
         $selectedmetrics = !empty($selectedmetrics) ? $selectedmetrics : self::DEFAULT_QUIZ_METRICS;
-
-        $statsrows = quiz_metrics::compute_quiz_stats($attemptframe, $selectedstats);
 
         $sections = [];
 
@@ -88,13 +80,6 @@ class course_analysis {
             'table' => table_helpers::to_table(
                 quiz_metrics::build_student_quiz_summary($attemptframe)
             ),
-        ];
-
-        $sections[] = [
-            'id' => 'quiz-stats',
-            'title' => '2. Summary of Quiz Stats',
-            'caption' => 'Aggregated statistics per quiz, combined across the course.',
-            'table' => table_helpers::to_table($statsrows),
         ];
 
         $boxfig = quiz_metrics::build_boxplot_figure($attemptframe, $colorblindmode);

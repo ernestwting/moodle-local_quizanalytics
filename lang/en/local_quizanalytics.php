@@ -65,7 +65,6 @@ $string['pdfsectionnetworkfeatures']   = 'Network Features per Node';
 $string['pdfsectionprtdistance3d']     = 'PRT-Distance 3D Chart';
 $string['pdfsectionquestiondetails']        = '3. Question Item Details & Error Drill-Down';
 $string['pdfsectionquestiondetailscaption'] = 'Question text, right answer, and wrong-response drill-down (Best Attempt)';
-$string['pdfsectionquizstats']         = '2. Summary of Quiz Stats';
 $string['pdfsectionresponsedistribution'] = '4. Question Response Distribution';
 $string['pdfsectionscatter']           = '5. Scatter Plot: Attempts vs Grades';
 $string['pdfsectionstudentmatrix']     = '5. Student Performance Matrix';
