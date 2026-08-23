@@ -70,7 +70,7 @@ class pdf_sections {
     /** @var array<string, string> section id => lang string key, for the Quiz Analysis (course-wide) PDF. */
     const QUIZ = [
         'attempt-list' => 'pdfsectionattemptlist',
-        'question-difficulty' => 'pdfsectiondifficultyoverview',
+        'quiz-stats' => 'pdfsectionquizstats',
         'boxplot' => 'pdfsectionboxplot',
         'engagement' => 'pdfsectionengagement',
         'scatter' => 'pdfsectionscatter',

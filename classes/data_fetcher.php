@@ -30,7 +30,6 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/mod/quiz/locallib.php');
-require_once($CFG->dirroot . '/mod/quiz/report/statistics/report.php');
 require_once($CFG->dirroot . '/question/engine/lib.php');
 
 /**
@@ -132,38 +131,13 @@ class local_quizanalytics_data_fetcher {
                   JOIN {question_bank_entries} qbe ON qbe.id = qr.questionbankentryid
                   JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
                   JOIN {question} q ON q.id = qv.questionid AND q.qtype = 'stack'
-                 WHERE quiz.course = :courseid";
+                 WHERE quiz.course = :courseid
+              ORDER BY quiz.name";
 
-        $quizzes = $DB->get_records_sql($sql, [
+        return $DB->get_records_sql($sql, [
             'contextmodule' => CONTEXT_MODULE,
             'courseid'      => $courseid,
         ]);
-
-        // Match Moodle's course page order: section order first, then the
-        // activity order stored in each section's sequence. The SQL query
-        // above deliberately does not sort by quiz name.
-        $modinfo = get_fast_modinfo($courseid);
-        $courseorder = [];
-        $position = 0;
-        foreach ($modinfo->get_sections() as $cmids) {
-            foreach ($cmids as $cmid) {
-                $cm = $modinfo->get_cm($cmid);
-                if ($cm->modname === 'quiz') {
-                    $courseorder[(int) $cm->instance] = $position++;
-                }
-            }
-        }
-
-        uasort($quizzes, static function (stdClass $a, stdClass $b) use ($courseorder): int {
-            $aorder = $courseorder[(int) $a->id] ?? PHP_INT_MAX;
-            $border = $courseorder[(int) $b->id] ?? PHP_INT_MAX;
-            if ($aorder !== $border) {
-                return $aorder <=> $border;
-            }
-            return (int) $a->id <=> (int) $b->id;
-        });
-
-        return $quizzes;
     }
 
     /**
@@ -195,7 +169,7 @@ class local_quizanalytics_data_fetcher {
 
         // Batch-load user records instead of querying per attempt.
         $userids = array_unique(array_map(fn($a) => $a->userid, $attempts));
-        $users = $DB->get_records_list('user', 'id', $userids, '', 'id, username, firstname, lastname, email');
+        $users = $DB->get_records_list('user', 'id', $userids, '', 'id, firstname, lastname, email');
 
         foreach ($attempts as $attempt) {
             $user = $users[$attempt->userid] ?? null;
@@ -209,9 +183,6 @@ class local_quizanalytics_data_fetcher {
             $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
 
             $row = [
-                'attempt_id'     => $attempt->id,
-                'cmid'           => $cm->id,
-                'username'       => $user->username,
                 'last_name'      => $user->lastname,
                 'first_name'     => $user->firstname,
                 'email'          => $user->email,
@@ -314,68 +285,5 @@ class local_quizanalytics_data_fetcher {
             $bycourse[$quiz->name] = self::get_response_records_for_quiz($quiz, $course);
         }
         return $bycourse;
-    }
-
-    /**
-     * Reads Moodle's Quiz Statistics Facility Index for each direct STACK
-     * question slot in the supplied quizzes. Moodle calculates and caches
-     * missing statistics using its own question-mark and max-mark formula;
-     * the plugin only reads the resulting Moodle statistic.
-     *
-     * @param stdClass $course
-     * @param stdClass[] $stackquizzes
-     * @return array[]
-     */
-    public static function get_course_question_facility_data(stdClass $course, array $stackquizzes): array {
-        global $DB;
-
-        $rows = [];
-        $report = new \quiz_statistics_report();
-        foreach ($stackquizzes as $quiz) {
-            $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
-            $context = \context_module::instance($cm->id);
-            $stackslots = $DB->get_records_sql(
-                "SELECT DISTINCT slot.slot, q.id AS questionid, q.name AS questionname
-                   FROM {quiz_slots} slot
-                   JOIN {question_references} qr ON qr.usingcontextid = :contextid
-                                                 AND qr.component = 'mod_quiz'
-                                                 AND qr.questionarea = 'slot'
-                                                 AND qr.itemid = slot.id
-                   JOIN {question_bank_entries} qbe ON qbe.id = qr.questionbankentryid
-                   JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
-                   JOIN {question} q ON q.id = qv.questionid AND q.qtype = 'stack'
-                  WHERE slot.quizid = :quizid
-               ORDER BY slot.slot",
-                ['contextid' => $context->id, 'quizid' => $quiz->id]
-            );
-
-            if (empty($stackslots)) {
-                continue;
-            }
-
-            $questionstats = $report->calculate_questions_stats_for_question_bank(
-                (int) $quiz->id,
-                true,
-                false
-            );
-            foreach ($stackslots as $slot) {
-                $facility = null;
-                if ($questionstats !== null && $questionstats->has_slot((int) $slot->slot)) {
-                    $stat = $questionstats->for_slot((int) $slot->slot);
-                    if ($stat->facility !== null) {
-                        $facility = (float) $stat->facility * 100.0;
-                    }
-                }
-                $rows[] = [
-                    'quiz_name' => $quiz->name,
-                    'question_number' => 'Q' . (int) $slot->slot,
-                    'question_slot' => (int) $slot->slot,
-                    'question_name' => $slot->questionname,
-                    'facility_index' => $facility,
-                ];
-            }
-        }
-
-        return $rows;
     }
 }
