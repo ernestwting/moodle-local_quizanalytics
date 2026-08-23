@@ -34,9 +34,10 @@ class quiz_metrics {
     /** @var string Default reddish mean-grade overlay line/marker color. */
     const DEFAULT_ACCENT = '#FF474C';
 
-    /** @var string[] Column order for the per-attempt "Merged List of Users and Files" table. */
+    /** @var string[] Column order for the internal per-attempt analytics frame. */
     const ATTEMPT_FRAME_COLUMNS = [
-        'quiz_name', 'student_name', 'student_id', 'attempt_idx', 'overall_grade', 'completed_dt', 'started_on',
+        'quiz_name', 'student_name', 'student_id', 'username', 'attempt_idx', 'attempt_id',
+        'attempt_number', 'cmid', 'overall_grade', 'completed_dt', 'started_on',
     ];
 
     /**
@@ -134,6 +135,58 @@ class quiz_metrics {
     }
 
     /**
+     * Builds the compact one-row-per-student-per-quiz summary table.
+     * The latest attempt is linked to Moodle's native review page.
+     *
+     * @param array[] $attemptframe
+     * @return array[]
+     */
+    public static function build_student_quiz_summary(array $attemptframe): array {
+        $groups = [];
+        foreach ($attemptframe as $row) {
+            $key = (string) $row['quiz_name'] . '|' . (string) $row['student_id'];
+            $groups[$key][] = $row;
+        }
+
+        $summary = [];
+        foreach ($groups as $rows) {
+            usort($rows, static function (array $a, array $b): int {
+                $atime = strtotime((string) ($a['completed_dt'] ?: $a['started_on'])) ?: 0;
+                $btime = strtotime((string) ($b['completed_dt'] ?: $b['started_on'])) ?: 0;
+                if ($atime !== $btime) {
+                    return $atime <=> $btime;
+                }
+                $anumber = (int) ($a['attempt_number'] ?? 0);
+                $bnumber = (int) ($b['attempt_number'] ?? 0);
+                if ($anumber !== $bnumber) {
+                    return $anumber <=> $bnumber;
+                }
+                return ((int) ($a['attempt_id'] ?? 0)) <=> ((int) ($b['attempt_id'] ?? 0));
+            });
+
+            $first = $rows[0];
+            $latest = $rows[count($rows) - 1];
+            $reviewurl = new \moodle_url('/mod/quiz/review.php', [
+                'attempt' => (int) $latest['attempt_id'],
+                'cmid' => (int) $latest['cmid'],
+            ]);
+
+            $summary[] = [
+                'user' => \html_writer::link($reviewurl, $latest['student_name'], [
+                    'target' => '_blank',
+                    'rel' => 'noopener',
+                ]),
+                'quiz_name' => $latest['quiz_name'],
+                'attempt_count' => count($rows),
+                'first_grade' => $first['overall_grade'],
+                'latest_grade' => $latest['overall_grade'],
+            ];
+        }
+
+        return $summary;
+    }
+
+    /**
      * Same formulas as the original per-file Quiz Analysis page, grouped by
      * quiz_name and reading overall_grade instead of a locally normalized
      * grade.
@@ -153,7 +206,6 @@ class quiz_metrics {
         // groupby, so the output row order needs the same plain string sort
         // (matching prt_analysis::compute_prt_pass_rates()'s identical note).
         $quiznames = array_keys($byquiz);
-        sort($quiznames);
 
         $statsbyquiz = array_fill_keys($quiznames, []);
 
@@ -250,10 +302,8 @@ class quiz_metrics {
         // Unlike the box traces above (plain px.box(color=...), which keeps
         // first-appearance order), Python builds this line from
         // attempt_frame.groupby("quiz_name")["overall_grade"].mean() — a
-        // groupby, sorted alphabetically by default — so it needs its own,
-        // separately-sorted quiz name list rather than reusing $quiznames.
+        // Keep the mean line in the same course order as the box traces.
         $meansquiznames = $quiznames;
-        sort($meansquiznames);
         $meansx = [];
         $meansy = [];
         foreach ($meansquiznames as $quiz) {
@@ -384,7 +434,6 @@ class quiz_metrics {
             $quiznames[$r['quiz_name']] = true;
         }
         $quiznames = array_keys($quiznames);
-        sort($quiznames);
         $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_SET2);
 
         $data = [];
@@ -463,7 +512,6 @@ class quiz_metrics {
         // Python original (sort=True default) — see compute_quiz_stats()'s
         // identical note.
         $quiznames = array_keys($byquiz);
-        sort($quiznames);
 
         $out = [];
         foreach ($quiznames as $quiz) {
@@ -471,6 +519,9 @@ class quiz_metrics {
             $entry = ['quiz_name' => $quiz];
             if (in_array('student_count', $selectedmetrics, true)) {
                 $entry['student_count'] = count(array_unique(array_map(fn($r) => $r['student_id'], $rows)));
+            }
+            if (in_array('attempt_count', $selectedmetrics, true)) {
+                $entry['attempt_count'] = count($rows);
             }
             if (in_array('attempt_rate', $selectedmetrics, true)) {
                 $counts = [];
@@ -482,6 +533,9 @@ class quiz_metrics {
             if (in_array('mean_grade', $selectedmetrics, true)) {
                 $entry['mean_grade'] = stats::mean(array_map(fn($r) => $r['overall_grade'], $rows));
             }
+            if (in_array('median_grade', $selectedmetrics, true)) {
+                $entry['median_grade'] = stats::median(array_map(fn($r) => $r['overall_grade'], $rows));
+            }
             if (in_array('grade_variance', $selectedmetrics, true)) {
                 $entry['grade_variance'] = stats::sample_variance(array_map(fn($r) => $r['overall_grade'], $rows));
             }
@@ -491,31 +545,42 @@ class quiz_metrics {
     }
 
     /**
-     * One line trace per selected metric across quizzes, for "Line Graph of Various Metrics".
+     * One line trace per selected metric across quizzes, for "Quiz Metrics Across Quizzes".
      *
      * @param array[] $trenddata one row per quiz_name, metric fields as
      *        selected by build_metric_trend_data()
      */
     public static function build_line_graph_figure(array $trenddata, bool $colorblindmode = false): array {
         if (empty($trenddata)) {
-            return ['data' => [], 'layout' => ['title' => ['text' => 'Line Graph of Various Metrics']]];
+            return ['data' => [], 'layout' => ['title' => ['text' => 'Quiz Metrics Across Quizzes']]];
         }
 
         $metricnames = array_values(array_diff(array_keys($trenddata[0]), ['quiz_name']));
         $palette = chart_helpers::qualitative_colors($colorblindmode, chart_helpers::PALETTE_SET1);
+        $metriclabels = [
+            'student_count' => 'Student count',
+            'attempt_count' => 'Number of attempts',
+            'attempt_rate' => 'Attempts per student',
+            'mean_grade' => 'Mean grade',
+            'median_grade' => 'Median grade',
+            'grade_variance' => 'Grade variance',
+        ];
 
         $wrappedlabels = array_map(fn($r) => self::wrap_category_label((string) $r['quiz_name']), $trenddata);
 
         $data = [];
         foreach ($metricnames as $i => $metric) {
+            $metriclabel = $metriclabels[$metric] ?? chart_helpers::humanize_label($metric);
             $data[] = [
                 'type' => 'scatter',
                 'mode' => 'lines+markers',
                 'x' => $wrappedlabels,
                 'y' => array_map(fn($r) => $r[$metric], $trenddata),
-                'name' => chart_helpers::humanize_label($metric),
+                'name' => $metriclabel,
                 'line' => ['color' => $palette[$i % count($palette)]],
                 'marker' => ['color' => $palette[$i % count($palette)]],
+                'meta' => $metric,
+                'hovertemplate' => 'Quiz: %{x}<br>' . $metriclabel . ': %{y}<extra></extra>',
             ];
         }
 
@@ -524,7 +589,7 @@ class quiz_metrics {
         return [
             'data' => $data,
             'layout' => [
-                'title' => ['text' => 'Line Graph of Various Metrics'],
+                'title' => ['text' => 'Quiz Metrics Across Quizzes'],
                 'template' => 'plotly',
                 'legend' => ['title' => ['text' => 'Metric']],
                 'xaxis' => ['type' => 'category', 'tickangle' => 0, 'tickfont' => ['size' => 10], 'title' => ['text' => 'Quiz']],
@@ -589,7 +654,6 @@ class quiz_metrics {
                 'x' => array_map(fn($d) => self::days_to_iso($d), $grid),
                 'y' => $density,
                 'name' => (string) $quiz,
-                'fill' => 'tozeroy',
                 'line' => ['color' => $palette[$i % count($palette)]],
             ];
         }

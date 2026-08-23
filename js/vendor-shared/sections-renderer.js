@@ -48,7 +48,10 @@
     // generic word-splitting logic below.
     var FULL_LABEL_OVERRIDES = {
         'attempt_idx': 'Attempt Number',
+        'attempt_count': 'No. of Attempts',
         'completed_dt': 'Completed On',
+        'first_grade': 'First Grade',
+        'latest_grade': 'Latest Grade',
     };
 
     function humanizeLabel(key) {
@@ -223,6 +226,163 @@
         global.Plotly.newPlot(container, chart.plotly_json.data, chart.plotly_json.layout, {
             responsive: true,
         });
+        return container;
+    }
+
+    function renderScatterControls(wrapper, section, prefix) {
+        var variants = section.scatter_variants || {};
+        var types = Object.keys(variants);
+        if (!types.length) {
+            return;
+        }
+
+        var controls = document.createElement('div');
+        controls.className = 'mb-3';
+        var label = document.createElement('span');
+        label.textContent = 'Compare attempts against: ';
+        controls.appendChild(label);
+
+        var initial = section.selected_scatter_type || types[0];
+        var chart = section.charts && section.charts[0];
+        var chartContainer = renderChart(wrapper, chart, prefix);
+        var caption = wrapper.querySelector('p');
+
+        types.forEach(function (type) {
+            var id = prefix + '-scatter-' + type.toLowerCase().replace(/[^a-z]+/g, '-');
+            var radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = prefix + '-scatter-grade-type';
+            radio.id = id;
+            radio.value = type;
+            radio.checked = type === initial;
+            radio.style.marginLeft = '0.75rem';
+
+            var radioLabel = document.createElement('label');
+            radioLabel.htmlFor = id;
+            radioLabel.textContent = variants[type].label;
+            radioLabel.style.marginLeft = '0.25rem';
+            controls.appendChild(radio);
+            controls.appendChild(radioLabel);
+
+            radio.addEventListener('change', function () {
+                var variant = variants[radio.value];
+                global.Plotly.react(chartContainer, variant.plotly_json.data, variant.plotly_json.layout, {
+                    responsive: true,
+                });
+                if (caption) {
+                    caption.textContent = variant.caption;
+                }
+            });
+        });
+
+        wrapper.insertBefore(controls, chartContainer.parentNode === wrapper ? chartContainer : chartContainer.parentNode);
+    }
+
+    function trendMetricLabel(metric, options) {
+        return options[metric] || humanizeLabel(metric);
+    }
+
+    function buildTrendView(chartJson, selected, options) {
+        var traces = (chartJson.data || []).filter(function (trace) {
+            return selected.indexOf(trace.meta) !== -1;
+        }).map(function (trace) {
+            return Object.assign({}, trace);
+        });
+
+        var spans = traces.map(function (trace) {
+            var values = (trace.y || []).filter(function (value) {
+                return typeof value === 'number' && isFinite(value);
+            });
+            if (!values.length) {
+                return 0;
+            }
+            return Math.max.apply(null, values) - Math.min.apply(null, values);
+        }).filter(function (span) {
+            return span > 0;
+        });
+        var maxSpan = spans.length ? Math.max.apply(null, spans) : 0;
+        var minSpan = spans.length ? Math.min.apply(null, spans) : 0;
+        var separatePanels = selected.length > 1 && minSpan > 0 && maxSpan / minSpan >= 5;
+        var layout = Object.assign({}, chartJson.layout, {
+            title: {text: 'Quiz Metrics Across Quizzes'},
+            yaxis: {title: {text: selected.length === 1 ? trendMetricLabel(selected[0], options) : 'Value'}, autorange: true},
+        });
+
+        if (separatePanels) {
+            layout.grid = {rows: selected.length, columns: 1, pattern: 'independent', roworder: 'top to bottom'};
+            layout.height = Math.max(420, selected.length * 240);
+            selected.forEach(function (metric, index) {
+                var suffix = index === 0 ? '' : String(index + 1);
+                var axis = 'y' + suffix;
+                var xaxis = 'x' + suffix;
+                layout[axis] = {title: {text: trendMetricLabel(metric, options)}, autorange: true};
+                layout[xaxis] = {type: 'category', title: {text: 'Quiz'}, tickangle: 0, tickfont: {size: 10}};
+                if (traces[index]) {
+                    traces[index].yaxis = axis;
+                    traces[index].xaxis = xaxis;
+                }
+            });
+        } else {
+            layout.autosize = true;
+            delete layout.height;
+            traces.forEach(function (trace) {
+                trace.yaxis = 'y';
+                trace.xaxis = 'x';
+            });
+        }
+
+        return {data: traces, layout: layout};
+    }
+
+    function renderTrendControls(wrapper, section, prefix) {
+        var options = section.metric_options || {};
+        var metrics = Object.keys(options);
+        var chart = section.charts && section.charts[0];
+        if (!metrics.length || !chart || !chart.plotly_json) {
+            return;
+        }
+
+        var selected = (section.selected_metrics || metrics).slice();
+        var chartContainer = wrapper.querySelector('[id$="-chart-' + chart.id + '"]');
+        if (!chartContainer) {
+            return;
+        }
+        var controls = document.createElement('div');
+        controls.className = 'mb-3';
+        var label = document.createElement('span');
+        label.textContent = 'Show metrics: ';
+        controls.appendChild(label);
+
+        metrics.forEach(function (metric) {
+            var id = prefix + '-metric-' + metric;
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = id;
+            checkbox.checked = selected.indexOf(metric) !== -1;
+            checkbox.style.marginLeft = '0.75rem';
+            var checkboxLabel = document.createElement('label');
+            checkboxLabel.htmlFor = id;
+            checkboxLabel.textContent = options[metric];
+            checkboxLabel.style.marginLeft = '0.25rem';
+            controls.appendChild(checkbox);
+            controls.appendChild(checkboxLabel);
+
+            checkbox.addEventListener('change', function () {
+                selected = metrics.filter(function (name) {
+                    return document.getElementById(prefix + '-metric-' + name).checked;
+                });
+                if (!selected.length) {
+                    selected = [metric];
+                    checkbox.checked = true;
+                }
+                var view = buildTrendView(chart.plotly_json, selected, options);
+                global.Plotly.react(chartContainer, view.data, view.layout, {responsive: true});
+            });
+        });
+
+        var initialView = buildTrendView(chart.plotly_json, selected, options);
+        global.Plotly.react(chartContainer, initialView.data, initialView.layout, {responsive: true});
+        wrapper.insertBefore(controls, chartContainer);
     }
 
     function renderNotes(root, notes) {
@@ -309,6 +469,15 @@
         if (section.caption) {
             var caption = document.createElement('p');
             caption.textContent = section.caption;
+            if (section.caption_link && section.caption_link.url && section.caption_link.label) {
+                caption.appendChild(document.createTextNode(' '));
+                var captionLink = document.createElement('a');
+                captionLink.href = section.caption_link.url;
+                captionLink.target = '_blank';
+                captionLink.rel = 'noopener noreferrer';
+                captionLink.textContent = section.caption_link.label;
+                caption.appendChild(captionLink);
+            }
             wrapper.appendChild(caption);
         }
         if (section.table) {
@@ -317,7 +486,14 @@
                 makeCrossAttemptRowsClickable(wrapper, section.row_student_ids);
             }
         }
-        if (section.charts) {
+        if (section.id === 'scatter' && section.scatter_variants) {
+            renderScatterControls(wrapper, section, prefix);
+        } else if (section.id === 'trend' && section.metric_options) {
+            section.charts.forEach(function (chart) {
+                renderChart(wrapper, chart, prefix);
+            });
+            renderTrendControls(wrapper, section, prefix);
+        } else if (section.charts) {
             section.charts.forEach(function (chart) {
                 renderChart(wrapper, chart, prefix);
             });
