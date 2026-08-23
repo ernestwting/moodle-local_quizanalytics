@@ -252,7 +252,7 @@ class local_quizanalytics_quiz_data_fetcher {
             $datamapper = new question_engine_data_mapper();
             $qubasbyid = $datamapper->load_questions_usages_by_activity(new qubaid_list($uniqueids));
 
-            self::append_response_rows($attemptbatch, $qubasbyid, $users, $quiz, $questiontextbyslot, $records);
+            self::append_response_rows($attemptbatch, $qubasbyid, $users, $quiz, $cm, $questiontextbyslot, $records);
 
             unset($qubasbyid);
             gc_collect_cycles();
@@ -341,7 +341,7 @@ class local_quizanalytics_quiz_data_fetcher {
     public static function estimate_seconds_per_attempt(stdClass $quiz, stdClass $course, int $samplesize = 100): ?float {
         global $DB;
 
-        get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
 
         $sample = $DB->get_records('quiz_attempts', [
             'quiz'  => $quiz->id,
@@ -362,7 +362,7 @@ class local_quizanalytics_quiz_data_fetcher {
         $qubasbyid = $datamapper->load_questions_usages_by_activity(new qubaid_list($uniqueids));
         $questiontextbyslot = [];
         $samplerecords = [];
-        self::append_response_rows($sample, $qubasbyid, $users, $quiz, $questiontextbyslot, $samplerecords);
+        self::append_response_rows($sample, $qubasbyid, $users, $quiz, $cm, $questiontextbyslot, $samplerecords);
         $elapsed = microtime(true) - $t0;
 
         unset($qubasbyid);
@@ -381,6 +381,7 @@ class local_quizanalytics_quiz_data_fetcher {
      * @param \question_usage_by_activity[] $qubasbyid keyed by uniqueid, this batch only
      * @param stdClass[] $users keyed by userid, every user in the whole quiz (not just this batch)
      * @param stdClass $quiz
+     * @param stdClass $cm course module record for $quiz, used to build the review-page link
      * @param array $questiontextbyslot memo keyed by [slot][variant], shared and mutated across every batch of this quiz
      * @param array $records output, appended to in place
      */
@@ -389,6 +390,7 @@ class local_quizanalytics_quiz_data_fetcher {
         array $qubasbyid,
         array $users,
         stdClass $quiz,
+        stdClass $cm,
         array &$questiontextbyslot,
         array &$records
     ): void {
@@ -404,6 +406,8 @@ class local_quizanalytics_quiz_data_fetcher {
             }
 
             $row = [
+                'attempt_id'     => $attempt->id,
+                'cmid'           => $cm->id,
                 'last_name'      => $user->lastname,
                 'first_name'     => $user->firstname,
                 'email'          => $user->email,

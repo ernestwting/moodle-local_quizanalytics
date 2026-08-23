@@ -334,6 +334,9 @@ class parser {
                 }
 
                 $rows[] = [
+                    'attempt_id' => $rec['attempt_id'] ?? null,
+                    'attempt_number' => $rec['attempt_number'] ?? null,
+                    'cmid' => $rec['cmid'] ?? null,
                     'student_id' => $studentid,
                     'student_name' => $studentname,
                     'question' => $questionlabel,

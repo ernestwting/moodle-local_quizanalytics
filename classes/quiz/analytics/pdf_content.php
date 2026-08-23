@@ -256,12 +256,26 @@ class pdf_content {
      */
     private static function from_onscreen_section(array $section): array {
         $table = $section['table'] ?? null;
-        if ($table !== null && count($table['rows']) > self::MAX_TABLE_ROWS) {
-            $table = [
-                'columns' => $table['columns'],
-                'rows' => array_slice($table['rows'], 0, self::MAX_TABLE_ROWS),
-                'truncated_from' => count($table['rows']),
-            ];
+        if ($table !== null) {
+            // Cell values can carry on-screen-only markup (e.g. the Student
+            // Quiz Summary's review-page link) — the PDF builder writes
+            // cells as plain text (TCPDF's MultiCell(), not writeHTML()), so
+            // any tags need stripping here or they'd print as literal
+            // "<a href=...>" text in the PDF.
+            $table['rows'] = array_map(
+                fn($row) => array_map(
+                    fn($value) => is_string($value) ? html_entity_decode(strip_tags($value)) : $value,
+                    $row
+                ),
+                $table['rows']
+            );
+            if (count($table['rows']) > self::MAX_TABLE_ROWS) {
+                $table = [
+                    'columns' => $table['columns'],
+                    'rows' => array_slice($table['rows'], 0, self::MAX_TABLE_ROWS),
+                    'truncated_from' => count($table['rows']),
+                ];
+            }
         }
         return [
             'title' => $section['title'] ?? '',

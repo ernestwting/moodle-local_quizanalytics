@@ -126,44 +126,12 @@ $fetchbyquiz = function () use ($course, $stackquizzes): array {
     return array_filter($byquiz, fn($records) => !empty($records));
 };
 
-// Grade-type selector for the Attempts-vs-Grades scatter plot — a plain
-// GET-reload radio group, same convention as everywhere else in this
-// plugin.
-$gradetypeoptions = [
-    'Highest Grade' => get_string('gradetypehighest', 'local_quizanalytics'),
-    \local_quizanalytics\quiz\analytics\course_analysis::DEFAULT_GRADE_TYPE
-        => get_string('gradetypeaverage', 'local_quizanalytics'),
-    'Minimum Grade' => get_string('gradetypeminimum', 'local_quizanalytics'),
-];
-$gradetype = optional_param(
-    'gradetype',
-    \local_quizanalytics\quiz\analytics\course_analysis::DEFAULT_GRADE_TYPE,
-    PARAM_RAW
-);
-if (!array_key_exists($gradetype, $gradetypeoptions)) {
-    $gradetype = \local_quizanalytics\quiz\analytics\course_analysis::DEFAULT_GRADE_TYPE;
-}
-$PAGE->url->param('gradetype', $gradetype);
-
-echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-4']);
-foreach ($PAGE->url->params() as $name => $value) {
-    if ($name === 'gradetype') {
-        continue;
-    }
-    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $name, 'value' => $value]);
-}
-echo html_writer::tag('span', get_string('gradetypelabel', 'local_quizanalytics') . ' ');
-foreach ($gradetypeoptions as $value => $label) {
-    $radioid = 'qw-gradetype-' . preg_replace('/[^a-z]/', '', strtolower($value));
-    echo html_writer::empty_tag('input', array_merge([
-        'type' => 'radio', 'name' => 'gradetype', 'value' => $value, 'id' => $radioid,
-    ], $gradetype === $value ? ['checked' => 'checked'] : []));
-    echo html_writer::label($label, $radioid, true, ['class' => 'mr-2 ml-1']);
-}
-echo ' ' . html_writer::empty_tag('input', [
-    'type' => 'submit', 'value' => get_string('gobutton', 'local_quizanalytics'), 'class' => 'btn btn-secondary btn-sm',
-]);
-echo html_writer::end_tag('form');
+// Grade-type comparison for the Attempts-vs-Grades scatter plot is now
+// picked client-side, inside the scatter section itself (see
+// sections-renderer.js's renderScatterControls()) — the server always
+// computes every variant up front (see course_analysis::build_analysis())
+// so switching between them doesn't reload the page.
+$gradetype = \local_quizanalytics\quiz\analytics\course_analysis::DEFAULT_GRADE_TYPE;
 
 // Shown unconditionally here, before the cache lookup below — matching
 // Model Analytics/Diagnostics Analytics, which always show this same

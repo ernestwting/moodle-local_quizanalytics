@@ -14,6 +14,22 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [2.5.0] — Redesigned Student Quiz Summary; scatter grade-type switches without reloading
+
+- The course-wide "Merged List of Users and Files" section is now "Student
+  Quiz Summary": one row per student per quiz instead of one row per raw
+  attempt, showing attempt count, first grade, and latest grade. The
+  student's name links to Moodle's own review page for their latest
+  attempt, opening in a new tab. The Completed On/Started On columns are
+  gone from this table (still available per-attempt elsewhere).
+- The Attempts vs Grades scatter plot's "Compare attempts against:
+  Highest/Average/Minimum Grade" control moved from a page-reloading form
+  above the chart into the chart's own controls, and switching between them
+  now swaps the plot in place via Plotly — every variant is computed once
+  server-side and shipped together, so there's no page reload.
+- Ported from `jumazevick`'s PR #4 against the plugin's earlier, pre-merge
+  `local_quizanalytics` codebase.
+
 ## [2.4.15] — Auto-refresh while a large course computes in the background; two spacing fixes
 
 - The "computed in the background" page previously just sat there
