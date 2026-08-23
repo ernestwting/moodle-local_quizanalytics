@@ -169,7 +169,7 @@ class local_quizanalytics_data_fetcher {
 
         // Batch-load user records instead of querying per attempt.
         $userids = array_unique(array_map(fn($a) => $a->userid, $attempts));
-        $users = $DB->get_records_list('user', 'id', $userids, '', 'id, firstname, lastname, email');
+        $users = $DB->get_records_list('user', 'id', $userids, '', 'id, username, firstname, lastname, email');
 
         foreach ($attempts as $attempt) {
             $user = $users[$attempt->userid] ?? null;
@@ -183,6 +183,9 @@ class local_quizanalytics_data_fetcher {
             $quba = question_engine::load_questions_usage_by_activity($attempt->uniqueid);
 
             $row = [
+                'attempt_id'     => $attempt->id,
+                'cmid'           => $cm->id,
+                'username'       => $user->username,
                 'last_name'      => $user->lastname,
                 'first_name'     => $user->firstname,
                 'email'          => $user->email,

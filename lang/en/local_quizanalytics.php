@@ -55,7 +55,7 @@ $string['pdfchartunavailable']  = '{$a} — chart image unavailable (not capture
 $string['pdferror']           = 'The PDF report could not be generated. Contact your Moodle administrator.';
 $string['pdfnosections']        = 'No sections were selected for this report.';
 $string['pdfquizsubtitle']        = 'Combined across every STACK quiz in the course';
-$string['pdfsectionattemptlist']       = '1. Merged List of Users and Files';
+$string['pdfsectionattemptlist']       = '1. Student Quiz Summary';
 $string['pdfsectionboxplot']           = '3. Quiz Grade Distribution (Box Plot)';
 $string['pdfsectioncrossattempt']      = 'Cross-Attempt Comparison';
 $string['pdfsectiondifficulty']        = '2. Question Difficulty Analysis';
@@ -84,8 +84,8 @@ $string['pluginname'] = 'Analytics';
 $string['privacy:metadata'] = 'The Quiz Analytics plugin does not store any personal data of its own. It reads finished quiz attempts, question responses, and user records directly from Moodle\'s own database (mod_quiz, the question engine, and core_user) at request time, all of which are already covered by their own privacy providers. Any cached results (Moodle\'s own MUC cache API) are a purely derived, disposable recomputation of that same data, automatically invalidated whenever the underlying attempts change.';
 $string['quizanalytics:view'] = 'View STACK quiz analytics';
 
-$string['quizselectlabel']      = 'View a single quiz\'s analytics';
-$string['quizselectoption']     = 'All STACK quizzes (course-wide view)';
+$string['quizselectlabel']      = 'Select what to view';
+$string['quizselectoption']     = 'Course data (all quizzes)';
 
 $string['selectpart']           = 'Part';
 $string['selectquestion']       = 'Question';

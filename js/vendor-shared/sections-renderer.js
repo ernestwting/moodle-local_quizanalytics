@@ -48,7 +48,10 @@
     // generic word-splitting logic below.
     var FULL_LABEL_OVERRIDES = {
         'attempt_idx': 'Attempt Number',
+        'attempt_count': 'No. of Attempts',
         'completed_dt': 'Completed On',
+        'first_grade': 'First Grade',
+        'latest_grade': 'Latest Grade',
     };
 
     function humanizeLabel(key) {
@@ -223,6 +226,56 @@
         global.Plotly.newPlot(container, chart.plotly_json.data, chart.plotly_json.layout, {
             responsive: true,
         });
+        return container;
+    }
+
+    function renderScatterControls(wrapper, section, prefix) {
+        var variants = section.scatter_variants || {};
+        var types = Object.keys(variants);
+        if (!types.length) {
+            return;
+        }
+
+        var controls = document.createElement('div');
+        controls.className = 'mb-3';
+        var label = document.createElement('span');
+        label.textContent = 'Compare attempts against: ';
+        controls.appendChild(label);
+
+        var initial = section.selected_scatter_type || types[0];
+        var chart = section.charts && section.charts[0];
+        var chartContainer = renderChart(wrapper, chart, prefix);
+        var caption = wrapper.querySelector('p');
+
+        types.forEach(function (type) {
+            var id = prefix + '-scatter-' + type.toLowerCase().replace(/[^a-z]+/g, '-');
+            var radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = prefix + '-scatter-grade-type';
+            radio.id = id;
+            radio.value = type;
+            radio.checked = type === initial;
+            radio.style.marginLeft = '0.75rem';
+
+            var radioLabel = document.createElement('label');
+            radioLabel.htmlFor = id;
+            radioLabel.textContent = variants[type].label;
+            radioLabel.style.marginLeft = '0.25rem';
+            controls.appendChild(radio);
+            controls.appendChild(radioLabel);
+
+            radio.addEventListener('change', function () {
+                var variant = variants[radio.value];
+                global.Plotly.react(chartContainer, variant.plotly_json.data, variant.plotly_json.layout, {
+                    responsive: true,
+                });
+                if (caption) {
+                    caption.textContent = variant.caption;
+                }
+            });
+        });
+
+        wrapper.insertBefore(controls, chartContainer.parentNode === wrapper ? chartContainer : chartContainer.parentNode);
     }
 
     function renderNotes(root, notes) {
@@ -317,7 +370,9 @@
                 makeCrossAttemptRowsClickable(wrapper, section.row_student_ids);
             }
         }
-        if (section.charts) {
+        if (section.id === 'scatter' && section.scatter_variants) {
+            renderScatterControls(wrapper, section, prefix);
+        } else if (section.charts) {
             section.charts.forEach(function (chart) {
                 renderChart(wrapper, chart, prefix);
             });

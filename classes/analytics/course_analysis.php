@@ -83,9 +83,11 @@ class course_analysis {
 
         $sections[] = [
             'id' => 'attempt-list',
-            'title' => '1. Merged List of Users and Files',
-            'caption' => 'Every parsed quiz attempt row, combined across every STACK quiz in the course.',
-            'table' => table_helpers::to_table($attemptframe),
+            'title' => 'Student Quiz Summary',
+            'caption' => 'Summary of each student\'s attempts and grades for every STACK quiz in the course.',
+            'table' => table_helpers::to_table(
+                quiz_metrics::build_student_quiz_summary($attemptframe)
+            ),
         ];
 
         $sections[] = [
@@ -113,13 +115,26 @@ class course_analysis {
             ];
         }
 
-        $scatterresult = quiz_metrics::build_scatter_figure($attemptframe, $gradetype, $colorblindmode);
-        if ($scatterresult !== null) {
-            $correlationstr = is_nan($scatterresult['correlation']) ? 'nan' : sprintf('%.2f', $scatterresult['correlation']);
+        $scattervariants = [];
+        foreach (['Highest Grade', 'Average Grade', 'Minimum Grade'] as $scattertype) {
+            $scatterresult = quiz_metrics::build_scatter_figure($attemptframe, $scattertype, $colorblindmode);
+            if ($scatterresult !== null) {
+                $correlationstr = is_nan($scatterresult['correlation']) ? 'nan' : sprintf('%.2f', $scatterresult['correlation']);
+                $scattervariants[$scattertype] = [
+                    'label' => $scatterresult['y_label'],
+                    'caption' => "Correlation between number of attempts and quiz {$scatterresult['y_label']}: r = {$correlationstr}",
+                    'plotly_json' => $scatterresult['plotly_json'],
+                ];
+            }
+        }
+        if (!empty($scattervariants)) {
+            $scatterresult = $scattervariants[self::DEFAULT_GRADE_TYPE];
             $sections[] = [
                 'id' => 'scatter',
                 'title' => '5. Scatter Plot: Attempts vs Grades',
-                'caption' => "Correlation between number of attempts and quiz {$scatterresult['y_label']}: r = {$correlationstr}",
+                'caption' => $scatterresult['caption'],
+                'scatter_variants' => $scattervariants,
+                'selected_scatter_type' => self::DEFAULT_GRADE_TYPE,
                 'charts' => [['id' => 'scatter-fig', 'title' => null, 'plotly_json' => $scatterresult['plotly_json']]],
             ];
         }

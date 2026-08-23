@@ -34,9 +34,10 @@ class quiz_metrics {
     /** @var string Default reddish mean-grade overlay line/marker color. */
     const DEFAULT_ACCENT = '#FF474C';
 
-    /** @var string[] Column order for the per-attempt "Merged List of Users and Files" table. */
+    /** @var string[] Column order for the internal per-attempt analytics frame. */
     const ATTEMPT_FRAME_COLUMNS = [
-        'quiz_name', 'student_name', 'student_id', 'attempt_idx', 'overall_grade', 'completed_dt', 'started_on',
+        'quiz_name', 'student_name', 'student_id', 'username', 'attempt_idx', 'attempt_id',
+        'attempt_number', 'cmid', 'overall_grade', 'completed_dt', 'started_on',
     ];
 
     /**
@@ -131,6 +132,58 @@ class quiz_metrics {
             $out[] = $entry;
         }
         return $out;
+    }
+
+    /**
+     * Builds the compact one-row-per-student-per-quiz summary table.
+     * The latest attempt is linked to Moodle's native review page.
+     *
+     * @param array[] $attemptframe
+     * @return array[]
+     */
+    public static function build_student_quiz_summary(array $attemptframe): array {
+        $groups = [];
+        foreach ($attemptframe as $row) {
+            $key = (string) $row['quiz_name'] . '|' . (string) $row['student_id'];
+            $groups[$key][] = $row;
+        }
+
+        $summary = [];
+        foreach ($groups as $rows) {
+            usort($rows, static function (array $a, array $b): int {
+                $atime = strtotime((string) ($a['completed_dt'] ?: $a['started_on'])) ?: 0;
+                $btime = strtotime((string) ($b['completed_dt'] ?: $b['started_on'])) ?: 0;
+                if ($atime !== $btime) {
+                    return $atime <=> $btime;
+                }
+                $anumber = (int) ($a['attempt_number'] ?? 0);
+                $bnumber = (int) ($b['attempt_number'] ?? 0);
+                if ($anumber !== $bnumber) {
+                    return $anumber <=> $bnumber;
+                }
+                return ((int) ($a['attempt_id'] ?? 0)) <=> ((int) ($b['attempt_id'] ?? 0));
+            });
+
+            $first = $rows[0];
+            $latest = $rows[count($rows) - 1];
+            $reviewurl = new \moodle_url('/mod/quiz/review.php', [
+                'attempt' => (int) $latest['attempt_id'],
+                'cmid' => (int) $latest['cmid'],
+            ]);
+
+            $summary[] = [
+                'quiz_name' => $latest['quiz_name'],
+                'student_name' => \html_writer::link($reviewurl, $latest['student_name'], [
+                    'target' => '_blank',
+                    'rel' => 'noopener',
+                ]),
+                'attempt_count' => count($rows),
+                'first_grade' => $first['overall_grade'],
+                'latest_grade' => $latest['overall_grade'],
+            ];
+        }
+
+        return $summary;
     }
 
     /**
