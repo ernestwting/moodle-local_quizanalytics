@@ -31,6 +31,9 @@ class question_details {
     /** @var string Placeholder shown when a field wasn't captured for a given attempt. */
     const NOT_AVAILABLE = 'Not available in this export';
 
+    /** @var string Placeholder shown for a genuinely blank (never-answered) response, in place of Moodle's raw internal response summary. */
+    const NO_RESPONSE = '(No response)';
+
     /**
      * Group best-attempt rows by the instantiated STACK question and expected
      * answer, so randomized values are never mixed into one error list.
@@ -63,7 +66,18 @@ class question_details {
             $groups[$key]['students'][(string) ($row['student_id'] ?? '')] = true;
 
             if (($row['grade'] ?? null) !== null && (float) $row['grade'] < 1.0) {
-                $response = trim((string) ($row['response_text'] ?? ''));
+                // A genuinely blank response (no ansN: field at all, so
+                // parser::build_response_rows() never had an expression to
+                // parse) still carries Moodle's own raw response summary in
+                // response_text — internal bookkeeping like "Seed: 123456;
+                // prt1: !", not anything the student actually typed. Shown
+                // as-is that read like a bizarre "common wrong answer";
+                // swapped for a plain, honest placeholder instead. A
+                // response_status of 'invalid' is left alone here — that's
+                // real (if malformed) student input, worth showing.
+                $response = ($row['response_status'] ?? '') === 'blank'
+                    ? self::NO_RESPONSE
+                    : trim((string) ($row['response_text'] ?? ''));
                 if ($response !== '') {
                     if (!isset($groups[$key]['wrong'][$response])) {
                         $groups[$key]['wrong'][$response] = [

@@ -166,16 +166,12 @@
         }
 
         var heading = document.createElement('h4');
-        heading.textContent = 'Quiz snapshot';
+        heading.textContent = 'Quiz Snapshot';
         root.appendChild(heading);
 
-        var overview = document.createElement('div');
-        overview.style.display = 'flex';
-        overview.style.flexWrap = 'wrap';
-        overview.style.gap = '0.35rem 1rem';
-        overview.style.marginBottom = '0.5rem';
         var overviewRows = [
-            ['Overall average', snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2), snapshot.quiz_average_finished],
+            ['Overall average', (snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2)) +
+                (snapshot.quiz_average_finished ? ' (Finished: ' + formatCellValue(snapshot.quiz_average_finished) + ')' : '')],
             ['Students with attempts', snapshot.students_with_attempts],
             ['Total attempts', snapshot.attempts_total],
             ['Finished', snapshot.attempts_finished],
@@ -184,16 +180,13 @@
         if (snapshot.attempts_other) {
             overviewRows.push(['Other', snapshot.attempts_other]);
         }
-        overviewRows.forEach(function (values, index) {
-            var item = document.createElement('span');
-            item.textContent = values[0] + ': ' + formatCellValue(values[1]) +
-                (values.length > 2 ? ' (Finished: ' + formatCellValue(values[2]) + ')' : '');
-            item.style.whiteSpace = 'nowrap';
-            if (index > 0) {
-                item.style.borderLeft = '1px solid #dee2e6';
-                item.style.paddingLeft = '1rem';
-            }
-            overview.appendChild(item);
+        var overview = document.createElement('div');
+        overview.style.marginBottom = '0.75rem';
+        renderDataTable(overview, {
+            columns: ['Metric', 'Value'],
+            rows: overviewRows.map(function (values) {
+                return [values[0], formatCellValue(values[1])];
+            }),
         });
         root.appendChild(overview);
 
@@ -505,7 +498,7 @@
         var selectId = prefix + '-question-select-' + (questionBlockCounter++);
         var label = document.createElement('label');
         label.setAttribute('for', selectId);
-        label.textContent = 'Select question: ';
+        label.textContent = 'Select Question: ';
         label.style.fontWeight = '600';
         label.style.marginRight = '0.5rem';
         wrapper.appendChild(label);
@@ -554,22 +547,34 @@
                 versionHeading.style.marginTop = '0';
                 versionBox.appendChild(versionHeading);
 
+                // Each heading/content pair gets a consistent gap above (from
+                // whatever came before) and below (from its own content) —
+                // previously these sat with no explicit spacing at all, so a
+                // heading landed flush against the content right above it.
                 var qHeading = document.createElement('h6');
-                qHeading.textContent = 'Question text';
+                qHeading.textContent = 'Question Text';
+                qHeading.style.marginTop = '1.1rem';
+                qHeading.style.marginBottom = '0.4rem';
                 versionBox.appendChild(qHeading);
                 var qText = document.createElement('div');
                 qText.innerHTML = version.question_text_html || '';
+                qText.style.marginBottom = '0.5rem';
                 versionBox.appendChild(qText);
 
                 var aHeading = document.createElement('h6');
-                aHeading.textContent = 'Expected answer';
+                aHeading.textContent = 'Expected Answer';
+                aHeading.style.marginTop = '1.1rem';
+                aHeading.style.marginBottom = '0.4rem';
                 versionBox.appendChild(aHeading);
                 var aText = document.createElement('div');
                 aText.innerHTML = version.right_answer_html || '';
+                aText.style.marginBottom = '0.5rem';
                 versionBox.appendChild(aText);
 
                 var dHeading = document.createElement('h6');
-                dHeading.textContent = 'Most common incorrect responses';
+                dHeading.textContent = 'Most Common Incorrect Responses';
+                dHeading.style.marginTop = '1.1rem';
+                dHeading.style.marginBottom = '0.5rem';
                 versionBox.appendChild(dHeading);
                 var common = version.common_responses || [];
                 if (common.length) {
@@ -592,6 +597,7 @@
                     versionLink.rel = 'noopener noreferrer';
                     versionLink.textContent = 'Review an example attempt in Moodle ↗';
                     versionLink.style.display = 'inline-block';
+                    versionLink.style.marginTop = '1rem';
                     versionLink.style.marginBottom = '0';
                     versionBox.appendChild(versionLink);
                 }
