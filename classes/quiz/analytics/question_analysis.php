@@ -89,7 +89,8 @@ class question_analysis {
         $sections[] = [
             'id' => 'question-response-overview',
             'title' => 'Question Response Overview',
-            'caption' => 'Shows how students responded to each question. Select a question to inspect the responses in more detail.',
+            'caption' => 'Shows how students responded to each question. Select a question to inspect the responses ' .
+                'in more detail.',
             'charts' => $responsecharts,
         ];
 
@@ -111,7 +112,8 @@ class question_analysis {
                 $version['right_answer_html'] = latex_utils::extract_stack_answer_latex($version['right_answer_text']);
                 foreach ($version['common_responses'] as &$commonresponse) {
                     $commonresponse['response'] = latex_utils::extract_stack_answer_latex(
-                        (string) $commonresponse['response']);
+                        (string) $commonresponse['response']
+                    );
                 }
                 unset($commonresponse);
                 unset($version['question_text'], $version['question_text_raw'], $version['right_answer_text']);
