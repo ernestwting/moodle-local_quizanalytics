@@ -100,15 +100,21 @@ class question_analysis {
         foreach ($questionorder as $q) {
             $versions = question_details::build_versioned_review($poolb, $q);
             foreach ($versions as &$version) {
-                [$cleantext, ] = latex_utils::split_stack_debug_dump($version['question_text']);
-                $version['question_text_html'] = latex_utils::strip_stack_input_placeholders($cleantext);
+                // Debug-dump detection stays on the raw (pre-format_text) HTML,
+                // matching where this check always ran — format_text()'s HTML
+                // purification runs after, on whatever's left once a leaked dump
+                // is split off.
+                [$cleanraw, ] = latex_utils::split_stack_debug_dump(
+                    $version['question_text_raw'] !== '' ? $version['question_text_raw'] : $version['question_text']
+                );
+                $version['question_text_html'] = latex_utils::render_question_html($cleanraw);
                 $version['right_answer_html'] = latex_utils::extract_stack_answer_latex($version['right_answer_text']);
                 foreach ($version['common_responses'] as &$commonresponse) {
                     $commonresponse['response'] = latex_utils::extract_stack_answer_latex(
                         (string) $commonresponse['response']);
                 }
                 unset($commonresponse);
-                unset($version['question_text'], $version['right_answer_text']);
+                unset($version['question_text'], $version['question_text_raw'], $version['right_answer_text']);
             }
             unset($version);
             $questions[$q] = [
