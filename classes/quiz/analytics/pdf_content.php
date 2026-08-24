@@ -83,17 +83,31 @@ class pdf_content {
         $sections = [];
         foreach ($selectedids as $id) {
             if ($id === 'summary') {
-                $responserows = parser::build_response_rows($records, $quizname, $anonymize);
-                $qmetrics = question_metrics::compute_question_metrics($responserows);
-                $rows = array_map(fn($r) => [
-                    'question' => $r['question'], 'attempts' => $r['attempts'], 'students' => $r['students'],
-                    'percent_valid' => $r['percent_valid'], 'percent_invalid' => $r['percent_invalid'],
-                    'syntax_error_count' => $r['syntax_error_count'],
-                ], $qmetrics);
+                // Mirrors the on-screen Quiz Snapshot table exactly (see
+                // sections-renderer.js's renderQuizSnapshot()) — this used to
+                // build the old per-question metrics table (attempts/
+                // students/percent valid/...) that used to sit above the six
+                // now-removed sections, left over from before this page was
+                // simplified down to the Moodle-native snapshot. That table
+                // no longer exists on screen at all, so shipping it here
+                // under a "Quiz Snapshot" title was actively misleading.
+                $rows = [
+                    ['Overall average', ($snapshot['quiz_average'] ?? null) === null
+                        ? 'N/A' : number_format((float) $snapshot['quiz_average'], 2)
+                        . (($snapshot['quiz_average_finished'] ?? null)
+                            ? ' (Finished: ' . $snapshot['quiz_average_finished'] . ')' : '')],
+                    ['Students with attempts', $snapshot['students_with_attempts'] ?? 0],
+                    ['Total attempts', $snapshot['attempts_total'] ?? 0],
+                    ['Finished', $snapshot['attempts_finished'] ?? 0],
+                    ['In progress', $snapshot['attempts_inprogress'] ?? 0],
+                ];
+                if (!empty($snapshot['attempts_other'])) {
+                    $rows[] = ['Other', $snapshot['attempts_other']];
+                }
                 $sections[] = [
                     'title' => get_string('pdfsectionsummary', 'local_quizanalytics'),
-                    'caption' => get_string('pdfsectionsummarycaption', 'local_quizanalytics'),
-                    'table' => table_helpers::to_table($rows),
+                    'caption' => '',
+                    'table' => ['columns' => ['Metric', 'Value'], 'rows' => $rows],
                     'charts' => [],
                 ];
             } else if ($id === 'questiondetails') {
