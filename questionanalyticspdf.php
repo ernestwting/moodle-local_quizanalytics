@@ -111,13 +111,19 @@ if (empty($records)) {
 }
 
 if ($kind === 'question') {
+    // Re-derived the same way as questionanalytics.php's own on-screen
+    // fetch, so the PDF's Question Response Overview chart shows the same
+    // Moodle-native mean marks/attempted-student counts as the page the
+    // "Download PDF" button was clicked from.
+    $snapshot = local_quizanalytics_quiz_data_fetcher::get_quiz_snapshot($selectedquiz, $course);
     $pdf = $client->download_pdf_question(
         $selectedquiz->name,
         $records,
         $selectedsections,
         $colorblind,
         $chartimages,
-        $anonymize
+        $anonymize,
+        $snapshot
     );
     $filename = clean_filename(
         $course->shortname . ' - ' . $selectedquiz->name . ' - Question Analytics - ' . date('Y-m-d') . '.pdf'
