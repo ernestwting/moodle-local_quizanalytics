@@ -135,10 +135,10 @@ if ($quizid) {
     // The "View:" sub-selector — only the selected view's data is ever
     // fetched/computed (a plain GET reload, not a client-side tab
     // swap that would need both already computed).
-    $view = optional_param('view', 'question', PARAM_ALPHA);
-    if (!in_array($view, ['question', 'solutionprocess'], true)) {
-        $view = 'question';
-    }
+    // Question Analytics is currently the only teacher-facing individual-quiz
+    // workflow. The previous Solution Process view remains in the codebase
+    // for possible redesign, but is intentionally not exposed here.
+    $view = 'question';
     $PAGE->url->param('view', $view);
 
     if ($view === 'question') {
@@ -316,7 +316,6 @@ if ($quizid) {
     }
 
     // Keep the view switcher below the selected quiz's analytics content.
-    echo sections_output_helper::render_view_selector_form($view);
 } else {
     // Course-wide: cross-quiz comparison across every STACK quiz.
     echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3, 'main mb-3');
