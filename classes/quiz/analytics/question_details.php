@@ -32,6 +32,86 @@ class question_details {
     const NOT_AVAILABLE = 'Not available in this export';
 
     /**
+     * Group best-attempt rows by the instantiated STACK question and expected
+     * answer, so randomized values are never mixed into one error list.
+     *
+     * @param array[] $poolbrows
+     * @param string $question
+     * @return array[]
+     */
+    public static function build_versioned_review(array $poolbrows, string $question): array {
+        $groups = [];
+        foreach ($poolbrows as $row) {
+            if ($row['question'] !== $question) {
+                continue;
+            }
+            $questiontext = (string) ($row['question_text'] ?? '');
+            $questiontextraw = (string) ($row['question_text_raw'] ?? '');
+            $rightanswer = (string) ($row['right_answer_text'] ?? '');
+            $key = sha1($questiontext . "\0" . $rightanswer);
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'question_text' => $questiontext,
+                    'question_text_raw' => $questiontextraw,
+                    'right_answer_text' => $rightanswer,
+                    'students' => [],
+                    'sample_attempt_id' => (int) ($row['attempt_id'] ?? 0),
+                    'cmid' => (int) ($row['cmid'] ?? 0),
+                    'wrong' => [],
+                ];
+            }
+            $groups[$key]['students'][(string) ($row['student_id'] ?? '')] = true;
+
+            if (($row['grade'] ?? null) !== null && (float) $row['grade'] < 1.0) {
+                $response = trim((string) ($row['response_text'] ?? ''));
+                if ($response !== '') {
+                    if (!isset($groups[$key]['wrong'][$response])) {
+                        $groups[$key]['wrong'][$response] = [
+                            'students' => 0,
+                            'sample_attempt_id' => (int) ($row['attempt_id'] ?? 0),
+                            'cmid' => (int) ($row['cmid'] ?? 0),
+                        ];
+                    }
+                    $groups[$key]['wrong'][$response]['students']++;
+                }
+            }
+        }
+
+        $versions = [];
+        $versionnumber = 1;
+        foreach ($groups as $group) {
+            uasort($group['wrong'], static function (array $a, array $b): int {
+                return $b['students'] <=> $a['students'];
+            });
+            $common = [];
+            foreach ($group['wrong'] as $response => $data) {
+                $reviewurl = (new \moodle_url('/mod/quiz/review.php', [
+                    'attempt' => $data['sample_attempt_id'],
+                    'cmid' => $data['cmid'],
+                ]))->out(false);
+                $common[] = [
+                    'response' => $response,
+                    'students' => (int) $data['students'],
+                    'review_url' => $reviewurl,
+                ];
+            }
+            $versions[] = [
+                'label' => 'Version ' . $versionnumber++,
+                'students' => count($group['students']),
+                'question_text' => $group['question_text'],
+                'question_text_raw' => $group['question_text_raw'],
+                'right_answer_text' => $group['right_answer_text'],
+                'common_responses' => $common,
+                'review_url' => (new \moodle_url('/mod/quiz/review.php', [
+                    'attempt' => $group['sample_attempt_id'],
+                    'cmid' => $group['cmid'],
+                ]))->out(false),
+            ];
+        }
+        return $versions;
+    }
+
+    /**
      * Question text / right answer for a question, taken from Pool B (Best
      * Attempt per Student).
      *
@@ -82,6 +162,24 @@ class question_details {
             $r['response_status'] ?? '',
         ], $wrong);
 
-        return ['columns' => $columns, 'rows' => $rows];
+        $common = [];
+        foreach ($wrong as $row) {
+            $response = trim((string) ($row['response_text'] ?? ''));
+            if ($response === '') {
+                continue;
+            }
+            $common[$response] = ($common[$response] ?? 0) + 1;
+        }
+        arsort($common, SORT_NUMERIC);
+        $commonresponses = [];
+        foreach ($common as $response => $count) {
+            $commonresponses[] = ['response' => $response, 'students' => (int) $count];
+        }
+
+        return [
+            'columns' => $columns,
+            'rows' => $rows,
+            'common_responses' => $commonresponses,
+        ];
     }
 }

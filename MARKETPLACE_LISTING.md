@@ -36,17 +36,21 @@ straight out of Moodle's own database and runs in-process, in plain PHP.
 course side by side (grade distributions, engagement over time, an
 attempts-vs-grade scatter plot, trend lines).
 
-**Question Analytics** — per quiz: difficulty and discrimination indices,
-response outcome distribution, a student performance matrix, consolidated
-question metrics, and a per-question error drill-down showing exactly what
-each student submitted next to the correct answer. Also includes
-**Solution Process Visualization**: class-wide answer transition graphs
-showing how students moved through a question's Potential Response Tree,
-per-node network centrality, 3D charts plotting each student's distance
-from the correct answer across attempts, and a cross-attempt comparison
-highlighting who improved, stayed flat, or regressed. PDF export on every
-view in both of these sections, with section checkboxes, a colorblind
-mode, and an anonymize-student-data toggle.
+**Question Analytics** — per quiz: a compact quiz snapshot (attempt
+counts, overall average), a Question Response Overview chart per question
+sized to Moodle's own Facility Index and mean mark, and a Question Review
+drill-down grouping each question's responses by instantiated variant,
+showing exactly what students submitted next to the correct answer, with
+the question text rendered as real HTML (lists, code, tables) rather than
+flattened plain text. Also includes **Solution Process Visualization**:
+class-wide answer transition graphs showing how students moved through a
+question's Potential Response Tree, per-node network centrality, 3D charts
+plotting each student's distance from the correct answer across attempts,
+and a cross-attempt comparison highlighting who improved, stayed flat, or
+regressed — currently implemented but temporarily hidden from the view
+selector pending a redesign, still reachable by direct URL. PDF export on
+every view in both of these sections, with section checkboxes, a
+colorblind mode, and an anonymize-student-data toggle.
 
 **Model Analytics** — built on Moodle's own Analytics API.
 **Model 1 (Student risk)**: a target predicting whether a student is at
@@ -64,13 +68,16 @@ enables/trains a model under Site Administration → Analytics → Models.
 **Diagnostics Analytics** — seed-bias (one-way ANOVA) and PRT
 branch-coverage reports, kept outside the ML pipeline since they have no
 natural ground-truth label: direct calculations, not model predictions.
+Currently not advertised in the section switcher pending a redesign, but
+the page and all of its code remain intact and reachable by direct URL.
 PDF export re-derives whichever sections are ticked, in both Model
 Analytics and Diagnostics Analytics, as a landscape report.
 
 One "Analytics" nav entry (reachable from a course's own navigation, and
 from an "Analytics" link this plugin adds directly to each STACK quiz's
-own settings menu) with a "Section:" switcher between all four sections at
-the top of every page — previously two separate plugins, now one install.
+own settings menu) with a "Section:" switcher between the three
+currently-advertised sections at the top of every page — previously two
+separate plugins, now one install.
 
 No external services, subscriptions, or API keys of any kind — every
 computation runs in-process in plain PHP, and nothing ever leaves the

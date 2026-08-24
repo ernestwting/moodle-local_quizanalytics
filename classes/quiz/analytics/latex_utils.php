@@ -68,6 +68,11 @@ class latex_utils {
         ];
     }
 
+    /** @var string Inline-styled stand-in for a STACK answer box — no live form behind it, just a visual echo of Moodle's own input styling (see render_question_html()). */
+    const INPUT_PLACEHOLDER_HTML = '<span style="display:inline-block;min-width:4em;padding:2px 8px;'
+        . 'margin:0 2px;border:1px solid #ccd2da;border-radius:4px;background:#f8f9fa;'
+        . 'font-family:monospace;font-size:0.9em;color:#6a737d;">(student\'s answer)</span>';
+
     /**
      * Replaces STACK's [[input:...]]/[[validation:...]] answer-box markup with a
      * plain "(student's answer)" marker, and drops [[feedback:...]] entirely — for
@@ -80,7 +85,7 @@ class latex_utils {
         }
         $cleaned = preg_replace(
             '/\[\[input:\w+\]\]\s*(?:\[\[validation:\w+\]\])?/',
-            "<em>(student's answer)</em>",
+            self::INPUT_PLACEHOLDER_HTML,
             $text
         );
         // A [[validation:ansN]] tag that isn't immediately adjacent to its
@@ -105,6 +110,39 @@ class latex_utils {
         // ordinary HTML boundaries.
         $cleaned = preg_replace('/\s*(?:<br\s*\/?>\s*)+/i', '<br>', $cleaned);
         return trim(preg_replace('/^(?:<br>\s*)+|(?:<br>\s*)+$/i', '', $cleaned));
+    }
+
+    /**
+     * Renders a STACK question's *raw* (un-flattened) instantiated question text
+     * for the Question Review panel, preserving the author's actual HTML — lists,
+     * `<code>`, tables, emphasis — instead of parser::clean_html_text()'s
+     * everything-to-<br> flattening (built for compact response-cell/table text,
+     * not a full question preview).
+     *
+     * Runs Moodle's own format_text() purely for its HTMLPurifier cleaning pass
+     * (safe-tag allowlisting, same one Moodle's real question renderer relies on)
+     * — cheap, plain string work, no CAS/Maxima call involved. Moodle's content
+     * *filters* are deliberately skipped ('filter' => false): this plugin already
+     * renders \\(...\\) / $$...$$ math client-side via KaTeX (see
+     * sections-renderer.js's renderMathInElement() call), and letting Moodle's own
+     * TeX/MathJax filter touch the same raw delimiters first would mangle them
+     * before KaTeX ever sees the text.
+     *
+     * @param string $rawhtml the CAS-rendered question text before any flattening
+     */
+    public static function render_question_html(string $rawhtml): string {
+        if (trim($rawhtml) === '') {
+            return $rawhtml;
+        }
+        global $PAGE;
+        $context = $PAGE->context ?? \context_system::instance();
+        $cleaned = format_text($rawhtml, FORMAT_HTML, [
+            'context' => $context,
+            'filter' => false,
+            'noclean' => false,
+            'para' => false,
+        ]);
+        return self::strip_stack_input_placeholders(trim($cleaned));
     }
 
     /**

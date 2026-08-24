@@ -161,8 +161,16 @@ class dashboard_renderer {
         );
 
         foreach ($report->rows as $i => $row) {
-            $name = $anonymize ? self::pseudonym($i) : $row->fullname;
-            $tablerow = [s($name), self::render_grade_status($row->gradestatus)];
+            if ($anonymize) {
+                // No link when anonymized — a href carrying the real userid
+                // would undo the point of showing a pseudonym in the first
+                // place, even with the visible text replaced.
+                $name = s(self::pseudonym($i));
+            } else {
+                $profileurl = new \moodle_url('/user/view.php', ['id' => $row->userid, 'course' => $row->courseid]);
+                $name = \html_writer::link($profileurl, s($row->fullname));
+            }
+            $tablerow = [$name, self::render_grade_status($row->gradestatus)];
             foreach (self::MODEL1_INDICATORS as $indicatorkey => $stringsuffix) {
                 $tablerow[] = self::render_indicator_cell($row->indicators[$indicatorkey], 'model1sentence_' . $stringsuffix);
             }

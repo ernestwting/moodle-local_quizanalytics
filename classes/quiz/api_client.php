@@ -44,20 +44,24 @@ class local_quizanalytics_quiz_api_client {
      * @param array  $records
      * @param bool   $colorblindmode
      * @param bool   $anonymize
+     * @param array|null $snapshot Moodle-backed quiz snapshot from
+     *        local_quizanalytics_quiz_data_fetcher::get_quiz_snapshot()
      * @return array|null
      */
     public function analyze(
         string $quizname,
         array $records,
         bool $colorblindmode = false,
-        bool $anonymize = false
+        bool $anonymize = false,
+        ?array $snapshot = null
     ): ?array {
         try {
             return \local_quizanalytics\quiz\analytics\question_analysis::build_analysis(
                 $records,
                 $quizname,
                 $colorblindmode,
-                $anonymize
+                $anonymize,
+                $snapshot
             );
         } catch (\Throwable $e) {
             debugging(
@@ -196,6 +200,8 @@ class local_quizanalytics_quiz_api_client {
      * @param array  $chartimages Chart id => data: URL (PNG), captured
      *        client-side from the already-rendered on-screen charts.
      * @param bool   $anonymize
+     * @param array|null $snapshot Moodle-backed quiz snapshot from
+     *        local_quizanalytics_quiz_data_fetcher::get_quiz_snapshot()
      * @return string|null Raw PDF bytes, or null on any failure.
      */
     public function download_pdf_question(
@@ -204,7 +210,8 @@ class local_quizanalytics_quiz_api_client {
         ?array $selectedsections,
         bool $colorblindmode = false,
         array $chartimages = [],
-        bool $anonymize = false
+        bool $anonymize = false,
+        ?array $snapshot = null
     ): ?string {
         try {
             $ids = $selectedsections ?? \local_quizanalytics\quiz\analytics\pdf_sections::ids('question');
@@ -213,7 +220,8 @@ class local_quizanalytics_quiz_api_client {
                 $quizname,
                 $ids,
                 $colorblindmode,
-                $anonymize
+                $anonymize,
+                $snapshot
             );
             return \local_quizanalytics\quiz\analytics\pdf_builder::build($content, $chartimages);
         } catch (\Throwable $e) {

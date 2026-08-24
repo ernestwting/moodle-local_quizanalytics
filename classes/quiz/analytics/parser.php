@@ -273,7 +273,8 @@ class parser {
                 $questionlabel = "Q{$n}";
                 $celltext = (string) ($rec["response_{$n}"] ?? '');
 
-                $questiontext = self::clean_html_text((string) ($rec["question_{$n}_text"] ?? ''));
+                $questiontextraw = (string) ($rec["question_{$n}_text"] ?? '');
+                $questiontext = self::clean_html_text($questiontextraw);
                 $rightanswertext = self::clean_html_text((string) ($rec["right_answer_{$n}"] ?? ''));
 
                 $parsed = self::parse_response_cell($celltext);
@@ -303,6 +304,16 @@ class parser {
                             break;
                         }
                     }
+                }
+                // Moodle's own question state (e.g. "todo", "needsgrading") is
+                // a second, independent signal that this response isn't
+                // actually gradeable yet — a response that never reached a
+                // finished state can still have leftover PRT fractions from
+                // an earlier, since-superseded validation. See data_fetcher.
+                // php's question_{n}_state field for where this comes from.
+                $questionstate = (string) ($rec["question_{$n}_state"] ?? '');
+                if (in_array($questionstate, ['todo', 'complete', 'needsgrading'], true)) {
+                    $isungraded = true;
                 }
 
                 // Score computation: mean over all PRTs K of (prtK.fraction or 0.0).
@@ -340,6 +351,9 @@ class parser {
                     'student_id' => $studentid,
                     'student_name' => $studentname,
                     'question' => $questionlabel,
+                    'reached' => array_key_exists("question_{$n}_reached", $rec)
+                        ? (bool) $rec["question_{$n}_reached"] : true,
+                    'question_state' => $questionstate,
                     'grade' => $isungraded ? null : $qscore,
                     'max_grade' => 1.0,
                     'response_status' => $responsestatus,
@@ -353,6 +367,7 @@ class parser {
                     'attempt_idx' => $index,
                     'source_type' => 'responses',
                     'question_text' => $questiontext,
+                    'question_text_raw' => $questiontextraw,
                     'right_answer_text' => $rightanswertext,
                 ];
             }
