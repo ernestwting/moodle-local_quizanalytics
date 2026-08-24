@@ -273,7 +273,8 @@ class parser {
                 $questionlabel = "Q{$n}";
                 $celltext = (string) ($rec["response_{$n}"] ?? '');
 
-                $questiontext = self::clean_html_text((string) ($rec["question_{$n}_text"] ?? ''));
+                $questiontextraw = (string) ($rec["question_{$n}_text"] ?? '');
+                $questiontext = self::clean_html_text($questiontextraw);
                 $rightanswertext = self::clean_html_text((string) ($rec["right_answer_{$n}"] ?? ''));
 
                 $parsed = self::parse_response_cell($celltext);
@@ -366,6 +367,7 @@ class parser {
                     'attempt_idx' => $index,
                     'source_type' => 'responses',
                     'question_text' => $questiontext,
+                    'question_text_raw' => $questiontextraw,
                     'right_answer_text' => $rightanswertext,
                 ];
             }

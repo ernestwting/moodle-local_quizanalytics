@@ -537,30 +537,43 @@
 
             var versions = detail.versions || [];
             versions.forEach(function (version) {
+                // Each version gets its own bordered card so a question with
+                // several randomized variants doesn't read as one continuous
+                // block — the version boundary is the thing a reader most
+                // needs to spot at a glance here.
+                var versionBox = document.createElement('div');
+                versionBox.className = 'qa-version-box';
+                versionBox.style.border = '1px solid #d3d9e0';
+                versionBox.style.borderRadius = '0.5rem';
+                versionBox.style.padding = '1rem 1.25rem';
+                versionBox.style.marginBottom = '1.25rem';
+                versionBox.style.backgroundColor = '#fbfcfd';
+
                 var versionHeading = document.createElement('h5');
                 versionHeading.textContent = version.label;
-                block.appendChild(versionHeading);
+                versionHeading.style.marginTop = '0';
+                versionBox.appendChild(versionHeading);
 
                 var qHeading = document.createElement('h6');
                 qHeading.textContent = 'Question text';
-                block.appendChild(qHeading);
+                versionBox.appendChild(qHeading);
                 var qText = document.createElement('div');
                 qText.innerHTML = version.question_text_html || '';
-                block.appendChild(qText);
+                versionBox.appendChild(qText);
 
                 var aHeading = document.createElement('h6');
                 aHeading.textContent = 'Expected answer';
-                block.appendChild(aHeading);
+                versionBox.appendChild(aHeading);
                 var aText = document.createElement('div');
                 aText.innerHTML = version.right_answer_html || '';
-                block.appendChild(aText);
+                versionBox.appendChild(aText);
 
                 var dHeading = document.createElement('h6');
                 dHeading.textContent = 'Most common incorrect responses';
-                block.appendChild(dHeading);
+                versionBox.appendChild(dHeading);
                 var common = version.common_responses || [];
                 if (common.length) {
-                    renderDataTable(block, {
+                    renderDataTable(versionBox, {
                         columns: ['Response', 'Students'],
                         rows: common.map(function (item) {
                             return [item.response, item.students];
@@ -569,7 +582,7 @@
                 } else {
                     var noCommon = document.createElement('p');
                     noCommon.textContent = 'No incorrect response patterns were found.';
-                    block.appendChild(noCommon);
+                    versionBox.appendChild(noCommon);
                 }
 
                 if (version.review_url) {
@@ -579,9 +592,11 @@
                     versionLink.rel = 'noopener noreferrer';
                     versionLink.textContent = 'Review an example attempt in Moodle ↗';
                     versionLink.style.display = 'inline-block';
-                    versionLink.style.marginBottom = '1rem';
-                    block.appendChild(versionLink);
+                    versionLink.style.marginBottom = '0';
+                    versionBox.appendChild(versionLink);
                 }
+
+                block.appendChild(versionBox);
             });
 
             blocksRoot.appendChild(block);

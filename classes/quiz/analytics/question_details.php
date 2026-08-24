@@ -46,11 +46,13 @@ class question_details {
                 continue;
             }
             $questiontext = (string) ($row['question_text'] ?? '');
+            $questiontextraw = (string) ($row['question_text_raw'] ?? '');
             $rightanswer = (string) ($row['right_answer_text'] ?? '');
             $key = sha1($questiontext . "\0" . $rightanswer);
             if (!isset($groups[$key])) {
                 $groups[$key] = [
                     'question_text' => $questiontext,
+                    'question_text_raw' => $questiontextraw,
                     'right_answer_text' => $rightanswer,
                     'students' => [],
                     'sample_attempt_id' => (int) ($row['attempt_id'] ?? 0),
@@ -97,6 +99,7 @@ class question_details {
                 'label' => 'Version ' . $versionnumber++,
                 'students' => count($group['students']),
                 'question_text' => $group['question_text'],
+                'question_text_raw' => $group['question_text_raw'],
                 'right_answer_text' => $group['right_answer_text'],
                 'common_responses' => $common,
                 'review_url' => (new \moodle_url('/mod/quiz/review.php', [
