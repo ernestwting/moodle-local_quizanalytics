@@ -103,6 +103,7 @@ class model1_report {
         foreach ($bystudent as $userid => $source) {
             $rows[] = (object) [
                 'userid' => $userid,
+                'courseid' => $courseid,
                 'fullname' => fullname($source->user),
                 'gradestatus' => self::get_grade_status($gradeitemid, $grademax, $userid, $gradepasspercent),
                 'indicators' => [

@@ -25,7 +25,10 @@
  * local_stackanalytics; Quiz Analytics's own per-quiz drill-down later
  * split into its own Question Analytics section, and Model & Diagnostics
  * Analytics split the same way into Model Analytics and Diagnostics
- * Analytics — four independently-reachable sections in total now.
+ * Analytics — four independently-reachable sections in total now, though
+ * Diagnostics Analytics is currently omitted from the rendered switcher
+ * (see render()) while its page/code stays fully intact and reachable
+ * directly by URL.
  *
  * Deliberately global-namespace and outside classes/quiz/ or classes/stack/
  * — this belongs to neither product specifically, only to the merged
@@ -64,6 +67,13 @@ class local_quizanalytics_section_selector {
             'models' => get_string('sectionmodels', 'local_quizanalytics'),
             'diagnostics' => get_string('sectiondiagnostics', 'local_quizanalytics'),
         ];
+
+        // Diagnostics Analytics is intentionally not offered here — pending
+        // a redesign, same as Question Analytics's own Solution Process
+        // view (see questionanalytics.php). diagnosticsanalytics.php itself
+        // is untouched and still fully reachable by a direct URL; this only
+        // removes it from this switcher's visible links.
+        unset($options['diagnostics']);
 
         // Rendered as plain links rather than a form+select — there's no
         // per-section state to carry across the switch (unlike the quiz/view
