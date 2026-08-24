@@ -54,13 +54,16 @@ class pdf_content {
      *
      * @param array[] $records
      * @param string[] $selectedsectionids section ids ticked in the PDF form
+     * @param array|null $snapshot Moodle-backed quiz snapshot from
+     *        local_quizanalytics_quiz_data_fetcher::get_quiz_snapshot()
      */
     public static function build_question_content(
         array $records,
         string $quizname,
         array $selectedsectionids,
         bool $colorblindmode,
-        bool $anonymize = false
+        bool $anonymize = false,
+        ?array $snapshot = null
     ): array {
         $selectedids = pdf_sections::selected_ids('question', $selectedsectionids);
         if (empty($selectedids)) {
@@ -71,7 +74,7 @@ class pdf_content {
             ];
         }
 
-        $result = question_analysis::build_analysis($records, $quizname, $colorblindmode, $anonymize);
+        $result = question_analysis::build_analysis($records, $quizname, $colorblindmode, $anonymize, $snapshot);
         $sectionsbyid = [];
         foreach ($result['sections'] as $s) {
             $sectionsbyid[$s['id']] = $s;
@@ -94,24 +97,40 @@ class pdf_content {
                     'charts' => [],
                 ];
             } else if ($id === 'questiondetails') {
+                // One row per (question, version, common wrong response) —
+                // versions come from question_details::build_versioned_review(),
+                // grouping best-attempt rows by instantiated STACK question so
+                // randomized variants don't mix their expected answers/wrong-
+                // response lists together.
                 $rows = [];
                 foreach ($result['questions'] as $qname => $detail) {
-                    foreach ($detail['error_drilldown']['rows'] as $row) {
-                        $rows[] = array_merge([$qname], $row);
+                    foreach (($detail['versions'] ?? []) as $version) {
+                        $common = $version['common_responses'] ?? [];
+                        if (empty($common)) {
+                            $rows[] = [$qname, $version['label'], $version['students'], '', ''];
+                            continue;
+                        }
+                        foreach ($common as $commonresponse) {
+                            $rows[] = [
+                                $qname,
+                                $version['label'],
+                                $version['students'],
+                                $commonresponse['response'],
+                                $commonresponse['students'],
+                            ];
+                        }
                     }
                 }
-                if (!empty($rows)) {
-                    $firstquestion = $result['questions'][array_key_first($result['questions'])];
-                    $table = [
-                        'columns' => array_merge(
-                            [get_string('selectquestion', 'local_quizanalytics')],
-                            $firstquestion['error_drilldown']['columns']
-                        ),
-                        'rows' => $rows,
-                    ];
-                } else {
-                    $table = ['columns' => [], 'rows' => []];
-                }
+                $table = [
+                    'columns' => [
+                        get_string('selectquestion', 'local_quizanalytics'),
+                        'Version',
+                        'Students (version)',
+                        'Common incorrect response',
+                        'Students (response)',
+                    ],
+                    'rows' => $rows,
+                ];
                 $sections[] = [
                     'title' => get_string('pdfsectionquestiondetails', 'local_quizanalytics'),
                     'caption' => get_string('pdfsectionquestiondetailscaption', 'local_quizanalytics'),

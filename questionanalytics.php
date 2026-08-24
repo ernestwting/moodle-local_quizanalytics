@@ -118,18 +118,13 @@ echo html_writer::div($OUTPUT->render($quizselector), 'mb-3');
 
 $selectedquiz = $stackquizzes[$quizid];
 
-// The "View:" sub-selector — only the selected view's data is ever
-// fetched/computed (a plain GET reload, not a client-side tab swap that
-// would need both already computed). Resolved and rendered here, ahead of
-// the colorblind/anonymize toggles below (and the quiz's own heading
-// further down) — previously this sat after the heading instead, moving
-// position relative to Model Analytics' own View: selector.
-$view = optional_param('view', 'question', PARAM_ALPHA);
-if (!in_array($view, ['question', 'solutionprocess'], true)) {
-    $view = 'question';
-}
+// The "View:" sub-selector used to also offer Solution Process
+// Visualization here. Question Analytics is currently the only
+// teacher-facing individual-quiz workflow — the previous Solution Process
+// view remains in the codebase below (for possible redesign) but is
+// intentionally not exposed via a selector any more.
+$view = 'question';
 $PAGE->url->param('view', $view);
-echo sections_output_helper::render_view_selector_form($view);
 
 $colorblind = sections_output_helper::resolve_colorblind_mode();
 $anonymize = sections_output_helper::resolve_anonymize_mode();
@@ -142,7 +137,11 @@ echo $OUTPUT->heading($selectedquiz->name, 3, 'main mt-4 mb-3');
 // Cheap fingerprint first — a cache hit below skips the expensive
 // per-attempt DB fetch entirely. $records is fetched lazily (at most once)
 // since either view below might independently need it on its own cache
-// miss.
+// miss. $snapshot is a compact, Moodle-native summary (attempt counts,
+// overall average, per-question Facility Index) read straight from SQL —
+// cheap enough to compute on every request, unlike the full per-attempt
+// $records fetch below.
+$snapshot = local_quizanalytics_quiz_data_fetcher::get_quiz_snapshot($selectedquiz, $course);
 $stats = local_quizanalytics_quiz_cache_helper::stats_for_quiz($selectedquiz);
 if ($stats->count === 0) {
     echo $OUTPUT->notification(get_string('noattempts', 'local_quizanalytics'), 'notifymessage');
@@ -164,6 +163,7 @@ if ($view === 'question') {
     $qakey = local_quizanalytics_quiz_cache_helper::build_key(
         $selectedquiz->id,
         $stats->fingerprint,
+        md5(json_encode($snapshot)),
         $colorblind,
         $anonymize
     );
@@ -196,7 +196,7 @@ if ($view === 'question') {
         // request redoing the same expensive work from scratch.
         sections_output_helper::flush_computing_notice();
         $previousabort = ignore_user_abort(true);
-        $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind, $anonymize);
+        $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind, $anonymize, $snapshot);
         if ($result !== null) {
             $qacache->set($qakey, $result);
         }
