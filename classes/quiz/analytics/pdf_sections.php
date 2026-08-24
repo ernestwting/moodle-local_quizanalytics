@@ -27,9 +27,10 @@
  * can never drift apart.
  *
  * 'summary' and 'questiondetails' are synthetic ids: they don't come from
- * $result['sections'] (which is only sections 2/4/5/6 for Question
- * Analytics) but are built directly from $result['summary']-equivalent
- * data and $result['questions'] respectively — see pdf_content.php.
+ * $result['sections'] (which is only 'question-response-overview' for
+ * Question Analytics) but are built directly from $result['summary']-
+ * equivalent data and $result['questions'] respectively — see
+ * pdf_content.php.
  *
  * @package local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
@@ -51,11 +52,8 @@ class pdf_sections {
     /** @var array<string, string> section id => lang string key, for the Question Analytics PDF. */
     const QUESTION = [
         'summary' => 'pdfsectionsummary',
-        'difficulty' => 'pdfsectiondifficulty',
+        'question-response-overview' => 'pdfsectionresponseoverview',
         'questiondetails' => 'pdfsectionquestiondetails',
-        'response-distribution' => 'pdfsectionresponsedistribution',
-        'student-matrix' => 'pdfsectionstudentmatrix',
-        'metrics' => 'pdfsectionmetrics',
     ];
 
     /** @var array<string, string> section id => lang string key, for the Solution Process Visualization PDF. */

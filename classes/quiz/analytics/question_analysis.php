@@ -15,13 +15,12 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Assembles the full Question Analytics {summary, sections, questions, audit}
- * payload — the PHP port's equivalent of analytics-service's app.py::analyze()
- * route (POST /analyze) plus the parts of question_analytics.py::
- * build_question_analytics() that route actually reads from (syntax_analysis
- * and export_summary are computed there but never read by the route, so
- * they're not ported at all — see this port's own commit history for the
- * confirmation of that before committing to skipping them).
+ * Assembles the simplified Question Analytics {summary, snapshot, sections,
+ * questions, audit} payload — a single Question Response Overview chart plus
+ * a versioned per-question drill-down, backed by a compact Moodle-native
+ * "quiz snapshot" (see local_quizanalytics_quiz_data_fetcher::
+ * get_quiz_snapshot()) instead of this plugin's own self-computed difficulty/
+ * metrics tables.
  *
  * @package local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
@@ -31,25 +30,28 @@
 namespace local_quizanalytics\quiz\analytics;
 
 /**
- * Assembles the full Question Analytics {summary, sections, questions, audit} payload for one quiz.
+ * Assembles the simplified Question Analytics {summary, snapshot, sections, questions, audit} payload for one quiz.
  */
 class question_analysis {
     /**
-     * Builds the full Question Analytics payload: difficulty, response distribution,
-     * student performance matrix, and question metrics sections, plus per-question drill-down.
+     * Builds the individual Question Analytics payload: response overview
+     * and per-question drill-down.
      *
      * @param array[] $records as returned by
      *        local_quizanalytics_quiz_data_fetcher::get_response_records_for_quiz()
      * @param string $quizname
      * @param bool $colorblindmode
      * @param bool $anonymize
-     * @return array {quiz_name, summary, sections, questions, audit}
+     * @param array|null $snapshot Moodle-backed quiz snapshot from
+     *        local_quizanalytics_quiz_data_fetcher::get_quiz_snapshot()
+     * @return array {quiz_name, summary, snapshot, sections, questions, audit}
      */
     public static function build_analysis(
         array $records,
         string $quizname,
         bool $colorblindmode = false,
-        bool $anonymize = false
+        bool $anonymize = false,
+        ?array $snapshot = null
     ): array {
         $responserows = parser::build_response_rows($records, $quizname, $anonymize);
 
@@ -57,167 +59,78 @@ class question_analysis {
         $poolb = $pools['pool_b'];
 
         $questionmetricsrows = question_metrics::compute_question_metrics($responserows);
-        $prtframerows = prt_analysis::build_prt_frame($responserows); // Pool A === response_rows unchanged.
-        $questionsummary = question_metrics::compute_question_summary($responserows);
-        $responseoutcomesrows = response_analysis::compute_response_outcomes($responserows);
-        $difficultymetricsrows = difficulty::compute_difficulty_metrics($responserows);
-        $prtpassratesrows = prt_analysis::compute_prt_pass_rates($prtframerows);
-        $repeatedwronganswersrows = response_analysis::compute_repeated_wrong_answers($responserows);
-        $rankeddifficultyrows = question_metrics::compute_ranked_difficulty($questionmetricsrows);
-
-        $summary = array_merge(['quiz_name' => $quizname], $questionsummary);
+        $snapshotquestions = array_column($snapshot['students_per_question'] ?? [], 'question');
+        $questionstudents = [];
+        foreach ($snapshot['students_per_question'] ?? [] as $questionstudent) {
+            $questionstudents[$questionstudent['question']] = (int) $questionstudent['students'];
+        }
+        $responseoverviewrows = response_analysis::compute_response_statuses(
+            $responserows,
+            $snapshotquestions,
+            $questionstudents,
+            $snapshot['question_means'] ?? [],
+            $snapshot['question_mean_counts'] ?? []
+        );
 
         $sections = [];
         $questionorder = array_map(fn($r) => $r['question'], $questionmetricsrows);
 
-        // 2. Question Difficulty Analysis.
-        // Adds scaled_score (grade * 10.0) to every Pool B row, matching the
-        // Python route's pool_b_df["scaled_score"] = pool_b_df["grade"] * 10.0
-        // — needed by the boxplot chart below.
-        $poolbscaled = array_map(function ($r) {
-            $r['scaled_score'] = $r['grade'] === null ? null : $r['grade'] * 10.0;
-            return $r;
-        }, $poolb);
-
-        $difficultycharts = [];
-        if (!empty($rankeddifficultyrows)) {
-            $difficultycharts[] = [
-                'id' => 'difficulty-bar', 'title' => 'Top Difficult Questions by Average Score',
-                'plotly_json' => question_charts::build_difficulty_bar_figure($rankeddifficultyrows, $colorblindmode),
-            ];
-        }
-        if (!empty($poolbscaled)) {
-            $difficultycharts[] = [
-                'id' => 'score-box', 'title' => 'Score Distribution by Question (Best Attempt per Student)',
-                'plotly_json' => question_charts::build_score_boxplot_figure($poolbscaled, $colorblindmode),
+        // Question Response Overview — replaces the old Question Difficulty
+        // Analysis / Question Response Distribution / Student Performance
+        // Matrix / Question Metrics sections with a single chart, matching
+        // this simplified page's own reduced scope.
+        $responsecharts = [];
+        if (!empty($responseoverviewrows)) {
+            $responsecharts[] = [
+                'id' => 'response-status', 'title' => null,
+                'plotly_json' => question_charts::build_response_status_figure($responseoverviewrows, $colorblindmode),
             ];
         }
         $sections[] = [
-            'id' => 'difficulty',
-            'title' => '2. Question Difficulty Analysis',
-            'table' => table_helpers::to_table($difficultymetricsrows),
-            'charts' => $difficultycharts,
+            'id' => 'question-response-overview',
+            'title' => 'Question Response Overview',
+            'caption' => 'Shows how students responded to each question. Select a question to inspect the responses ' .
+                'in more detail.',
+            'charts' => $responsecharts,
         ];
 
-        // 4. Question Response Distribution.
-        $hasprtdata = false;
-        foreach ($responserows as $r) {
-            if (trim((string) ($r['response_text'] ?? '')) !== '') {
-                $hasprtdata = true;
-                break;
-            }
-        }
-
-        $distributioncharts = [];
-        if ($hasprtdata && !empty($responseoutcomesrows)) {
-            $distributioncharts[] = [
-                'id' => 'response-outcomes', 'title' => 'Response Outcome Percentages (Best Attempts)',
-                'plotly_json' => question_charts::build_response_outcome_figure($responseoutcomesrows, $colorblindmode),
-            ];
-            $distributioncharts[] = [
-                'id' => 'valid-invalid', 'title' => 'Valid vs Invalid Attempts (All Attempts)',
-                'plotly_json' => question_charts::build_valid_invalid_figure($questionmetricsrows, $colorblindmode),
-            ];
-            $heatmap = prt_analysis::build_prt_pass_heatmap($prtpassratesrows, $questionorder, $prtframerows);
-            if (!empty($heatmap['prt_names'])) {
-                $distributioncharts[] = [
-                    'id' => 'prt-pass-heatmap', 'title' => 'PRT Pass Heatmap',
-                    'plotly_json' => prt_analysis::build_prt_pass_heatmap_figure($heatmap, $colorblindmode),
-                ];
-            }
-        }
-
-        // Left join response_outcomes with repeated_wrong_answers (minus its
-        // top_wrong_expressions column) on "question".
-        $repeatedbyquestion = [];
-        foreach ($repeatedwronganswersrows as $r) {
-            $repeatedbyquestion[$r['question']] = $r;
-        }
-        $distributiontablerows = array_map(function ($r) use ($repeatedbyquestion) {
-            $extra = $repeatedbyquestion[$r['question']] ?? null;
-            if ($extra !== null) {
-                $r['most_common_incorrect_answer'] = $extra['most_common_incorrect_answer'];
-                $r['frequency'] = $extra['frequency'];
-            }
-            return $r;
-        }, $responseoutcomesrows);
-
-        $sections[] = [
-            'id' => 'response-distribution',
-            'title' => '4. Question Response Distribution',
-            'table' => table_helpers::to_table($distributiontablerows),
-            'charts' => $distributioncharts,
-        ];
-
-        // 5. Student Performance Matrix.
-        $studentmatrixcharts = [];
-        $studentmatrixtable = ['columns' => [], 'rows' => []];
-        if (!empty($poolbscaled) && !empty($questionorder)) {
-            $studentmatrix = question_charts::build_student_matrix($poolbscaled, $questionorder);
-            $studentmatrixtable = [
-                'columns' => array_merge(['student_id'], $questionorder),
-                'rows' => array_map(
-                    fn($sid) => array_merge([$sid], array_map(fn($q) => $studentmatrix['grid'][$sid][$q], $questionorder)),
-                    $studentmatrix['students']
-                ),
-            ];
-            $studentmatrixcharts[] = [
-                'id' => 'student-heatmap', 'title' => null,
-                'plotly_json' => question_charts::build_student_matrix_figure($studentmatrix),
-            ];
-        }
-        $sections[] = [
-            'id' => 'student-matrix',
-            'title' => '5. Student Performance Matrix',
-            'table' => $studentmatrixtable,
-            'charts' => $studentmatrixcharts,
-        ];
-
-        // 6. Question Metrics.
-        $metricstable = ['columns' => [], 'rows' => []];
-        if (!empty($questionmetricsrows) && !empty($difficultymetricsrows)) {
-            $metricstable = question_charts::build_question_metrics_table($questionmetricsrows, $difficultymetricsrows);
-        }
-        $sections[] = [
-            'id' => 'metrics',
-            'title' => '6. Question Metrics',
-            'table' => $metricstable,
-        ];
-
-        // Per-question detail (drives the PHP question <select>).
+        // Per-question detail (drives the PHP question <select>), grouped by
+        // instantiated STACK question "version" so randomized variants don't
+        // mix their expected answers/wrong-response lists together.
         $questions = [];
         foreach ($questionorder as $q) {
-            $detail = question_details::build_question_detail($poolb, $q);
-            [$cleantext, ] = latex_utils::split_stack_debug_dump($detail['question_text']);
-            $cleantext = latex_utils::strip_stack_input_placeholders($cleantext);
-            $cleananswer = latex_utils::extract_stack_answer_latex($detail['right_answer_text']);
-
-            $drilldown = question_details::build_error_drilldown($poolb, $q);
-            if (!empty($drilldown['rows'])) {
-                $submittedidx = array_search('Submitted Response', $drilldown['columns'], true);
-                $rightansweridx = array_search('Right Answer', $drilldown['columns'], true);
-                $drilldown['rows'] = array_map(function ($row) use ($submittedidx, $rightansweridx) {
-                    $row[$submittedidx] = latex_utils::extract_stack_answer_latex((string) $row[$submittedidx]);
-                    $row[$rightansweridx] = latex_utils::extract_stack_answer_latex((string) $row[$rightansweridx]);
-                    return $row;
-                }, $drilldown['rows']);
+            $versions = question_details::build_versioned_review($poolb, $q);
+            foreach ($versions as &$version) {
+                // Debug-dump detection stays on the raw (pre-format_text) HTML,
+                // matching where this check always ran — format_text()'s HTML
+                // purification runs after, on whatever's left once a leaked dump
+                // is split off.
+                [$cleanraw, ] = latex_utils::split_stack_debug_dump(
+                    $version['question_text_raw'] !== '' ? $version['question_text_raw'] : $version['question_text']
+                );
+                $version['question_text_html'] = latex_utils::render_question_html($cleanraw);
+                $version['right_answer_html'] = latex_utils::extract_stack_answer_latex($version['right_answer_text']);
+                foreach ($version['common_responses'] as &$commonresponse) {
+                    $commonresponse['response'] = latex_utils::extract_stack_answer_latex(
+                        (string) $commonresponse['response']
+                    );
+                }
+                unset($commonresponse);
+                unset($version['question_text'], $version['question_text_raw'], $version['right_answer_text']);
             }
-
+            unset($version);
             $questions[$q] = [
-                'question_text_html' => $cleantext,
-                'right_answer_html' => $cleananswer,
-                'error_drilldown' => $drilldown,
+                'versions' => $versions,
             ];
         }
-
-        $audit = validation::audit_question_data($responserows);
 
         return [
             'quiz_name' => $quizname,
-            'summary' => $summary,
+            'summary' => [],
+            'snapshot' => $snapshot,
             'sections' => $sections,
             'questions' => $questions,
-            'audit' => $audit,
+            'audit' => null,
         ];
     }
 }

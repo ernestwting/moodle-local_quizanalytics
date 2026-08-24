@@ -104,6 +104,122 @@ class question_charts {
     }
 
     /**
+     * Horizontal diverging response-status chart for the individual quiz
+     * overview. Negative bars are non-correct outcomes; correct responses are
+     * shown on the positive side. Values are percentages and hover data keeps
+     * the corresponding student counts.
+     *
+     * @param array[] $responseoutcomes
+     * @param bool $colorblindmode
+     * @return array
+     */
+    public static function build_response_status_figure(array $responseoutcomes, bool $colorblindmode = false): array {
+        $questions = array_map(function ($row) {
+            $mean = $row['mean_mark'] === null
+                ? 'N/A'
+                : sprintf('%.2f (%d)', (float) $row['mean_mark'], (int) $row['mean_mark_count']);
+            return $row['question'] . ' (average = ' . $mean . ')';
+        }, $responseoutcomes);
+        $definitions = [
+            'incorrect' => [
+                'label' => 'Incorrect',
+                'percent' => 'incorrect_percent',
+                'count' => 'incorrect_count',
+                'color' => $colorblindmode ? '#0072B2' : '#2878b5',
+                'negative' => true,
+            ],
+            'invalid' => [
+                'label' => 'Invalid input',
+                'percent' => 'invalid_percent',
+                'count' => 'invalid_count',
+                'color' => $colorblindmode ? '#E69F00' : '#ff7f0e',
+                'negative' => true,
+            ],
+            'no_response' => [
+                'label' => 'No response / not evaluated',
+                'percent' => 'no_response_percent',
+                'count' => 'no_response_count',
+                'color' => $colorblindmode ? '#D55E00' : '#d62728',
+                'negative' => true,
+            ],
+            'correct' => [
+                'label' => 'Correct',
+                'percent' => 'correct_percent',
+                'count' => 'correct_count',
+                'color' => $colorblindmode ? '#CC79A7' : '#9467bd',
+                'negative' => false,
+            ],
+        ];
+
+        $traces = [];
+        foreach ($definitions as $definition) {
+            $x = [];
+            $text = [];
+            $customdata = [];
+            foreach ($responseoutcomes as $row) {
+                $percent = (float) $row[$definition['percent']];
+                $x[] = $definition['negative'] ? -$percent : $percent;
+                $text[] = abs($percent) >= 8.0 ? sprintf('%.0f%%', $percent) : '';
+                $meanlabel = $row['mean_mark'] === null
+                    ? 'N/A'
+                    : sprintf('%.2f (%d)', (float) $row['mean_mark'], (int) $row['mean_mark_count']);
+                $customdata[] = [
+                    (int) $row[$definition['count']],
+                    $percent,
+                    $row['question'],
+                    (int) $row['students_attempted'],
+                    $meanlabel,
+                ];
+            }
+            $traces[] = [
+                'type' => 'bar',
+                'orientation' => 'h',
+                'name' => $definition['label'],
+                'y' => $questions,
+                'x' => $x,
+                'text' => $text,
+                'textposition' => 'inside',
+                'insidetextanchor' => 'middle',
+                'customdata' => $customdata,
+                'marker' => ['color' => $definition['color']],
+                'hovertemplate' => '%{customdata[2]}<br>' . $definition['label'] .
+                    ': %{customdata[1]:.0f}% (%{customdata[0]} students)<br>' .
+                    'Students who attempted question: %{customdata[3]}<br>' .
+                    'Mean question mark: %{customdata[4]}<extra></extra>',
+            ];
+        }
+
+        $longestlabel = !empty($questions) ? max(array_map('strlen', $questions)) : 0;
+        $leftmargin = min(320, max(175, $longestlabel * 7.5 + 45));
+
+        return [
+            'data' => $traces,
+            'layout' => [
+                'title' => ['text' => 'Question Response Overview', 'x' => 0.5, 'font' => ['size' => 18]],
+                'barmode' => 'relative',
+                'bargap' => 0.35,
+                'height' => max(560, 120 + count($questions) * 62),
+                'margin' => ['l' => $leftmargin, 'r' => 35, 't' => 55, 'b' => 80],
+                'xaxis' => [
+                    'title' => ['text' => 'Percentage of students'],
+                    'range' => [-100, 100],
+                    'tickvals' => [-100, -75, -50, -25, 0, 25, 50, 75, 100],
+                    'ticktext' => ['100%', '75%', '50%', '25%', '0%', '25%', '50%', '75%', '100%'],
+                    'zeroline' => true,
+                    'zerolinewidth' => 1,
+                ],
+                'yaxis' => [
+                    'automargin' => true,
+                    'categoryorder' => 'array',
+                    'categoryarray' => $questions,
+                    'autorange' => 'reversed',
+                ],
+                'legend' => ['title' => ['text' => 'Response status']],
+            ],
+        ];
+    }
+
+    /**
      * "Valid vs Invalid Attempts (All Attempts)" — percent_valid/
      * percent_invalid grouped bars per question, from question_metrics
      * (Pool A based).

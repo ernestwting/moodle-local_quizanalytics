@@ -14,6 +14,76 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.0] — Simplified per-quiz Question Analytics; real HTML in Question Review; Diagnostics out of the nav; Model 1 names link to profiles
+
+- Question Analytics for a single quiz (`questionanalytics.php`) is
+  simplified from six sections down to one: the old Question Difficulty
+  Analysis, Question Response Distribution, Student Performance Matrix, and
+  Question Metrics sections are replaced by a single "Question Response
+  Overview" — one horizontal diverging bar chart per question (Correct/
+  Incorrect/Invalid input/No response), sized to Moodle's own per-question
+  Facility Index and mean mark rather than this plugin's self-computed
+  equivalents, so the figures agree with Quiz -> Results -> Statistics.
+- The summary table at the top of the page is replaced by a compact "Quiz
+  snapshot" (overall average, students with attempts, finished/in-progress/
+  other attempt counts) read straight from Moodle's own attempt and quiz
+  statistics data, with a link to that quiz's own Moodle attempts report.
+- The per-question drill-down is renamed "Question Review" and now groups
+  a question's best-attempt responses by its instantiated STACK question
+  text/expected answer ("Version 1", "Version 2", ...) instead of one flat
+  list, so a randomized question's distinct variants no longer mix their
+  expected answers and common-wrong-response lists together. Each version
+  lists its most common incorrect responses (with student counts) and links
+  to an example attempt in Moodle's own review page.
+- The Question Analytics PDF export's section list and "Question Review"
+  table are updated to match; the now-dropped Student Performance Matrix
+  checkbox is removed from the PDF form rather than left pointing at a
+  section that no longer exists on screen.
+- The Solution Process Visualization view (`?view=solutionprocess`) is
+  temporarily hidden from `questionanalytics.php`'s view selector — the
+  underlying code is untouched and still reachable by URL, but is no longer
+  offered as a teacher-facing option pending a redesign.
+- Ported from `jumazevick`'s branch (`4e1b303c`, `c680134`) against the
+  plugin's earlier, pre-merge `local_quizanalytics` codebase. Two pieces of
+  that branch's own work were intentionally left out of this port: a
+  `question_difficulty.php` documentation-link fix, whose target section
+  (a course-wide "Moodle Facility Index" panel) was already deliberately
+  reverted before this repo's merge and was never present here to begin
+  with; and fetching in-progress (not just finished) attempts into the
+  per-question response computation, to keep this view on the same
+  finished-attempt cache fingerprint the rest of this plugin already uses
+  — Moodle's own in-progress/finished attempt counts are still shown as-is
+  in the new quiz snapshot, straight from SQL.
+- Question Review's question text now preserves the author's actual HTML
+  instead of being flattened to plain text. `question_text_html` used to be
+  built from `parser::clean_html_text()`'s output — a helper written for
+  compact table cells that flattens every tag to a single space, collapsing
+  lists, `<code>` spans, and any other structure into bare `<br>`-joined
+  lines that looked nothing like Moodle's own STACK question rendering. It
+  now carries the raw (un-flattened) CAS-rendered HTML alongside the
+  existing flattened copy and runs it through
+  `latex_utils::render_question_html()`, which uses `format_text()` purely
+  for its HTMLPurifier pass — content filters are deliberately skipped,
+  since this plugin already renders math client-side via KaTeX and Moodle's
+  own TeX filter would mangle the same `\(...\)` delimiters first. STACK's
+  `[[input:...]]` placeholders now render as a small bordered box instead
+  of plain "(student's answer)" text, and each version in the Question
+  Review drill-down gets its own bordered card, so a question with several
+  randomized variants reads as clearly separate entries instead of one
+  continuous block.
+- Diagnostics Analytics is removed from the section switcher's visible
+  links (`classes/section_selector.php`) — `diagnosticsanalytics.php` and
+  all of its underlying code (`classes/stack/diagnostics/*`,
+  `classes/stack/analytics/report/diagnostics_report.php`) are untouched
+  and still fully reachable by a direct URL, this only stops advertising it
+  in the nav pending further work.
+- Model Analytics' Model 1 ("Student at risk") table now links each
+  student's name to their Moodle profile (`/user/view.php`), matching how
+  Quiz Analytics' Student Quiz Summary table already links names to a
+  review page. Correctly skipped when the anonymize toggle is on, since a
+  link carrying the real userid would defeat the point of showing a
+  pseudonym even with the visible text replaced.
+
 ## [2.5.0] — Redesigned Student Quiz Summary; scatter grade-type switches without reloading
 
 - The course-wide "Merged List of Users and Files" section is now "Student
