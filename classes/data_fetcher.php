@@ -119,7 +119,7 @@ class local_quizanalytics_data_fetcher {
     public static function get_course_stack_quizzes(int $courseid): array {
         global $DB;
 
-        $sql = "SELECT DISTINCT quiz.id, quiz.name, quiz.course, quiz.sumgrades
+        $sql = "SELECT DISTINCT quiz.id, quiz.name, quiz.course, quiz.sumgrades, quiz.grade
                   FROM {quiz} quiz
                   JOIN {course_modules} cm ON cm.instance = quiz.id
                   JOIN {modules} m ON m.id = cm.module AND m.name = 'quiz'
@@ -173,9 +173,14 @@ class local_quizanalytics_data_fetcher {
      *
      * @param stdClass $quiz   row from mdl_quiz
      * @param stdClass $course course record
+     * @param bool $includeinprogress include Moodle's in-progress attempts
      * @return array
      */
-    public static function get_response_records_for_quiz(stdClass $quiz, stdClass $course): array {
+    public static function get_response_records_for_quiz(
+        stdClass $quiz,
+        stdClass $course,
+        bool $includeinprogress = false
+    ): array {
         global $DB;
 
         $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
@@ -184,10 +189,19 @@ class local_quizanalytics_data_fetcher {
         // Only finished attempts — matches what a teacher would get from the
         // "Responses" report with the default "Finished" state filter. Adjust
         // this if you also want in-progress/overdue attempts included.
-        $attempts = $DB->get_records('quiz_attempts', [
-            'quiz'  => $quiz->id,
-            'state' => 'finished',
-        ], 'userid, attempt');
+        if ($includeinprogress) {
+            $attempts = $DB->get_records_select(
+                'quiz_attempts',
+                "quiz = :quizid AND state IN ('finished', 'inprogress')",
+                ['quizid' => $quiz->id],
+                'userid, attempt'
+            );
+        } else {
+            $attempts = $DB->get_records('quiz_attempts', [
+                'quiz'  => $quiz->id,
+                'state' => 'finished',
+            ], 'userid, attempt');
+        }
 
         if (!$attempts) {
             return [];
@@ -234,6 +248,12 @@ class local_quizanalytics_data_fetcher {
                 'attempt_number' => $attempt->attempt,
             ];
 
+            $reachedslots = $DB->get_records_menu(
+                'question_attempts',
+                ['questionusageid' => $attempt->uniqueid],
+                'slot',
+                'slot, id'
+            );
             $qnum = 1;
             foreach ($quba->get_slots() as $slot) {
                 $question = $quba->get_question($slot);
@@ -247,6 +267,8 @@ class local_quizanalytics_data_fetcher {
                 $row["right_answer_{$qnum}"]     = $quba->get_right_answer_summary($slot) ?? '';
                 $row["question_{$qnum}_mark"]    = $quba->get_question_mark($slot);
                 $row["question_{$qnum}_maxmark"] = $quba->get_question_max_mark($slot);
+                $row["question_{$qnum}_reached"] = array_key_exists($slot, $reachedslots);
+                $row["question_{$qnum}_state"]   = (string) $quba->get_question_attempt($slot)->get_state();
 
                 $qnum++;
             }
@@ -255,6 +277,122 @@ class local_quizanalytics_data_fetcher {
         }
 
         return $records;
+    }
+
+    /**
+     * Build the compact Moodle-backed snapshot shown above an individual quiz
+     * analysis. Attempt counts include every Moodle attempt state, while the
+     * per-question student counts include finished and in-progress attempts.
+     *
+     * @param stdClass $quiz
+     * @param stdClass $course
+     * @return array
+     */
+    public static function get_quiz_snapshot(stdClass $quiz, stdClass $course): array {
+        global $DB;
+
+        $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
+        $slots = $DB->get_records_sql(
+            "SELECT id, slot
+               FROM {quiz_slots}
+              WHERE quizid = :quizid AND slot > 0
+           ORDER BY slot",
+            ['quizid' => $quiz->id]
+        );
+
+        $statecounts = $DB->get_records_sql(
+            "SELECT state, COUNT(*) AS attemptcount
+               FROM {quiz_attempts}
+              WHERE quiz = :quizid
+           GROUP BY state",
+            ['quizid' => $quiz->id]
+        );
+        $studentswithattempts = (int) $DB->count_records_sql(
+            "SELECT COUNT(DISTINCT userid)
+               FROM {quiz_attempts}
+              WHERE quiz = :quizid",
+            ['quizid' => $quiz->id]
+        );
+        $attempts = ['total' => 0, 'finished' => 0, 'inprogress' => 0, 'other' => 0];
+        foreach ($statecounts as $statecount) {
+            $count = (int) $statecount->attemptcount;
+            $attempts['total'] += $count;
+            if ($statecount->state === 'finished') {
+                $attempts['finished'] = $count;
+            } else if ($statecount->state === 'inprogress') {
+                $attempts['inprogress'] = $count;
+            } else {
+                $attempts['other'] += $count;
+            }
+        }
+
+        // Match Moodle's Quiz Overview "Overall average" row: average the
+        // raw sumgrades for finished attempts with a grade, then rescale it
+        // to the quiz grade shown by Moodle.
+        $averagerecord = $DB->get_record_sql(
+            "SELECT AVG(sumgrades) AS averagegrade, COUNT(sumgrades) AS gradedcount
+               FROM {quiz_attempts}
+              WHERE quiz = :quizid AND state = :finishedstate AND sumgrades IS NOT NULL",
+            ['quizid' => $quiz->id, 'finishedstate' => 'finished']
+        );
+        $quizaverage = $averagerecord->averagegrade === null
+            ? null
+            : (float) quiz_rescale_grade((float) $averagerecord->averagegrade, $quiz, false);
+
+        $studentcounts = $DB->get_records_sql(
+            "SELECT slot.slot,
+                    COUNT(DISTINCT CASE WHEN questionattempt.id IS NOT NULL THEN attempt.userid END) AS studentcount
+               FROM {quiz_slots} slot
+          LEFT JOIN {quiz_attempts} attempt
+                 ON attempt.quiz = slot.quizid
+                AND attempt.state IN ('finished', 'inprogress')
+          LEFT JOIN {question_attempts} questionattempt
+                 ON questionattempt.questionusageid = attempt.uniqueid
+                AND questionattempt.slot = slot.slot
+              WHERE slot.quizid = :quizid AND slot.slot > 0
+           GROUP BY slot.slot
+           ORDER BY slot.slot",
+            ['quizid' => $quiz->id]
+        );
+        $studentsbyquestion = [];
+        foreach ($studentcounts as $studentcount) {
+            $studentsbyquestion[] = [
+                'question' => 'Q' . (int) $studentcount->slot,
+                'students' => (int) $studentcount->studentcount,
+            ];
+        }
+
+        // Use the same Moodle Quiz Statistics Facility Index values shown in
+        // Quiz -> Results -> Statistics. Do not recompute question means from
+        // the plugin's parsed response rows.
+        $questionmeans = [];
+        $questionmeancounts = [];
+        foreach (self::get_course_question_facility_data($course, [$quiz]) as $facilityrow) {
+            $questionmeans[$facilityrow['question_number']] = $facilityrow['mark_average'];
+            $questionmeancounts[$facilityrow['question_number']] = $facilityrow['mark_average_count'];
+        }
+
+        return [
+            'question_count' => count($slots),
+            'students_with_attempts' => $studentswithattempts,
+            'attempts_total' => $attempts['total'],
+            'attempts_finished' => $attempts['finished'],
+            'attempts_inprogress' => $attempts['inprogress'],
+            'attempts_other' => $attempts['other'],
+            'quiz_average' => $quizaverage,
+            'quiz_average_finished' => (int) $averagerecord->gradedcount,
+            'students_per_question' => $studentsbyquestion,
+            'question_means' => $questionmeans,
+            'question_mean_counts' => $questionmeancounts,
+            'quiz_report_url' => (new \moodle_url('/mod/quiz/report.php', [
+                'id' => $cm->id,
+                'mode' => 'overview',
+            ]))->out(false),
+            'quiz_responses_url' => (new \moodle_url('/mod/quiz/report.php', [
+                'id' => $cm->id,
+                'mode' => 'responses',
+            ]))->out(false),
+        ];
     }
 
     /**
@@ -335,7 +473,7 @@ class local_quizanalytics_data_fetcher {
             $cm = get_coursemodule_from_instance('quiz', $quiz->id, $course->id, false, MUST_EXIST);
             $context = \context_module::instance($cm->id);
             $stackslots = $DB->get_records_sql(
-                "SELECT DISTINCT slot.slot, q.id AS questionid, q.name AS questionname
+                "SELECT DISTINCT slot.slot, slot.maxmark, q.id AS questionid, q.name AS questionname
                    FROM {quiz_slots} slot
                    JOIN {question_references} qr ON qr.usingcontextid = :contextid
                                                  AND qr.component = 'mod_quiz'
@@ -353,6 +491,20 @@ class local_quizanalytics_data_fetcher {
                 continue;
             }
 
+            // This is the same raw question-average source used by Moodle's
+            // Quiz overview report (the values shown in its final average row).
+            $questions = $report->load_and_initialise_questions_for_calculations($quiz);
+            $qubaids = new \qubaid_join(
+                '{quiz_attempts} quiza',
+                'quiza.uniqueid',
+                'quiza.quiz = :quizid AND quiza.preview = 0 AND quiza.state = :finishedstate',
+                ['quizid' => (int) $quiz->id, 'finishedstate' => 'finished']
+            );
+            $averagemarks = (new \question_engine_data_mapper())->load_average_marks(
+                $qubaids,
+                array_keys($questions)
+            );
+
             $questionstats = $report->calculate_questions_stats_for_question_bank(
                 (int) $quiz->id,
                 true,
@@ -360,6 +512,12 @@ class local_quizanalytics_data_fetcher {
             );
             foreach ($stackslots as $slot) {
                 $facility = null;
+                $markaverage = null;
+                if (isset($averagemarks[(int) $slot->slot]) && (float) $slot->maxmark > 0) {
+                    $rawmarkaverage = (float) $averagemarks[(int) $slot->slot]->averagefraction *
+                        (float) $slot->maxmark;
+                    $markaverage = (float) quiz_rescale_grade($rawmarkaverage, $quiz, false);
+                }
                 if ($questionstats !== null && $questionstats->has_slot((int) $slot->slot)) {
                     $stat = $questionstats->for_slot((int) $slot->slot);
                     if ($stat->facility !== null) {
@@ -372,6 +530,9 @@ class local_quizanalytics_data_fetcher {
                     'question_slot' => (int) $slot->slot,
                     'question_name' => $slot->questionname,
                     'facility_index' => $facility,
+                    'mark_average' => $markaverage,
+                    'mark_average_count' => isset($averagemarks[(int) $slot->slot])
+                        ? (int) $averagemarks[(int) $slot->slot]->numaveraged : 0,
                 ];
             }
         }

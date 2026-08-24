@@ -44,20 +44,23 @@ class local_quizanalytics_api_client {
      * @param array  $records
      * @param bool   $colorblindmode
      * @param bool   $anonymize
+     * @param array|null $snapshot
      * @return array|null
      */
     public function analyze(
         string $quizname,
         array $records,
         bool $colorblindmode = false,
-        bool $anonymize = false
+        bool $anonymize = false,
+        ?array $snapshot = null
     ): ?array {
         try {
             return \local_quizanalytics\analytics\question_analysis::build_analysis(
                 $records,
                 $quizname,
                 $colorblindmode,
-                $anonymize
+                $anonymize,
+                $snapshot
             );
         } catch (\Throwable $e) {
             debugging(

@@ -76,6 +76,98 @@ class response_analysis {
     }
 
     /**
+     * Compute one response-status breakdown per question using one selected
+     * attempt per student, so the displayed counts represent students rather
+     * than multiplying a student by every retry.
+     *
+     * Blank and ungraded responses are presented together as no response /
+     * not evaluated.
+     *
+     * @param array[] $responserows
+     * @param string[] $questionorder optional Moodle slot order
+     * @param array<string, int> $questionstudents Moodle distinct reached-student counts
+     * @param array<string, float|null> $questionmeans Moodle Facility Index values
+     * @param array<string, int> $questionmeancounts Moodle average mark counts
+     * @return array[]
+     */
+    public static function compute_response_statuses(
+        array $responserows,
+        array $questionorder = [],
+        array $questionstudents = [],
+        array $questionmeans = [],
+        array $questionmeancounts = []
+    ): array {
+        if (empty($responserows) && empty($questionorder)) {
+            return [];
+        }
+
+        $pools = parser::get_attempt_pools($responserows);
+        $poola = $pools['pool_a'];
+        $poolb = $pools['pool_b'];
+        $questions = !empty($questionorder)
+            ? $questionorder
+            : table_helpers::unique_sorted_by_question($poola, 'question');
+        $rows = [];
+
+        foreach ($questions as $question) {
+            $counts = [
+                'correct' => 0,
+                'incorrect' => 0,
+                'invalid' => 0,
+                'no_response' => 0,
+            ];
+            $studentrows = [];
+            foreach ($poola as $row) {
+                if ($row['question'] !== $question || !($row['reached'] ?? true)) {
+                    continue;
+                }
+                $studentid = (string) $row['student_id'];
+                $current = $studentrows[$studentid] ?? null;
+                if ($current === null || (int) ($row['attempt_number'] ?? 0) >= (int) ($current['attempt_number'] ?? 0)) {
+                    $studentrows[$studentid] = $row;
+                }
+            }
+            $questionrows = array_values($studentrows);
+            foreach ($questionrows as $row) {
+                if ($row['response_status'] === 'correct') {
+                    $counts['correct']++;
+                } else if ($row['response_status'] === 'invalid') {
+                    $counts['invalid']++;
+                } else if ($row['response_status'] === 'incorrect') {
+                    $counts['incorrect']++;
+                } else {
+                    $counts['no_response']++;
+                }
+            }
+
+            $total = array_sum($counts);
+            // Moodle's Facility Index is the mean question mark divided by
+            // the maximum question mark. Use Moodle's cached/calculated value
+            // directly so this agrees with Quiz -> Results -> Statistics.
+            $meanmark = array_key_exists($question, $questionmeans)
+                ? $questionmeans[$question]
+                : null;
+            $rows[] = [
+                'question' => $question,
+                'total_students' => $total,
+                'students_attempted' => $questionstudents[$question] ?? $total,
+                'mean_mark' => $meanmark,
+                'mean_mark_count' => $questionmeancounts[$question] ?? 0,
+                'correct_count' => $counts['correct'],
+                'correct_percent' => $total > 0 ? $counts['correct'] / $total * 100.0 : 0.0,
+                'incorrect_count' => $counts['incorrect'],
+                'incorrect_percent' => $total > 0 ? $counts['incorrect'] / $total * 100.0 : 0.0,
+                'invalid_count' => $counts['invalid'],
+                'invalid_percent' => $total > 0 ? $counts['invalid'] / $total * 100.0 : 0.0,
+                'no_response_count' => $counts['no_response'],
+                'no_response_percent' => $total > 0 ? $counts['no_response'] / $total * 100.0 : 0.0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * Tally the most frequent wrong literal inputs, strictly from Pool B
      * (Best Attempt per Student).
      *

@@ -146,6 +146,52 @@
         root.appendChild(table);
     }
 
+    function renderQuizSnapshot(root, snapshot) {
+        if (!root || !snapshot) {
+            return;
+        }
+
+        var heading = document.createElement('h4');
+        heading.textContent = 'Quiz snapshot';
+        root.appendChild(heading);
+
+        var overview = document.createElement('div');
+        overview.style.display = 'flex';
+        overview.style.flexWrap = 'wrap';
+        overview.style.gap = '0.35rem 1rem';
+        overview.style.marginBottom = '0.5rem';
+        var overviewRows = [
+            ['Overall average', snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2), snapshot.quiz_average_finished],
+            ['Students with attempts', snapshot.students_with_attempts],
+            ['Total attempts', snapshot.attempts_total],
+            ['Finished', snapshot.attempts_finished],
+            ['In progress', snapshot.attempts_inprogress],
+        ];
+        if (snapshot.attempts_other) {
+            overviewRows.push(['Other', snapshot.attempts_other]);
+        }
+        overviewRows.forEach(function (values, index) {
+            var item = document.createElement('span');
+            item.textContent = values[0] + ': ' + formatCellValue(values[1]) +
+                (values.length > 2 ? ' (Finished: ' + formatCellValue(values[2]) + ')' : '');
+            item.style.whiteSpace = 'nowrap';
+            if (index > 0) {
+                item.style.borderLeft = '1px solid #dee2e6';
+                item.style.paddingLeft = '1rem';
+            }
+            overview.appendChild(item);
+        });
+        root.appendChild(overview);
+
+        var link = document.createElement('a');
+        link.href = snapshot.quiz_report_url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'View quiz attempts in Moodle ↗';
+        root.appendChild(link);
+
+    }
+
     function renderDataTable(root, table) {
         if (!table || !table.columns || !table.rows) {
             return;
@@ -202,8 +248,9 @@
         // would just shrink the visible chart back down to the same
         // "looks tiny" problem that height was set to fix.
         var isScene3d = !!(chart.plotly_json.layout && chart.plotly_json.layout.scene);
+        var isResponseStatusChart = chart.id === 'response-status';
         var declaredHeight = chart.plotly_json.layout && chart.plotly_json.layout.height;
-        if (!isScene3d && declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD) {
+        if (!isScene3d && !isResponseStatusChart && declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD) {
             var scrollWrapper = document.createElement('div');
             scrollWrapper.style.maxHeight = CHART_SCROLL_MAX_HEIGHT + 'px';
             scrollWrapper.style.overflowY = 'auto';
@@ -506,7 +553,7 @@
 
     var questionBlockCounter = 0;
 
-    function renderQuestionDetails(root, prefix, questions) {
+    function renderQuestionDetails(root, prefix, questions, snapshot) {
         var names = Object.keys(questions || {});
         if (!names.length) {
             return;
@@ -517,23 +564,32 @@
         wrapper.id = prefix + '-section-questiondetails';
 
         var heading = document.createElement('h4');
-        heading.textContent = '3. Question Item Details & Error Drill-Down';
+        heading.textContent = 'Question Review';
         wrapper.appendChild(heading);
 
         var caption = document.createElement('p');
         caption.textContent = 'The question as students see it, the correct answer for ' +
             'each part, and — for students who didn’t get full credit on their best ' +
             'attempt — what they actually submitted.';
+        caption.textContent = 'Inspect the question, expected answer, and common response patterns to understand where students had difficulty.';
         wrapper.appendChild(caption);
 
         var selectId = prefix + '-question-select-' + (questionBlockCounter++);
         var label = document.createElement('label');
         label.setAttribute('for', selectId);
-        label.textContent = 'Question: ';
+        label.textContent = 'Select question: ';
+        label.style.fontWeight = '600';
+        label.style.marginRight = '0.5rem';
         wrapper.appendChild(label);
 
         var select = document.createElement('select');
         select.id = selectId;
+        select.style.minWidth = '10rem';
+        select.style.padding = '0.55rem 2rem 0.55rem 0.75rem';
+        select.style.fontSize = '1rem';
+        select.style.border = '2px solid #0f6cbf';
+        select.style.borderRadius = '0.35rem';
+        select.style.backgroundColor = '#eef6fc';
         names.forEach(function (name) {
             var option = document.createElement('option');
             option.value = name;
@@ -551,24 +607,54 @@
             block.style.display = (i === 0) ? 'block' : 'none';
             block.style.marginTop = '1rem';
 
-            var qHeading = document.createElement('h5');
-            qHeading.textContent = 'Question text';
-            block.appendChild(qHeading);
-            var qText = document.createElement('div');
-            qText.innerHTML = detail.question_text_html || '';
-            block.appendChild(qText);
+            var versions = detail.versions || [];
+            versions.forEach(function (version) {
+                var versionHeading = document.createElement('h5');
+                versionHeading.textContent = version.label;
+                block.appendChild(versionHeading);
 
-            var aHeading = document.createElement('h5');
-            aHeading.textContent = 'Right answer';
-            block.appendChild(aHeading);
-            var aText = document.createElement('div');
-            aText.innerHTML = detail.right_answer_html || '';
-            block.appendChild(aText);
+                var qHeading = document.createElement('h6');
+                qHeading.textContent = 'Question text';
+                block.appendChild(qHeading);
+                var qText = document.createElement('div');
+                qText.innerHTML = version.question_text_html || '';
+                block.appendChild(qText);
 
-            var dHeading = document.createElement('h5');
-            dHeading.textContent = 'Error drill-down (best attempt, score < 1.0)';
-            block.appendChild(dHeading);
-            renderDataTable(block, detail.error_drilldown);
+                var aHeading = document.createElement('h6');
+                aHeading.textContent = 'Expected answer';
+                block.appendChild(aHeading);
+                var aText = document.createElement('div');
+                aText.innerHTML = version.right_answer_html || '';
+                block.appendChild(aText);
+
+                var dHeading = document.createElement('h6');
+                dHeading.textContent = 'Most common incorrect responses';
+                block.appendChild(dHeading);
+                var common = version.common_responses || [];
+                if (common.length) {
+                    renderDataTable(block, {
+                        columns: ['Response', 'Students'],
+                        rows: common.map(function (item) {
+                            return [item.response, item.students];
+                        }),
+                    });
+                } else {
+                    var noCommon = document.createElement('p');
+                    noCommon.textContent = 'No incorrect response patterns were found.';
+                    block.appendChild(noCommon);
+                }
+
+                if (version.review_url) {
+                    var versionLink = document.createElement('a');
+                    versionLink.href = version.review_url;
+                    versionLink.target = '_blank';
+                    versionLink.rel = 'noopener noreferrer';
+                    versionLink.textContent = 'Review an example attempt in Moodle ↗';
+                    versionLink.style.display = 'inline-block';
+                    versionLink.style.marginBottom = '1rem';
+                    block.appendChild(versionLink);
+                }
+            });
 
             blocksRoot.appendChild(block);
         });
@@ -580,6 +666,17 @@
                 block.style.display = (block.getAttribute('data-question') === chosen) ? 'block' : 'none';
             });
         });
+
+        if (snapshot && snapshot.quiz_responses_url) {
+            var reportLink = document.createElement('a');
+            reportLink.href = snapshot.quiz_responses_url;
+            reportLink.target = '_blank';
+            reportLink.rel = 'noopener noreferrer';
+            reportLink.textContent = 'View individual responses in Moodle ↗';
+            reportLink.style.display = 'inline-block';
+            reportLink.style.marginTop = '1rem';
+            wrapper.appendChild(reportLink);
+        }
 
         root.appendChild(wrapper);
         typesetMath(wrapper);
@@ -685,19 +782,20 @@
             return;
         }
 
-        renderSummaryTable(summaryRoot, result.summary);
+        if (result.snapshot) {
+            renderQuizSnapshot(summaryRoot, result.snapshot);
+        } else {
+            renderSummaryTable(summaryRoot, result.summary);
+        }
         typesetMath(summaryRoot);
 
         if (sectionsRoot && Array.isArray(result.sections)) {
-            // Sections 1-2 come first (summary is rendered separately above;
-            // "2. Question Difficulty Analysis" is sections[0]), then the
-            // per-question drill-down (section "3.") slots in before
-            // "4. Question Response Distribution" onward, matching the
-            // Streamlit page's section ordering.
+            // The per-question drill-down follows the response overview,
+            // matching the selected-question workflow on this page.
             result.sections.forEach(function (section) {
                 renderSection(sectionsRoot, section, prefix);
-                if (section.id === 'difficulty') {
-                    renderQuestionDetails(sectionsRoot, prefix, result.questions);
+                if (section.id === 'question-response-overview') {
+                    renderQuestionDetails(sectionsRoot, prefix, result.questions, result.snapshot);
                 }
             });
             renderAudit(sectionsRoot, prefix, result.audit);

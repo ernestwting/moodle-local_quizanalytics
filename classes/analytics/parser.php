@@ -260,6 +260,10 @@ class parser {
                         }
                     }
                 }
+                $questionstate = (string) ($rec["question_{$n}_state"] ?? '');
+                if (in_array($questionstate, ['todo', 'complete', 'needsgrading'], true)) {
+                    $isungraded = true;
+                }
 
                 // Score computation: mean over all PRTs K of (prtK.fraction or 0.0).
                 $m = $mbyquestion[$n];
@@ -297,6 +301,9 @@ class parser {
                     'username' => (string) ($rec['username'] ?? ''),
                     'student_name' => $studentname,
                     'question' => $questionlabel,
+                    'reached' => array_key_exists("question_{$n}_reached", $rec)
+                        ? (bool) $rec["question_{$n}_reached"] : true,
+                    'question_state' => $questionstate,
                     'grade' => $isungraded ? null : $qscore,
                     'max_grade' => 1.0,
                     'response_status' => $responsestatus,

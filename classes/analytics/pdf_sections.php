@@ -51,11 +51,9 @@ class pdf_sections {
     /** @var array<string, string> section id => lang string key, for the Question Analytics PDF. */
     const QUESTION = [
         'summary' => 'pdfsectionsummary',
-        'difficulty' => 'pdfsectiondifficulty',
+        'question-response-overview' => 'pdfsectionresponseoverview',
         'questiondetails' => 'pdfsectionquestiondetails',
-        'response-distribution' => 'pdfsectionresponsedistribution',
         'student-matrix' => 'pdfsectionstudentmatrix',
-        'metrics' => 'pdfsectionmetrics',
     ];
 
     /** @var array<string, string> section id => lang string key, for the Solution Process Visualization PDF. */

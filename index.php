@@ -75,12 +75,9 @@ foreach ($stackquizzes as $quiz) {
 echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out_omit_querystring(), 'class' => 'mb-4']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $courseid]);
 echo html_writer::label(get_string('quizselectlabel', 'local_quizanalytics'), 'qa-quizid-select', true, ['class' => 'mr-2']);
-echo html_writer::select($selectoptions, 'quizid', $quizid, false, ['id' => 'qa-quizid-select']);
-echo ' ';
-echo html_writer::empty_tag('input', [
-    'type'  => 'submit',
-    'value' => get_string('gobutton', 'local_quizanalytics'),
-    'class' => 'btn btn-secondary',
+echo html_writer::select($selectoptions, 'quizid', $quizid, false, [
+    'id' => 'qa-quizid-select',
+    'onchange' => 'this.form.submit();',
 ]);
 echo html_writer::end_tag('form');
 
@@ -114,16 +111,25 @@ if ($quizid) {
     // per-attempt DB fetch entirely. $records is fetched lazily (at most
     // once) since either view below might independently need it on its
     // own cache miss.
+    $snapshot = local_quizanalytics_data_fetcher::get_quiz_snapshot($selectedquiz, $course);
     $stats = local_quizanalytics_cache_helper::stats_for_quiz($selectedquiz);
-    if ($stats->count === 0) {
+    if (($snapshot['attempts_total'] ?? 0) === 0) {
         echo $OUTPUT->notification(get_string('noattempts', 'local_quizanalytics'), 'notifymessage');
         echo $OUTPUT->footer();
         exit;
     }
 
     $records = null;
+    $questionrecords = null;
     $fetchrecords = function () use (&$records, $selectedquiz, $course): array {
         return $records ??= local_quizanalytics_data_fetcher::get_response_records_for_quiz($selectedquiz, $course);
+    };
+    $fetchquestionrecords = function () use (&$questionrecords, $selectedquiz, $course): array {
+        return $questionrecords ??= local_quizanalytics_data_fetcher::get_response_records_for_quiz(
+            $selectedquiz,
+            $course,
+            true
+        );
     };
 
     // The "View:" sub-selector — only the selected view's data is ever
@@ -134,19 +140,25 @@ if ($quizid) {
         $view = 'question';
     }
     $PAGE->url->param('view', $view);
-    echo sections_output_helper::render_view_selector_form($view);
 
     if ($view === 'question') {
         $qacache = cache::make('local_quizanalytics', 'questionanalysis');
         $qakey = local_quizanalytics_cache_helper::build_key(
             $selectedquiz->id,
             $stats->fingerprint,
+            md5(json_encode($snapshot)),
             $colorblind,
             $anonymize
         );
         $result = $qacache->get($qakey);
         if ($result === false) {
-            $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind, $anonymize);
+            $result = $client->analyze(
+                $selectedquiz->name,
+                $fetchquestionrecords(),
+                $colorblind,
+                $anonymize,
+                $snapshot
+            );
             if ($result !== null) {
                 $qacache->set($qakey, $result);
             }
@@ -302,6 +314,9 @@ if ($quizid) {
             'spv'
         );
     }
+
+    // Keep the view switcher below the selected quiz's analytics content.
+    echo sections_output_helper::render_view_selector_form($view);
 } else {
     // Course-wide: cross-quiz comparison across every STACK quiz.
     echo $OUTPUT->heading(get_string('coursewideheading', 'local_quizanalytics'), 3, 'main mb-3');

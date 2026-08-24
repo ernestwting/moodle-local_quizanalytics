@@ -130,7 +130,7 @@ class question_difficulty {
             'title' => 'Moodle Facility Index',
             'caption' => 'Shows Moodle\'s Facility Index for each question across the STACK quizzes. Lower values indicate more challenging questions.',
             'caption_link' => [
-                'url' => 'https://docs.moodle.org/en/Quiz_statistics',
+                'url' => 'https://docs.moodle.org/502/en/Quiz_statistics_report',
                 'label' => 'Moodle Quiz Statistics documentation',
             ],
             'notes' => $notes,
