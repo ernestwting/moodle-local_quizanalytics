@@ -14,6 +14,19 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.1] — German, Italian, and Spanish translations
+
+- Added full `lang/de/`, `lang/it/`, and `lang/es/local_quizanalytics.php`
+  language packs alongside the existing `lang/en/` — every one of the 185
+  strings in the English pack (UI labels, admin settings, PDF section
+  titles, indicator/model descriptions, error and status messages)
+  translated into all three, with `{$a}`/`{$a->...}` placeholders and
+  `<strong>` markup preserved exactly. `STACK`, `PRT`, `seed`, `cron`, and
+  the "STACK q-type Analytics" product name are kept untranslated
+  everywhere as established technical/brand terms; "quiz" follows each
+  language's own Moodle convention (German "Test", Italian "quiz",
+  Spanish "cuestionario").
+
 ## [3.0.0] — Simplified per-quiz Question Analytics; real HTML in Question Review; Diagnostics out of the nav; Model 1 names link to profiles
 
 - Question Analytics for a single quiz (`questionanalytics.php`) is
