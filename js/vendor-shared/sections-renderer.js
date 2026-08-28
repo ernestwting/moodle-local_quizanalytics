@@ -123,6 +123,14 @@
     function wrapScrollable(el, rowCount) {
         var wrapper = document.createElement('div');
         wrapper.style.overflowX = 'auto';
+        // `overflow` (X here, X+Y below for a tall table) puts this wrapper
+        // in its own block-formatting context, which stops the wrapped
+        // table's own bottom margin from collapsing outward the normal way
+        // — without an explicit margin on the wrapper itself, that margin
+        // gets trapped inside it, leaving nothing between this table and
+        // whatever renders right after it (the next section's own
+        // heading/chart, with no visible gap at all).
+        wrapper.style.marginBottom = '1.5rem';
         if (rowCount > SCROLL_ROW_THRESHOLD) {
             wrapper.style.maxHeight = '420px';
             wrapper.style.overflowY = 'auto';
@@ -146,22 +154,24 @@
         root.appendChild(table);
     }
 
+    // Compact Moodle-native summary shown above an individual quiz's own
+    // Question Analytics — replaces renderSummaryTable() there (see
+    // renderResult()'s own branch below) with the {attempt counts, overall
+    // average, per-question Facility Index} snapshot data_fetcher.php's
+    // get_quiz_snapshot() reads straight from Moodle's own SQL, plus a link
+    // to that quiz's own Moodle attempts report.
     function renderQuizSnapshot(root, snapshot) {
         if (!root || !snapshot) {
             return;
         }
 
         var heading = document.createElement('h4');
-        heading.textContent = 'Quiz snapshot';
+        heading.textContent = 'Quiz Snapshot';
         root.appendChild(heading);
 
-        var overview = document.createElement('div');
-        overview.style.display = 'flex';
-        overview.style.flexWrap = 'wrap';
-        overview.style.gap = '0.35rem 1rem';
-        overview.style.marginBottom = '0.5rem';
         var overviewRows = [
-            ['Overall average', snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2), snapshot.quiz_average_finished],
+            ['Overall average', (snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2)) +
+                (snapshot.quiz_average_finished ? ' (Finished: ' + formatCellValue(snapshot.quiz_average_finished) + ')' : '')],
             ['Students with attempts', snapshot.students_with_attempts],
             ['Total attempts', snapshot.attempts_total],
             ['Finished', snapshot.attempts_finished],
@@ -170,16 +180,13 @@
         if (snapshot.attempts_other) {
             overviewRows.push(['Other', snapshot.attempts_other]);
         }
-        overviewRows.forEach(function (values, index) {
-            var item = document.createElement('span');
-            item.textContent = values[0] + ': ' + formatCellValue(values[1]) +
-                (values.length > 2 ? ' (Finished: ' + formatCellValue(values[2]) + ')' : '');
-            item.style.whiteSpace = 'nowrap';
-            if (index > 0) {
-                item.style.borderLeft = '1px solid #dee2e6';
-                item.style.paddingLeft = '1rem';
-            }
-            overview.appendChild(item);
+        var overview = document.createElement('div');
+        overview.style.marginBottom = '0.75rem';
+        renderDataTable(overview, {
+            columns: ['Metric', 'Value'],
+            rows: overviewRows.map(function (values) {
+                return [values[0], formatCellValue(values[1])];
+            }),
         });
         root.appendChild(overview);
 
@@ -189,7 +196,6 @@
         link.rel = 'noopener noreferrer';
         link.textContent = 'View quiz attempts in Moodle ↗';
         root.appendChild(link);
-
     }
 
     function renderDataTable(root, table) {
@@ -226,6 +232,23 @@
     var CHART_SCROLL_HEIGHT_THRESHOLD = 500;
     var CHART_SCROLL_MAX_HEIGHT = 500;
 
+    // "Line Graph of Various Metrics" sets an explicit layout.width of
+    // 220px per quiz (question_analysis.php: max(800, 220 * $ncategories))
+    // so a course-wide view's per-quiz tick labels stay legible instead of
+    // overlapping — for a large course (dozens of quizzes) that easily runs
+    // past any reasonable page width. Without a bounding box, that stretched
+    // the whole page horizontally rather than just the one chart. This
+    // doesn't affect the PDF export's own chart capture: collectChartImages()
+    // below reads the inner chart div's own offsetWidth, which keeps its
+    // full intrinsic size regardless of an ancestor's overflow/max-width.
+    var CHART_SCROLL_WIDTH_THRESHOLD = 900;
+    // The wrapper's own box stays 100% of its parent — matching the width of
+    // every other element on the page (tables, headings, the other charts)
+    // — with the (potentially much wider) chart scrolling *inside* it,
+    // rather than the wrapper itself shrinking to a fixed pixel width
+    // narrower than everything around it.
+    var CHART_SCROLL_MAX_WIDTH = '100%';
+
     function renderChart(root, chart, prefix) {
         if (!chart || !chart.plotly_json) {
             return;
@@ -248,12 +271,27 @@
         // would just shrink the visible chart back down to the same
         // "looks tiny" problem that height was set to fix.
         var isScene3d = !!(chart.plotly_json.layout && chart.plotly_json.layout.scene);
+        // The Question Response Overview chart (one horizontal bar row per
+        // question) grows its own height with the question count the same
+        // way the old Student Performance Matrix heatmap did — but unlike
+        // that heatmap, its whole point is to let a teacher scan every
+        // question at a glance, so it's exempt from the scroll cap too
+        // rather than getting shrunk back into a small scrollable window.
         var isResponseStatusChart = chart.id === 'response-status';
         var declaredHeight = chart.plotly_json.layout && chart.plotly_json.layout.height;
-        if (!isScene3d && !isResponseStatusChart && declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD) {
+        var declaredWidth = chart.plotly_json.layout && chart.plotly_json.layout.width;
+        var needsHeightScroll = !isScene3d && !isResponseStatusChart &&
+            declaredHeight && declaredHeight > CHART_SCROLL_HEIGHT_THRESHOLD;
+        var needsWidthScroll = declaredWidth && declaredWidth > CHART_SCROLL_WIDTH_THRESHOLD;
+        if (needsHeightScroll || needsWidthScroll) {
             var scrollWrapper = document.createElement('div');
-            scrollWrapper.style.maxHeight = CHART_SCROLL_MAX_HEIGHT + 'px';
-            scrollWrapper.style.overflowY = 'auto';
+            if (needsHeightScroll) {
+                scrollWrapper.style.maxHeight = CHART_SCROLL_MAX_HEIGHT + 'px';
+                scrollWrapper.style.overflowY = 'auto';
+            }
+            if (needsWidthScroll) {
+                scrollWrapper.style.maxWidth = CHART_SCROLL_MAX_WIDTH;
+            }
             scrollWrapper.style.overflowX = 'auto';
             scrollWrapper.style.border = '1px solid #dee2e6';
             scrollWrapper.style.marginBottom = '2rem';
@@ -276,6 +314,12 @@
         return container;
     }
 
+    // Renders the scatter chart plus a radio group ("Compare attempts
+    // against: Highest/Average/Minimum Grade") that swaps the active Plotly
+    // figure client-side via Plotly.react() — every variant's figure was
+    // already computed server-side (see course_analysis::build_analysis()'s
+    // $scattervariants) and shipped in section.scatter_variants, so
+    // switching never reloads the page.
     function renderScatterControls(wrapper, section, prefix) {
         var variants = section.scatter_variants || {};
         var types = Object.keys(variants);
@@ -323,113 +367,6 @@
         });
 
         wrapper.insertBefore(controls, chartContainer.parentNode === wrapper ? chartContainer : chartContainer.parentNode);
-    }
-
-    function trendMetricLabel(metric, options) {
-        return options[metric] || humanizeLabel(metric);
-    }
-
-    function buildTrendView(chartJson, selected, options) {
-        var traces = (chartJson.data || []).filter(function (trace) {
-            return selected.indexOf(trace.meta) !== -1;
-        }).map(function (trace) {
-            return Object.assign({}, trace);
-        });
-
-        var spans = traces.map(function (trace) {
-            var values = (trace.y || []).filter(function (value) {
-                return typeof value === 'number' && isFinite(value);
-            });
-            if (!values.length) {
-                return 0;
-            }
-            return Math.max.apply(null, values) - Math.min.apply(null, values);
-        }).filter(function (span) {
-            return span > 0;
-        });
-        var maxSpan = spans.length ? Math.max.apply(null, spans) : 0;
-        var minSpan = spans.length ? Math.min.apply(null, spans) : 0;
-        var separatePanels = selected.length > 1 && minSpan > 0 && maxSpan / minSpan >= 5;
-        var layout = Object.assign({}, chartJson.layout, {
-            title: {text: 'Quiz Metrics Across Quizzes'},
-            yaxis: {title: {text: selected.length === 1 ? trendMetricLabel(selected[0], options) : 'Value'}, autorange: true},
-        });
-
-        if (separatePanels) {
-            layout.grid = {rows: selected.length, columns: 1, pattern: 'independent', roworder: 'top to bottom'};
-            layout.height = Math.max(420, selected.length * 240);
-            selected.forEach(function (metric, index) {
-                var suffix = index === 0 ? '' : String(index + 1);
-                var axis = 'y' + suffix;
-                var xaxis = 'x' + suffix;
-                layout[axis] = {title: {text: trendMetricLabel(metric, options)}, autorange: true};
-                layout[xaxis] = {type: 'category', title: {text: 'Quiz'}, tickangle: 0, tickfont: {size: 10}};
-                if (traces[index]) {
-                    traces[index].yaxis = axis;
-                    traces[index].xaxis = xaxis;
-                }
-            });
-        } else {
-            layout.autosize = true;
-            delete layout.height;
-            traces.forEach(function (trace) {
-                trace.yaxis = 'y';
-                trace.xaxis = 'x';
-            });
-        }
-
-        return {data: traces, layout: layout};
-    }
-
-    function renderTrendControls(wrapper, section, prefix) {
-        var options = section.metric_options || {};
-        var metrics = Object.keys(options);
-        var chart = section.charts && section.charts[0];
-        if (!metrics.length || !chart || !chart.plotly_json) {
-            return;
-        }
-
-        var selected = (section.selected_metrics || metrics).slice();
-        var chartContainer = wrapper.querySelector('[id$="-chart-' + chart.id + '"]');
-        if (!chartContainer) {
-            return;
-        }
-        var controls = document.createElement('div');
-        controls.className = 'mb-3';
-        var label = document.createElement('span');
-        label.textContent = 'Show metrics: ';
-        controls.appendChild(label);
-
-        metrics.forEach(function (metric) {
-            var id = prefix + '-metric-' + metric;
-            var checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = id;
-            checkbox.checked = selected.indexOf(metric) !== -1;
-            checkbox.style.marginLeft = '0.75rem';
-            var checkboxLabel = document.createElement('label');
-            checkboxLabel.htmlFor = id;
-            checkboxLabel.textContent = options[metric];
-            checkboxLabel.style.marginLeft = '0.25rem';
-            controls.appendChild(checkbox);
-            controls.appendChild(checkboxLabel);
-
-            checkbox.addEventListener('change', function () {
-                selected = metrics.filter(function (name) {
-                    return document.getElementById(prefix + '-metric-' + name).checked;
-                });
-                if (!selected.length) {
-                    selected = [metric];
-                    checkbox.checked = true;
-                }
-                var view = buildTrendView(chart.plotly_json, selected, options);
-                global.Plotly.react(chartContainer, view.data, view.layout, {responsive: true});
-            });
-        });
-
-        var initialView = buildTrendView(chart.plotly_json, selected, options);
-        global.Plotly.react(chartContainer, initialView.data, initialView.layout, {responsive: true});
-        wrapper.insertBefore(controls, chartContainer);
     }
 
     function renderNotes(root, notes) {
@@ -516,15 +453,6 @@
         if (section.caption) {
             var caption = document.createElement('p');
             caption.textContent = section.caption;
-            if (section.caption_link && section.caption_link.url && section.caption_link.label) {
-                caption.appendChild(document.createTextNode(' '));
-                var captionLink = document.createElement('a');
-                captionLink.href = section.caption_link.url;
-                captionLink.target = '_blank';
-                captionLink.rel = 'noopener noreferrer';
-                captionLink.textContent = section.caption_link.label;
-                caption.appendChild(captionLink);
-            }
             wrapper.appendChild(caption);
         }
         if (section.table) {
@@ -535,11 +463,6 @@
         }
         if (section.id === 'scatter' && section.scatter_variants) {
             renderScatterControls(wrapper, section, prefix);
-        } else if (section.id === 'trend' && section.metric_options) {
-            section.charts.forEach(function (chart) {
-                renderChart(wrapper, chart, prefix);
-            });
-            renderTrendControls(wrapper, section, prefix);
         } else if (section.charts) {
             section.charts.forEach(function (chart) {
                 renderChart(wrapper, chart, prefix);
@@ -568,16 +491,14 @@
         wrapper.appendChild(heading);
 
         var caption = document.createElement('p');
-        caption.textContent = 'The question as students see it, the correct answer for ' +
-            'each part, and — for students who didn’t get full credit on their best ' +
-            'attempt — what they actually submitted.';
-        caption.textContent = 'Inspect the question, expected answer, and common response patterns to understand where students had difficulty.';
+        caption.textContent = 'Inspect the question, expected answer, and common response ' +
+            'patterns to understand where students had difficulty.';
         wrapper.appendChild(caption);
 
         var selectId = prefix + '-question-select-' + (questionBlockCounter++);
         var label = document.createElement('label');
         label.setAttribute('for', selectId);
-        label.textContent = 'Select question: ';
+        label.textContent = 'Select Question: ';
         label.style.fontWeight = '600';
         label.style.marginRight = '0.5rem';
         wrapper.appendChild(label);
@@ -609,30 +530,55 @@
 
             var versions = detail.versions || [];
             versions.forEach(function (version) {
+                // Each version gets its own bordered card so a question with
+                // several randomized variants doesn't read as one continuous
+                // block — the version boundary is the thing a reader most
+                // needs to spot at a glance here.
+                var versionBox = document.createElement('div');
+                versionBox.className = 'qa-version-box';
+                versionBox.style.border = '1px solid #d3d9e0';
+                versionBox.style.borderRadius = '0.5rem';
+                versionBox.style.padding = '1rem 1.25rem';
+                versionBox.style.marginBottom = '1.25rem';
+                versionBox.style.backgroundColor = '#fbfcfd';
+
                 var versionHeading = document.createElement('h5');
                 versionHeading.textContent = version.label;
-                block.appendChild(versionHeading);
+                versionHeading.style.marginTop = '0';
+                versionBox.appendChild(versionHeading);
 
+                // Each heading/content pair gets a consistent gap above (from
+                // whatever came before) and below (from its own content) —
+                // previously these sat with no explicit spacing at all, so a
+                // heading landed flush against the content right above it.
                 var qHeading = document.createElement('h6');
-                qHeading.textContent = 'Question text';
-                block.appendChild(qHeading);
+                qHeading.textContent = 'Question Text';
+                qHeading.style.marginTop = '1.1rem';
+                qHeading.style.marginBottom = '0.4rem';
+                versionBox.appendChild(qHeading);
                 var qText = document.createElement('div');
                 qText.innerHTML = version.question_text_html || '';
-                block.appendChild(qText);
+                qText.style.marginBottom = '0.5rem';
+                versionBox.appendChild(qText);
 
                 var aHeading = document.createElement('h6');
-                aHeading.textContent = 'Expected answer';
-                block.appendChild(aHeading);
+                aHeading.textContent = 'Expected Answer';
+                aHeading.style.marginTop = '1.1rem';
+                aHeading.style.marginBottom = '0.4rem';
+                versionBox.appendChild(aHeading);
                 var aText = document.createElement('div');
                 aText.innerHTML = version.right_answer_html || '';
-                block.appendChild(aText);
+                aText.style.marginBottom = '0.5rem';
+                versionBox.appendChild(aText);
 
                 var dHeading = document.createElement('h6');
-                dHeading.textContent = 'Most common incorrect responses';
-                block.appendChild(dHeading);
+                dHeading.textContent = 'Most Common Incorrect Responses';
+                dHeading.style.marginTop = '1.1rem';
+                dHeading.style.marginBottom = '0.5rem';
+                versionBox.appendChild(dHeading);
                 var common = version.common_responses || [];
                 if (common.length) {
-                    renderDataTable(block, {
+                    renderDataTable(versionBox, {
                         columns: ['Response', 'Students'],
                         rows: common.map(function (item) {
                             return [item.response, item.students];
@@ -641,7 +587,7 @@
                 } else {
                     var noCommon = document.createElement('p');
                     noCommon.textContent = 'No incorrect response patterns were found.';
-                    block.appendChild(noCommon);
+                    versionBox.appendChild(noCommon);
                 }
 
                 if (version.review_url) {
@@ -651,9 +597,12 @@
                     versionLink.rel = 'noopener noreferrer';
                     versionLink.textContent = 'Review an example attempt in Moodle ↗';
                     versionLink.style.display = 'inline-block';
-                    versionLink.style.marginBottom = '1rem';
-                    block.appendChild(versionLink);
+                    versionLink.style.marginTop = '1rem';
+                    versionLink.style.marginBottom = '0';
+                    versionBox.appendChild(versionLink);
                 }
+
+                block.appendChild(versionBox);
             });
 
             blocksRoot.appendChild(block);
@@ -782,6 +731,9 @@
             return;
         }
 
+        // Question Analytics results carry a Moodle-native snapshot instead
+        // of the generic key/value summary table every other view (course-
+        // wide, Solution Process) still uses.
         if (result.snapshot) {
             renderQuizSnapshot(summaryRoot, result.snapshot);
         } else {
@@ -791,7 +743,7 @@
 
         if (sectionsRoot && Array.isArray(result.sections)) {
             // The per-question drill-down follows the response overview,
-            // matching the selected-question workflow on this page.
+            // matching this simplified page's own reduced section list.
             result.sections.forEach(function (section) {
                 renderSection(sectionsRoot, section, prefix);
                 if (section.id === 'question-response-overview') {

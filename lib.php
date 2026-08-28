@@ -15,45 +15,41 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Course-level navigation hook for local_quizanalytics.
+ * Library functions for local_quizanalytics.
  *
  * HOW THIS GETS THE "Analytics" TAB ONTO THE SECONDARY NAV BAR
  * -------------------------------------------------------------
- * This was verified against the actual Moodle core source checked out for
- * this build (branch 503 / 5.3dev), not guessed:
+ * Confirmed against a real Moodle 4.5 core checkout while building the two
+ * source plugins this merges (both used this exact mechanism):
  *
- *   1. public/lib/classes/navigation/settings_navigation.php, around
- *      "Let plugins hook into course navigation", calls
+ *   1. public/lib/classes/navigation/settings_navigation.php calls
  *      get_plugins_with_function('extend_navigation_course', 'lib.php') for
- *      every installed plugin (local_ plugins are not excluded — only
- *      'report' and 'gradepenalty' are skipped there because they're wired
- *      up separately). That means a lib.php function named exactly
- *      local_quizanalytics_extend_navigation_course($navigation, $course,
- *      $context) gets called automatically with $navigation set to the
- *      course's "courseadmin" node — no separate registration step needed.
+ *      every installed plugin, so a lib.php function named exactly
+ *      local_quizanalytics_extend_navigation_course($navigation,
+ *      $course, $context) gets called automatically with $navigation set to
+ *      the course's "courseadmin" node.
  *
  *   2. public/lib/classes/navigation/views/secondary.php::load_course_navigation()
- *      then walks that same courseadmin node's children. Any child key NOT
- *      in its "expected" list (the built-in course-admin nodes) gets
- *      promoted into the top-level secondary nav bar (the
- *      Course | Settings | Participants | Grades | Reports | More strip) —
- *      or into the "More" overflow if the bar is already at its 5-node
- *      display cap. Since our node key ('quizanalyticscourse') isn't one of
- *      Moodle's built-in ones, this happens automatically too.
+ *      then promotes any child key not in core's "expected" list onto the
+ *      course's secondary nav bar (or its "More" overflow) automatically.
  *
- * This is the *older*-style callback the task description called out as the
- * one to verify rather than guess — confirmed still fully active in this
- * checkout (not deprecated, not migrated to the newer
- * \core\hook\navigation\secondary_extend hook, which core dispatches but no
- * core plugin currently listens to).
+ * ONE nav entry, not several — this merge's whole point is that a teacher
+ * sees a single "Analytics" tab, landing on the Quiz Analytics section
+ * (index.php), with the "Section:" selector at the top of every page one
+ * click away from every other section
+ * (classes/section_selector.php::SECTION_PAGES).
  *
  * @package local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die();
+
 /**
- * Adds an "Analytics" link to a course's own administration navigation.
+ * Adds a single "Analytics" link to a course's own administration
+ * navigation, landing on the Quiz Analytics section (index.php) — the
+ * "Section:" selector on that page reaches every other section from there.
  *
  * @param navigation_node $navigation the course admin node
  * @param stdClass $course
@@ -66,12 +62,15 @@ function local_quizanalytics_extend_navigation_course($navigation, $course, $con
         return;
     }
 
-    require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
+    require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/data_fetcher.php');
 
     // The one genuinely expensive-ish check here: does this course have any
     // STACK quiz at all? Gate on it so the tab never clutters courses that
-    // have nothing for this plugin to show.
-    if (!local_quizanalytics_data_fetcher::course_has_stack_quiz($course->id)) {
+    // have nothing for either section of this plugin to show — both source
+    // plugins' own "does this course have STACK content" checks resolve to
+    // the same underlying quiz_slots-joined-to-a-STACK-question query, so
+    // one gate covers both sections.
+    if (!local_quizanalytics_quiz_data_fetcher::course_has_stack_quiz($course->id)) {
         return;
     }
 
@@ -88,32 +87,25 @@ function local_quizanalytics_extend_navigation_course($navigation, $course, $con
 
 /**
  * Adds an "Analytics" link to a STACK quiz's own settings/administration
- * menu, jumping straight to this plugin's course-level page pre-scoped to
- * that quiz (index.php?id=<courseid>&quizid=<quizid>) — the same page and
- * URL a teacher would reach by picking that quiz from the course-level
- * quiz selector, just one click closer from the quiz itself. Since a local
- * plugin can't add a tab to the quiz results page's own Grades/Responses/
- * Statistics strip (that strip is built exclusively from mod_quiz report
- * subplugins), this is the closest equivalent: a link on the quiz page.
+ * menu, jumping straight to the Question Analytics page pre-scoped to that
+ * quiz (questionanalytics.php?id=<courseid>&quizid=<quizid>) — ported from
+ * the original local_quizanalytics, which had this; the other source
+ * plugin, local_stackanalytics, never did (Model 2/Diagnostics are
+ * course-wide with an in-page quiz filter, not naturally reached from a
+ * single quiz's own menu).
  *
  * Called by core for every settings-navigation build, at every context
- * level (see lib/navigationlib.php's load_local_plugin_settings(), which
- * calls every local_*_extend_settings_navigation() unconditionally) — so
- * this returns immediately for anything that isn't a quiz's own page.
+ * level (lib/navigationlib.php's load_local_plugin_settings() calls every
+ * local_*_extend_settings_navigation() unconditionally) — so this returns
+ * immediately for anything that isn't a quiz's own page.
  *
  * The link is added as a child of the 'modulesettings' node specifically
  * (found via $settingsnav->find(), the same lookup mod_quiz's own
- * secondary-nav view — mod_quiz\navigation\views\secondary::
- * load_module_navigation() — uses to decide what belongs in the quiz
- * page's "More" dropdown), not appended to $settingsnav directly. A plain
- * $settingsnav->add() attaches the node as a top-level sibling of
- * 'modulesettings' instead of a child of it, which mod_quiz's dropdown-
- * building code never looks at — the link would exist in the tree
- * somewhere, just nowhere a teacher would ever see it. Confirmed against
- * this exact quiz page's real "More" dropdown, which is where core's own
- * load_module_settings() (lib/navigationlib.php) builds 'modulesettings'
- * — and does so before load_local_plugin_settings() runs, so it's always
- * available to find() by the time this function fires.
+ * secondary-nav view uses to decide what belongs in the quiz page's "More"
+ * dropdown), not appended to $settingsnav directly — a plain
+ * $settingsnav->add() would attach it as a top-level sibling of
+ * 'modulesettings' instead, which mod_quiz's dropdown-building code never
+ * looks at.
  *
  * @param \settings_navigation $settingsnav
  * @param \context $context the current page's context
@@ -135,12 +127,12 @@ function local_quizanalytics_extend_settings_navigation($settingsnav, $context) 
         return;
     }
 
-    require_once($CFG->dirroot . '/local/quizanalytics/classes/data_fetcher.php');
-    if (!local_quizanalytics_data_fetcher::quiz_has_stack_question($cm->instance)) {
+    require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/data_fetcher.php');
+    if (!local_quizanalytics_quiz_data_fetcher::quiz_has_stack_question($cm->instance)) {
         return;
     }
 
-    $url = new moodle_url('/local/quizanalytics/index.php', [
+    $url = new moodle_url('/local/quizanalytics/questionanalytics.php', [
         'id'     => $cm->course,
         'quizid' => $cm->instance,
     ]);

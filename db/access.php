@@ -17,11 +17,12 @@
 /**
  * Capabilities for local_quizanalytics.
  *
- * Checked at CONTEXT_COURSE rather than CONTEXT_MODULE — the course-level
- * "Analytics" page can show data from every STACK quiz in the course at
- * once, and the per-quiz link this plugin adds to a quiz's own settings menu
- * (see lib.php) checks this same capability against that quiz's enclosing
- * course context.
+ * One capability for the whole merged plugin — both source plugins
+ * (local_quizanalytics's own local/quizanalytics:view, local_stackanalytics's
+ * own local/stackanalytics:view) gated the exact same content class
+ * (individual students' response/grade/behavioral data across a whole
+ * course) to the exact same archetypes, so merging them into one check is a
+ * like-for-like simplification, not a scope change.
  *
  * @package    local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
@@ -33,7 +34,8 @@ defined('MOODLE_INTERNAL') || die();
 $capabilities = [
 
     'local/quizanalytics:view' => [
-        'riskbitmask'  => RISK_PERSONAL, // Shows individual students' response data across the whole course.
+        'riskbitmask'  => RISK_PERSONAL, // Shows individual students' response data, grades, and
+                                          // behavioral indicators across the whole course.
         'captype'      => 'read',
         'contextlevel' => CONTEXT_COURSE,
         'archetypes'   => [
@@ -41,7 +43,7 @@ $capabilities = [
             'teacher'        => CAP_ALLOW,
             'manager'        => CAP_ALLOW,
             // Deliberately NOT granted to 'student' — this exposes other
-            // students' response text and grades across every quiz in the course.
+            // students' response text, grades, and predicted-risk data.
         ],
     ],
 

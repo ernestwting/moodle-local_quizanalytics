@@ -3,7 +3,7 @@
   <library>
     <location>js/vendor/plotly.min.js</location>
     <name>Plotly.js</name>
-    <description>Renders every chart in this plugin family (Question Analytics, Solution Process Visualization, and the course-wide Analytics page) — vendored locally rather than loaded from a CDN so no student response data or chart content ever leaves the Moodle server's own network.</description>
+    <description>Renders every chart in this plugin's Quiz Analytics section (Question Analytics, Solution Process Visualization, and the course-wide Analytics page) — vendored locally rather than loaded from a CDN so no student response data or chart content ever leaves the Moodle server's own network.</description>
     <version>2.32.0</version>
     <license>MIT</license>
     <licenseversion>MIT</licenseversion>
@@ -27,9 +27,9 @@
     <upgradable>true</upgradable>
   </library>
   <library>
-    <location>classes/vendor/tcpdf/*</location>
+    <location>classes/quiz/vendor/tcpdf/*</location>
     <name>TCPDF</name>
-    <description>Generates the "Generate PDF Report" downloads (Question Analytics, Solution Process Visualization, Quiz Analysis) server-side in pure PHP — no external binaries or services needed. Vendored as a trimmed copy of the classic 6.x release (core Helvetica + DejaVu Sans fonts only, barcode modules and other font families removed) rather than the 7.x line, which is a deprecated Composer-only facade requiring PHP 8.2+ and a separate tc-lib-pdf package graph incompatible with this plugin's no-Composer, vendor-locally convention.</description>
+    <description>Generates the Quiz Analytics section's "Generate PDF Report" downloads (Question Analytics, Solution Process Visualization, Quiz Analysis) server-side in pure PHP — no external binaries or services needed. Vendored as a trimmed copy of the classic 6.x release (core Helvetica + DejaVu Sans fonts only, barcode modules and other font families removed) rather than the 7.x line, which is a deprecated Composer-only facade requiring PHP 8.2+ and a separate tc-lib-pdf package graph incompatible with this plugin's no-Composer, vendor-locally convention. The Model Analytics section's own PDF export uses Moodle core's own bundled TCPDF (lib/pdflib.php) instead, so nothing there is vendored.</description>
     <version>6.11.3</version>
     <license>LGPLv3</license>
     <licenseversion>3</licenseversion>
