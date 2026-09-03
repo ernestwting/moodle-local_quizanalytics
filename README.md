@@ -1,10 +1,6 @@
 # STACK q-type Analytics for Moodle
 
-[![Moodle Plugin CI](https://github.com/ernestwting/moodle-local_stackanalytics/actions/workflows/moodle-ci.yml/badge.svg)](https://github.com/ernestwting/moodle-local_stackanalytics/actions/workflows/moodle-ci.yml)
-<!-- Repo is still named moodle-local_stackanalytics on GitHub even though the plugin's own
-     frankenstyle component is now local_quizanalytics (see CHANGELOG.md) — moodle-local_quizanalytics
-     is already taken by the original, separate standalone plugin this one replaces the listing of,
-     so this repo can't be renamed to match without first resolving that collision. -->
+[![Moodle Plugin CI](https://github.com/ernestwting/moodle-local_quizanalytics/actions/workflows/moodle-ci.yml/badge.svg)](https://github.com/ernestwting/moodle-local_quizanalytics/actions/workflows/moodle-ci.yml)
 
 One installable Moodle plugin covering four sections of analytics for STACK
 (Maxima CAS) quizzes, in two families: course-wide/per-quiz STACK response
@@ -163,6 +159,17 @@ still work, just without a direct benchmark backing it.
 
 See [INSTALL.md](INSTALL.md) for the full step-by-step setup. See
 [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## Documentation
+
+Full instructor/administrator documentation lives in
+[`docs/guide/`](docs/guide/index.md) — start at
+[Getting Started](docs/guide/getting-started.md) if you're new, or go
+straight to [How Everything Is Calculated](docs/guide/calculations.md)
+for the exact formula and data source behind every statistic, indicator,
+and model this plugin produces. [Privacy & Security](docs/guide/privacy-and-security.md)
+covers what data this plugin touches and why none of it can leave the
+server.
 
 ## Reference
 

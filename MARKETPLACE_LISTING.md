@@ -201,30 +201,20 @@ if not.
 
 ## Repository
 
-https://github.com/ernestwting/moodle-local_stackanalytics
-
-<!-- TODO before submitting: this repo is currently named
-     moodle-local_stackanalytics on GitHub (renamed once already this
-     session), but the plugin's frankenstyle component is now
-     local_quizanalytics (see CHANGELOG.md's rename entries) — they no
-     longer match. Renaming the repo again to moodle-local_quizanalytics
-     is blocked: that name is already taken by the original, separate
-     standalone local_quizanalytics plugin's own repo
-     (~/Desktop/moodle-local_quizanalytics on this machine). Resolve that
-     collision first (e.g. archive/rename the old standalone repo, since
-     this plugin replaces its Marketplace listing anyway) before renaming
-     this one to match and updating this URL and the two below. -->
+https://github.com/ernestwting/moodle-local_quizanalytics
 
 ## Issue tracker
 
-https://github.com/ernestwting/moodle-local_stackanalytics/issues
+https://github.com/ernestwting/moodle-local_quizanalytics/issues
 
 (Required field — confirm GitHub Issues is enabled for the repo:
 Settings → General → Features → Issues, on github.com.)
 
 ## Documentation
 
-https://github.com/ernestwting/moodle-local_stackanalytics#readme
+https://github.com/ernestwting/moodle-local_quizanalytics#readme —
+full instructor/administrator documentation:
+https://github.com/ernestwting/moodle-local_quizanalytics/tree/main/docs/guide
 
 ## License
 
