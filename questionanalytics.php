@@ -122,8 +122,14 @@ $selectedquiz = $stackquizzes[$quizid];
 // Visualization here. Question Analytics is currently the only
 // teacher-facing individual-quiz workflow — the previous Solution Process
 // view remains in the codebase below (for possible redesign) but is
-// intentionally not exposed via a selector any more.
-$view = 'question';
+// intentionally not exposed via a selector any more. Still read from
+// ?view= (defaulting to 'question') rather than hardcoded, so it stays
+// reachable by direct URL as documented in README.md/this file's own
+// docblock — only the on-screen <select> is gone, not the URL param.
+$view = optional_param('view', 'question', PARAM_ALPHA);
+if ($view !== 'question' && $view !== 'solutionprocess') {
+    $view = 'question';
+}
 $PAGE->url->param('view', $view);
 
 $colorblind = sections_output_helper::resolve_colorblind_mode();
