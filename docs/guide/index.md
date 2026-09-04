@@ -33,6 +33,8 @@ authors — with **nothing ever leaving the Moodle server it runs on**.
 | [How Everything Is Calculated](calculations.md) | Every statistic, indicator, and model — the exact formula, data source, and any approximation behind it. |
 | [Privacy & Security](privacy-and-security.md) | What data this plugin touches, who can see it, and why none of it can leave the server. |
 | [Architecture & Design](architecture.md) | How the codebase fits together, and the deeper design-rationale documents behind the two prediction models. |
+| [Glossary](glossary.md) | Short definitions of every plugin- and Analytics-API-specific term used across this guide. |
+| [References](references.md) | Citations behind Solution Process Visualization and tree-edit-distance, plus acknowledgements. |
 
 ## The four sections
 
@@ -44,3 +46,16 @@ authors — with **nothing ever leaving the Moodle server it runs on**.
 | **Diagnostics Analytics** | Seed-bias and PRT branch-coverage reports for question authors — statistical checks, not predictions. Currently reached by direct link only; see [Instructor Guide](instructor-guide.md#diagnostics-analytics). |
 
 New here? Start with [Getting Started](getting-started.md).
+
+## Published site
+
+This Markdown guide is the source of truth for this plugin's
+documentation — edit it here first. A styled, browsable version is
+published automatically at
+[ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io](https://ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io/),
+built from [`moodle-local_quizanalytics_documentation.github.io`](https://github.com/ernestwting/moodle-local_quizanalytics_documentation.github.io).
+A scheduled GitHub Action in that repo pulls this folder's Markdown every
+few hours (or on manual trigger), converts it, and republishes the site —
+see that repo's own `CLAUDE.md`/`README.md` for exactly how. Nothing needs
+to be done here to publish an edit beyond committing it to `main`; the
+site catches up on its own within a few hours.

@@ -169,7 +169,8 @@ straight to [How Everything Is Calculated](docs/guide/calculations.md)
 for the exact formula and data source behind every statistic, indicator,
 and model this plugin produces. [Privacy & Security](docs/guide/privacy-and-security.md)
 covers what data this plugin touches and why none of it can leave the
-server.
+server. A polished, published version of the same documentation is also
+available at [ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io](https://ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io/).
 
 ## Reference
 

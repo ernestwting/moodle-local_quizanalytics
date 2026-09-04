@@ -57,7 +57,11 @@ terminal result (`<prtname>: ! ` for a syntax error, or `<prtname>: # =
 
 **Score for a question with `M` parts** = the mean of each part's PRT
 fraction, treating a missing/null PRT part as `0` credit — not excluded
-from the average.
+from the average:
+
+$$
+\text{score} = \frac{1}{M}\sum_{i=1}^{M}\text{fraction}_i
+$$
 
 **Only `correct`/`incorrect` responses count as "graded"** for facility,
 percent-correct, and average-score calculations everywhere in this
@@ -82,19 +86,36 @@ Nearly every Quiz/Question Analytics calculation uses one of two
 ### Course-wide Quiz Analytics
 
 - **Summary of Quiz Stats** — per quiz: student count, mean grade,
-  sample variance of grade (÷ by `n-1`), mean of each student's own best
-  grade, attempt count, and mean attempts-per-student.
+  sample variance of grade (÷ by `n-1`, since this is a sample of
+  students, not a full population), mean of each student's own best
+  grade, attempt count, and mean attempts-per-student:
+
+  $$
+  s^2 = \frac{1}{n-1}\sum_{i=1}^{n}(x_i-\bar{x})^2
+  $$
 - **Quiz Grade Distribution (boxplot)** — one box per quiz over all grades,
   with a marker overlay at each quiz's mean.
 - **Attempts vs. Grades (scatter)** — one point per student per quiz,
   plotted against whichever grade type you pick (Average / Highest /
-  Minimum). The **displayed marker position is jittered** — see
+  Minimum). The reported correlation is the standard Pearson coefficient:
+
+  $$
+  r = \frac{\sum(x_i-\bar{x})(y_i-\bar{y})}{\sqrt{\sum(x_i-\bar{x})^2\sum(y_i-\bar{y})^2}}
+  $$
+
+  The **displayed marker position is jittered** — see
   [§ Hidden / not shown on screen today](#the-scatter-plots-jitter) — but
   the reported Pearson correlation coefficient always uses the true,
   unjittered values.
 - **Engagement Over Time** — a Gaussian kernel-density estimate of attempt
   start dates per quiz, using Scott's rule for bandwidth (the same default
-  `scipy`/seaborn use). Omitted entirely if any quiz is missing timestamps
+  `scipy`/seaborn use):
+
+  $$
+  h = n^{-1/(d+4)}\,\sigma \qquad (d = 1 \text{ for a single time dimension})
+  $$
+
+  Omitted entirely if any quiz is missing timestamps
   or has fewer than 2 distinct dates.
 - **Line Graph of Various Metrics** — the same course-wide metrics as the
   stats table, plotted as a trend line across quizzes in **chronological
@@ -122,9 +143,13 @@ Nearly every Quiz/Question Analytics calculation uses one of two
   on this simplified page — see [below](#hidden--not-shown-on-screen-today)) —
   the classic Kelley 27% top/bottom-group method: students are ranked by
   grade, the top and bottom 27% (`round(0.27 × n)`, minimum 1 student each)
-  form two cohorts, and discrimination = (fraction of top-cohort full-credit
-  responses) − (fraction of bottom-cohort full-credit responses) on each
-  question. Difficulty index and facility are computed over graded Pool B
+  form two cohorts:
+
+  $$
+  \text{discrimination} = (\text{top cohort fraction at full credit}) - (\text{bottom cohort fraction at full credit})
+  $$
+
+  Difficulty index and facility are computed over graded Pool B
   responses only.
 
 ### Solution Process Visualization
@@ -188,6 +213,19 @@ sentence:
 | **Help-seeking gap** | Whether this student seeks help after a wrong answer as often as classmates | For each STACK failure, checks whether a forum/glossary/resource/page/URL/book access happened within a lookback window (default 1 hour, admin-configurable). Student's own rate compared to the course-wide baseline rate. |
 | **Feedback revision distance** | Whether an answer meaningfully changes after feedback | Normalized Levenshtein edit distance between consecutive tries at the same input, averaged and rescaled — heavily revised (good) vs. barely changed (watch-worthy). |
 
+The z-score behind response-latency anomaly:
+
+$$
+z = \frac{\Delta t_{\text{student}} - \mu_{\text{cohort}}}{\sigma_{\text{cohort}}}
+$$
+
+The entropy term behind disengagement, Shannon entropy over binned
+inter-attempt intervals:
+
+$$
+H = -\sum_i p_i \log_2 p_i
+$$
+
 **Explicit ethics note carried in the code itself:** response-latency
 anomaly is described as "a correlational flag only, never evidence of
 misconduct on its own" — worth repeating here directly, not just in the
@@ -216,6 +254,12 @@ other.**
 | **Unreached PRT branches** | How much of the question's marking logic has never fired | For every PRT branch (a node's true/false answer-note), checks whether that answer-note text appears as a substring in any attempt's response summary. Ratio of never-matched branches. Branches with a blank answer-note can't be observed this way and are excluded — a known data-model limitation. |
 | **Feedback ineffectiveness** | Whether students improve after a wrong try, more than a fresh baseline | Log-odds of (improve rate on a next quiz attempt after a wrong one) vs. (first-attempt pass rate baseline), clipped to ±3, scaled to [-1,1]. See [caveat below](#documented-simplifications) — this is measured across a student's *repeated quiz attempts*, not within-attempt retries. |
 
+The difficulty logit transform:
+
+$$
+\text{logit}(p) = \ln\!\left(\frac{p}{1-p}\right) \xrightarrow{\text{clip to } [-3,3]} \xrightarrow{\text{scale}} [-1,1]
+$$
+
 ### Documented simplifications
 
 Two indicators are explicit, intentional simplifications of a more
@@ -225,9 +269,14 @@ or per question) has no hook for the batch step the fuller version needs:
 
 - **Question difficulty** uses a classical-test-theory pass-rate-to-logit
   proxy instead of a full 2-parameter logistic IRT model
-  (`P(correct|θ) = c + (1−c)/(1+e^{-a(θ−b)})` jointly fit across every
-  student's ability and every question's difficulty/discrimination at
-  once) — that joint fit needs a batch calibration pass across the whole
+  jointly fit across every student's ability and every question's
+  difficulty/discrimination at once:
+
+  $$
+  P(\text{correct} \mid \theta) = c + \frac{1-c}{1+e^{-a(\theta-b)}}
+  $$
+
+  That joint fit needs a batch calibration pass across the whole
   item bank, which nothing in the Analytics API's `calculate_sample()`
   contract provides a hook for.
 - **Feedback ineffectiveness** was originally designed to compare
@@ -261,7 +310,11 @@ assigned that attempt (STACK's mechanism for randomizing a question's
 numbers while keeping its structure). Reports:
 
 - **η² (eta-squared)** — the share of total score variance attributable
-  to which seed a student got, `SS_between / SS_total`.
+  to which seed a student got:
+
+  $$
+  \eta^2 = \frac{SS_{\text{between}}}{SS_{\text{total}}}
+  $$
 - **Effect-size magnitude** — Cohen's conventional bands: `< 0.01`
   negligible, `< 0.06` small, `< 0.14` medium, else large.
 

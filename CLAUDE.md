@@ -32,7 +32,16 @@ work, not as a separate follow-up someone has to remember to ask for:
 - [`docs/guide/`](docs/guide/index.md) — if instructor-facing behavior,
   installation steps, or a calculation/formula changed. See
   `docs/guide/calculations.md` in particular for anything touching how a
-  statistic, indicator, or model is computed.
+  statistic, indicator, or model is computed. **This folder is the source
+  of truth for the published documentation site** (see
+  `docs/guide/index.md`'s own "Published site" section) — a scheduled
+  GitHub Action in the
+  [`moodle-local_quizanalytics_documentation.github.io`](https://github.com/ernestwting/moodle-local_quizanalytics_documentation.github.io)
+  repo pulls this folder's Markdown automatically every few hours and
+  republishes it, so an edit here reaches the live site on its own once
+  it's committed to `main` — no separate step needed in that other repo.
+  Keep math formulas in real `$$...$$`/`$...$` LaTeX (not just prose),
+  since that's what carries through the sync to render on the site.
 
 **Do not** touch these for a small, self-contained bug fix (wrong string,
 off-by-one, a fixed regression back to already-documented behavior) —
