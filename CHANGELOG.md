@@ -14,6 +14,49 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.3] — Fixed misclassified/garbled analytics for non-"ans"-prefixed STACK inputs
+
+- **Fixed a real, confirmed bug**: every regex in this plugin that parses a
+  STACK input field out of a raw response/right-answer summary (`parser.php`'s
+  `parse_response_cell()`, `latex_utils.php`'s `extract_stack_answer_latex()`,
+  `solution_distance.php`'s TED-distance expression matcher, and
+  `prt_analysis.php`'s ans-field exclusion check) required the field's name to
+  literally start with `ans`. A prior fix (see the `parser_named_ans_test.php`
+  history) widened that to tolerate an arbitrary suffix after `ans`
+  (`ans_mcq`, `ans_1fx`, bare `ans`), but a STACK author can rename an input
+  to something with **no `ans` in it at all** — e.g. `R`. Reported live as
+  `Seed: 1585855368; R: 3*x^2 [score]; Result: # = 1 | ATDiff_true. |
+  Result-0-T` rendering as that raw, unparsed dump instead of a clean result
+  in Question Analytics.
+  - **Question Analytics rendering a raw response dump instead of a parsed
+    result**: with the input's `ans` entry never matching, `ans_list` came
+    back empty, so `parser.php` misclassified a genuinely-answered (and
+    correctly graded) response as `'blank'`. `latex_utils.php`'s
+    `extract_stack_answer_latex()` hit the same "must start with ans" gap on
+    the *display* side and fell back to lightly-cleaned raw text — the
+    `Seed: ...; ...` dump the user saw — instead of extracting and rendering
+    the actual answer expression as LaTeX.
+  - **Question Review's "Common Incorrect Responses" only showing some
+    students' answers**: the same misclassification made
+    `question_details.php`'s per-version wrong-response list substitute a
+    generic "(No response)" placeholder for any misclassified-as-blank
+    response with a real submitted answer, so multiple students' genuinely
+    different wrong answers all collapsed into one shared placeholder bucket
+    instead of showing as their own distinct entries — reading as though most
+    students' responses were missing from the version's breakdown.
+  - Every occurrence of this regex was generalized to match by **value
+    shape** (`<name>: <expression> [score|valid|invalid]`) rather than any
+    literal name prefix, with the expression capture constrained to
+    `[^;]*?` so it can't lazily span across an earlier field's own semicolon
+    boundary (e.g. the leading `Seed: ...;`) to reach a later field's
+    `[tag]` instead of failing its own match.
+  - `ans_list`'s `'index'` field (previously the digit suffix after `ans`,
+    or `null`) is now assigned by **order of appearance** — the same scheme
+    `prt_list` already used — since a field's name is no longer guaranteed
+    to carry a meaningful digit at all. `solution_distance.php`'s TED-distance
+    part-matching was updated to match on this same order-of-appearance
+    basis.
+
 ## [3.0.2] — Disabled parallel cache-warming: could silently crash the entire Moodle cron process
 
 - **Fixed a real, confirmed-in-production bug**: `parallel_course_fetcher`'s

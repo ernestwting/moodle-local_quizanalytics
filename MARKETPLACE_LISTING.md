@@ -85,6 +85,22 @@ Moodle server.
 
 Requires `qtype_stack` (the STACK question type) to have anything to show.
 
+## Release notes (v3.0.3)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Bug fix: a STACK question whose input is renamed to something with no "ans"
+in it at all (e.g. "R" instead of "ans1") could show up in Question
+Analytics as a raw, unparsed response dump instead of a clean rendered
+result, and in Question Review's "Common Incorrect Responses" list, several
+different students' genuinely different wrong answers could collapse into
+one shared "(No response)" placeholder instead of showing individually. Both
+traced to the same root cause — several regexes across the plugin required a
+literal "ans" name prefix to recognize an input field — now fixed by
+matching on value shape instead of name. See CHANGELOG.md's `[3.0.3]` entry
+for the full technical account.
+
 ## Release notes (v3.0.2)
 
 Copy-paste source for the "Plugin versions" tab (Edit plugin page →

@@ -23,11 +23,16 @@ defined('MOODLE_INTERNAL') || die();
 
 /**
  * Regression coverage for STACK questions whose inputs are renamed away from
- * the default "ans1"/"ans2" convention (e.g. "ans_mcq", "ans_1fx") — a
- * multi-part ODE question observed live misclassified every such response
- * as "blank" (parser.php's ans-field regex required a numeric suffix) and
- * leaked the "ans_*" fields into the PRT breakdown as fake zero-scoring
- * PRTs (prt_analysis.php's exclusion regex had the same numeric-only gap).
+ * the default "ans1"/"ans2" convention — anything from "ans_mcq"/"ans_1fx"
+ * (still "ans"-prefixed) to a name with no "ans" in it at all, like "R". A
+ * multi-part ODE question observed live misclassified every "ans_*"-style
+ * response as "blank" (parser.php's ans-field regex required a numeric
+ * suffix) and leaked the "ans_*" fields into the PRT breakdown as fake
+ * zero-scoring PRTs (prt_analysis.php's exclusion regex had the same
+ * numeric-only gap). A later report showed the same misclassification for a
+ * non-"ans"-prefixed input name ("R: 3*x^2 [score]"), which the first fix
+ * (requiring an "ans" prefix, just with a looser suffix) still didn't cover
+ * — the regex now matches by value shape alone, with no name requirement.
  *
  * @package local_quizanalytics
  * @copyright  2026 Ernest Ting <eting@caltech.edu>
@@ -44,6 +49,10 @@ final class parser_named_ans_test extends \advanced_testcase {
         . 'prt_lnyeqn: # = 0 | prt_lnyeqn-1-F; '
         . 'prt_ysol: # = 0 | prt_ysol-1-F | prt_ysol-2-F';
 
+    /** A real response cell whose single input is renamed to something with no "ans" in it at all. */
+    const NON_ANS_PREFIXED_RESPONSE = 'Seed: 1585855368; R: 3*x^2 [score]; '
+        . 'Result: # = 1 | ATDiff_true. | Result-0-T';
+
     public function test_named_ans_fields_are_parsed_not_treated_as_blank(): void {
         $parsed = parser::parse_response_cell(self::NAMED_ANS_RESPONSE);
 
@@ -52,12 +61,24 @@ final class parser_named_ans_test extends \advanced_testcase {
 
         $bymcq = array_values(array_filter($parsed['ans_list'], fn($a) => $a['expression'] === '"Separation of Variables"'));
         $this->assertNotEmpty($bymcq);
-        $this->assertNull($bymcq[0]['index'], 'A non-numeric input name has no meaningful numeric index.');
+        $this->assertSame(1, $bymcq[0]['index'], 'Index is order-of-appearance; this is the first ans field.');
     }
 
-    public function test_numeric_ans_suffix_still_gets_an_int_index(): void {
+    public function test_sequential_ans_index_matches_order_of_appearance(): void {
         $parsed = parser::parse_response_cell('ans1: x^2 [score]');
         $this->assertSame(1, $parsed['ans_list'][0]['index']);
+    }
+
+    public function test_non_ans_prefixed_input_name_is_parsed_not_treated_as_blank(): void {
+        $parsed = parser::parse_response_cell(self::NON_ANS_PREFIXED_RESPONSE);
+
+        $this->assertCount(1, $parsed['ans_list'], 'A non-"ans"-prefixed input name must still populate ans_list.');
+        $this->assertSame('3*x^2', $parsed['ans_list'][0]['expression']);
+        $this->assertSame('score', $parsed['ans_list'][0]['tag']);
+        $this->assertSame(1, $parsed['ans_list'][0]['index']);
+
+        $this->assertCount(1, $parsed['prt_list'], 'The Seed prefix and the ans field must not be misread as PRTs.');
+        $this->assertSame(1.0, $parsed['prt_list'][0]['fraction']);
     }
 
     public function test_named_ans_fields_do_not_leak_into_prt_breakdown(): void {
