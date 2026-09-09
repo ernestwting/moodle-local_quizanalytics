@@ -66,7 +66,7 @@ the plugin's own name changed twice along the way, is in
 
 ## Status
 
-**Stable** as of v3.0.1, after real-course stress testing (see
+**Stable** as of v3.0.2, after real-course stress testing (see
 [Getting Started](getting-started.md#tested-at) for the numbers) and
 several rounds of bug fixes against real production data. Both Analytics
 API models still ship **disabled** by default, and Diagnostics Analytics

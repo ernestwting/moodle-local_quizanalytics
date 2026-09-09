@@ -14,6 +14,40 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.2] — Disabled parallel cache-warming: could silently crash the entire Moodle cron process
+
+- **Fixed a real, confirmed-in-production bug**: `parallel_course_fetcher`'s
+  forked-worker cache-warming path, when it disposed and reconnected the
+  database connection after `fork()`, could leave `\core\task\manager`'s
+  own lock (acquired before this task's `execute()` ever runs, holding a
+  direct reference to the pre-fork connection object) pointing at a dead
+  connection. Its later `release()` call then failed inside a PHP shutdown
+  function — a point where nothing can catch the exception — which killed
+  the *entire* `admin/cli/cron.php` process outright, not just this one
+  task, on every course large enough to trigger it. Confirmed directly
+  against a real course (25 quizzes, 32,000+ attempts): a Quiz Analytics
+  page stuck on "generating in the background... queued for a full day"
+  turned out to be caused by cron dying on this exact crash before it ever
+  reached the queued background task — silently, on every single cron run,
+  for as long as that course stayed that large. This affected every task
+  queued after it too, not just this plugin's own.
+- Investigated reconnecting the *same* database object in place instead of
+  a new one (to keep the lock's reference valid) — rejected, since
+  Moodle's own `moodle_database::dispose()` docblock says outright "Do NOT
+  use connect() again, create a new instance if needed," and testing this
+  directly confirmed why: it trades the crash above for a different,
+  worse one (`Call to a member function is_temptable() on null`,
+  surfacing even inside core's own failure-logging path).
+- Given no safe fix was available within this session's testing,
+  **parallel cache-warming is disabled site-wide** — `parallel_course_fetcher::fetch()`
+  always takes its sequential fallback now, regardless of the "Cache-warming
+  parallel workers" setting, which is left in place (its description
+  updated to say so honestly) rather than removed, in case this is picked
+  up again later with the underlying fork-safety issue actually resolved.
+  Cache warming still runs and still warms every course, just always one
+  quiz at a time — slower on a very large course, never silently dangerous
+  to the rest of the site again.
+
 ## [3.0.1] — German, Italian, and Spanish translations
 
 - Added full `lang/de/`, `lang/it/`, and `lang/es/local_quizanalytics.php`

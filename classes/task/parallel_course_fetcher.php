@@ -65,28 +65,67 @@ require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/cache_helper.php
  */
 class parallel_course_fetcher {
     /**
-     * Fetches response records for every given quiz in $course, running up
-     * to $workers quizzes' worth of fetch work concurrently in separate
-     * forked processes when possible.
+     * DISABLED as of 2026-09-09 — forking is never actually used below,
+     * regardless of $workers; see the hardcoded `true ||` in the guard
+     * clause. Left disabled rather than removed: the parallel-worker
+     * implementation itself is still here, still correct in isolation,
+     * and this is the narrowest possible change to stop using it, should
+     * someone want to pick this back up later with the fork-safety issue
+     * below actually solved (ideally with upstream Moodle core input,
+     * since it's core's own dispose()/lock code this collides with, not
+     * anything this plugin controls).
+     *
+     * Why: every worker branch here (parent's post-fork reconnect, the
+     * fork-failure inline fallback, and the child's own reconnect) needs
+     * $DB usable again after \core\task\manager has *already* captured a
+     * reference to the pre-fork $DB object to release a lock with later —
+     * acquired outside this class entirely, before this task's own
+     * execute() ever runs, so nothing here can intercept or fix that up.
+     * Disposing that connection before fork() is independently confirmed
+     * necessary (see the dispose() call below) to stop forked children
+     * from corrupting the *parent's* connection via a shared OS socket —
+     * tested directly, including with children exiting via SIGKILL instead
+     * of a normal PHP shutdown specifically to rule that out as the cause,
+     * and the corruption happened regardless. That leaves reconnecting to
+     * a new object after fork() as the only remaining safe option
+     * (moodle_database::dispose()'s own docblock: "Do NOT use connect()
+     * again, create a new instance if needed" — confirmed directly on
+     * 2026-09-09 that ignoring this trades the symptom below for a worse
+     * one, "Call to a member function is_temptable() on null", surfacing
+     * even inside core's own failure-logging path). A new object leaves
+     * the task-manager's lock holding a permanently dead reference, so its
+     * later release() fails ("Call to a member function
+     * real_escape_string() on null") — and confirmed directly, also on
+     * 2026-09-09 against this plugin's own real data (a course with 25
+     * quizzes, 32,000+ attempts), that this failure is not merely
+     * cosmetic: it happens inside a PHP shutdown function, at a point
+     * where nothing can catch it, and kills the *entire* cron.php process
+     * outright — not just this task. Under real unattended cron, that
+     * silently starves every task queued after this one, on every course
+     * large enough to trigger it, for as long as it keeps happening —
+     * including this plugin's own on-demand background-compute adhoc task
+     * (warm_single_view_adhoc_task, which calls into this same fetch()),
+     * which is exactly what showed up as "queued and never even attempted
+     * for a full day" from a real page visit. The always-worked sequential
+     * fallback below has none of this risk — slower, not silently
+     * dangerous to the rest of the site.
      *
      * Falls back to a single-process sequential fetch (identical to what
-     * this method's forked path would produce, just slower) whenever
-     * forking isn't available or wouldn't help: no pcntl, $workers <= 1,
-     * or only one quiz to fetch. That fallback path is exactly
-     * data_fetcher.php's own get_course_response_records() — the same,
-     * already-correct, already-tested code this whole class exists to
-     * parallelize, never a reimplementation of it.
+     * the forked path would have produced, just slower). That fallback
+     * path is exactly data_fetcher.php's own get_course_response_records()
+     * — the same, already-correct, already-tested code this class exists
+     * to parallelize, never a reimplementation of it.
      *
      * @param \stdClass $course
      * @param \stdClass[] $stackquizzes quiz records to fetch, keyed by quiz id
-     * @param int $workers maximum number of concurrent forked processes
+     * @param int $workers maximum number of concurrent forked processes — currently ignored, see above
      * @return array [quiz_name => records[]]
      * @throws \Exception if any worker failed — the caller should treat
      *         that as "could not warm this course this run", not cache a
      *         partial/incomplete result.
      */
     public static function fetch(\stdClass $course, array $stackquizzes, int $workers): array {
-        if ($workers <= 1 || count($stackquizzes) <= 1 || !function_exists('pcntl_fork')) {
+        if (true || $workers <= 1 || count($stackquizzes) <= 1 || !function_exists('pcntl_fork')) {
             return \local_quizanalytics_quiz_data_fetcher::get_course_response_records($course, $stackquizzes);
         }
 
@@ -142,8 +181,20 @@ class parallel_course_fetcher {
         // later release() can fail ("Call to a member function
         // real_escape_string() on null"), which can show this task as
         // "failed" in Moodle's task log despite the actual fetch/cache work
-        // above having completed and been cached correctly. Prioritized
-        // the connection-safety fix over this one, since a corrupted
+        // above having completed and been cached correctly.
+        //
+        // Investigated reconnecting the *same* object in place instead, on
+        // 2026-09-09, specifically to keep that lock's reference valid.
+        // Rejected: moodle_database::dispose()'s own docblock says outright
+        // "Do NOT use connect() again, create a new instance if needed",
+        // and a real test against it confirmed why — dispose() nulls out
+        // $temptables/$database_manager/$tables, and reconnecting the same
+        // object doesn't reliably restore them the way connect() on a
+        // fresh instance does; it traded this task's cosmetic
+        // "failed"-with-good-data symptom for a strictly worse one
+        // ("Call to a member function is_temptable() on null", surfacing
+        // even inside core's own failure-logging path). Prioritized the
+        // connection-safety fix over the cosmetic one, since a corrupted
         // connection risks real data-fetch failures for whatever a visitor
         // or the next scheduled task does next, where this is a
         // log-accuracy issue on work that already genuinely succeeded.
@@ -406,6 +457,21 @@ class parallel_course_fetcher {
      * fork. Same driver/credentials setup_DB() itself uses
      * (lib/dmllib.php), just building a second, independent instance
      * instead of reusing the process-inherited one.
+     *
+     * Deliberately a new instance, not the same object reconnected in
+     * place — tried that (see git history around 2026-09-09), on the
+     * reasoning that it would keep \core\task\manager's own lock (acquired
+     * on the *parent's* original $DB object, before this task's execute()
+     * ever runs) pointing at a live connection instead of a dangling one.
+     * It doesn't work: moodle_database's own dispose() docblock says
+     * outright "Do NOT use connect() again, create a new instance if
+     * needed", and empirically, ignoring that produces a different, worse
+     * failure than the one it was meant to fix ("Call to a member function
+     * is_temptable() on null" — dispose() nulls out $temptables/
+     * $database_manager/$tables, and reconnecting the same object doesn't
+     * reliably restore them the way a fresh connect() on a new instance
+     * does). See the fetch() docblock for the accepted, still-present
+     * cosmetic cost of building a new instance here instead.
      */
     private static function reconnect_db(): void {
         global $CFG, $DB;

@@ -85,6 +85,23 @@ Moodle server.
 
 Requires `qtype_stack` (the STACK question type) to have anything to show.
 
+## Release notes (v3.0.2)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+Important reliability fix: the cache-warming scheduled task's parallel
+worker mode could, on a large enough course, crash Moodle's entire
+cron.php process outright — not just this task, everything queued after
+it too — due to a database-connection issue in how a forked worker pool
+reconnects after fork(). This could silently make a course's Quiz
+Analytics page get stuck showing "generating in the background" forever,
+with no error visible anywhere except deep in server-side task logs.
+Parallel cache-warming is disabled site-wide as of this release — caches
+still warm correctly, just always one quiz at a time — until the
+underlying issue can be fixed properly. See CHANGELOG.md's `[3.0.2]` entry
+for the full technical account.
+
 ## Release notes (v2.4.13)
 
 Copy-paste source for the "Plugin versions" tab (Edit plugin page →

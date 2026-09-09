@@ -68,8 +68,8 @@ hand-tune them on a normal install:
 | Setting | Default | What it does |
 |---|---|---|
 | Detected server resources | (readout) | Detected CPU cores/RAM and the cache-warming worker count calculated from them. "Re-detect and apply now" if the server's hardware changes later. |
-| Cache-warming parallel workers | auto-detected | How many worker processes the scheduled task forks to fetch several quizzes concurrently (CLI/cron only). |
-| Cache-warming worker memory limit | 2048 MB | PHP memory limit per worker. Size `workers × this` comfortably under real available RAM. |
+| Cache-warming parallel workers | auto-detected | **Currently has no effect (as of 3.0.2)** — forking was found able to crash the entire Moodle cron process on a large enough course (see `CHANGELOG.md`'s `[3.0.2]` entry for the full story); cache-warming always fetches one quiz at a time now regardless of this setting. Left in place for a possible future fix, not removed. |
+| Cache-warming worker memory limit | 2048 MB | PHP memory limit for the cache-warming fetch. |
 | On-demand background-compute time budget | 20s | If a cold-cache request is estimated to exceed this, it's handed to a background task instead of blocking. Set to `0` to always compute inline. |
 | Computation time limit | 120s | Raises PHP's own execution-time limit for the course-wide view and PDF export only — doesn't help a reverse-proxy timeout in front of your site. |
 
