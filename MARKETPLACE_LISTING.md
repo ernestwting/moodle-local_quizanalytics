@@ -247,7 +247,7 @@ Settings → General → Features → Issues, on github.com.)
 
 https://github.com/ernestwting/moodle-local_quizanalytics#readme —
 full instructor/administrator documentation:
-https://github.com/ernestwting/moodle-local_quizanalytics/tree/main/docs/guide
+https://github.com/ernestwting/moodle-local_quizanalytics/tree/main/docs
 
 ## License
 

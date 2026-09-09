@@ -24,7 +24,7 @@ vendored third-party libraries) found:
   `mail()`, in any file this plugin owns.
 - **Zero external script/asset loading.** Every JS/CSS dependency —
   Plotly.js, KaTeX, TCPDF — is vendored locally inside the plugin (see
-  [`thirdpartylibs.xml`](../../thirdpartylibs.xml)), specifically so that
+  [`thirdpartylibs.xml`](../thirdpartylibs.xml)), specifically so that
   no chart, no rendered math, and no PDF-generation step ever has to reach
   a CDN. There is no `<script src="https://...">` or `<link
   href="https://...">` pointing off-server anywhere in the codebase.

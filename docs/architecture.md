@@ -43,34 +43,18 @@ Plotly.js / KaTeX (client-side rendering) or TCPDF (server-side PDF)
 See [How Everything Is Calculated](calculations.md) for the actual math
 behind every number this produces, and
 [Privacy & Security](privacy-and-security.md) for what data this touches
-and where it stays.
-
-## Two deeper reference documents live alongside this guide
-
-- **[`moodle-stack-analytics-architecture.md`](../moodle-stack-analytics-architecture.md)**
-  — the original research/design outline for Model Analytics: for each of
-  the ~11 behaviors it detects, why it's a *target* (the thing being
-  predicted), an *indicator* (evidence feeding a prediction), or a
-  *diagnostic report* outside the ML pipeline entirely, plus the Moodle
-  Analytics API's own hard constraints (binary-only core backends,
-  indicators bounded to `[-1,1]`, supervised-only, one Target per Model)
-  that shaped those choices. §3.3 in particular covers the proxy-label
-  circularity caveat referenced throughout
-  [How Everything Is Calculated](calculations.md#model-analytics).
-- **[`plugin-naming-and-merge-history.md`](../plugin-naming-and-merge-history.md)**
-  — this plugin is the merger of two previously separate, independently
-  installed plugins (`local_quizanalytics` and `local_stackanalytics`),
-  and the merged codebase itself was renamed twice before settling on its
-  current name. This document is the condensed, narrative account of that
-  history — useful context for why some class namespaces still say
-  `stack`/`quiz` independently, or why an old commit message references a
-  component name that no longer exists. The full blow-by-blow lives in
-  [`CHANGELOG.md`](../../CHANGELOG.md).
+and where it stays. The proxy-label circularity caveat referenced
+throughout [How Everything Is Calculated](calculations.md#model-analytics)
+is documented in full there. This plugin is itself the merger of two
+previously separate, independently installed plugins
+(`local_quizanalytics` and `local_stackanalytics`) — see
+[`CHANGELOG.md`](../CHANGELOG.md) for the full history of that merge,
+including the renames along the way.
 
 ## Known, tracked gaps
 
 Documented rather than hidden — see
-[`README.md`](../../README.md#status) for the current list, currently:
+[`README.md`](../README.md#status) for the current list, currently:
 
 - Two Model Analytics indicators are documented simplifications of the
   architecture doc's literal spec — `question_difficulty_irt`'s classical-

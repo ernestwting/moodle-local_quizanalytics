@@ -56,7 +56,7 @@ against real and synthetic data, not just assumed to scale:
 - A synthetic stress test: **50 quizzes × 1,000 students** (50,000 total
   attempts).
 
-See [`CHANGELOG.md`](../../CHANGELOG.md) for the specific timings at each
+See [`CHANGELOG.md`](../CHANGELOG.md) for the specific timings at each
 scale, and [Installation](installation.md) for the sizing settings that
 make a large course practical (parallel cache-warming workers, the
 on-demand background-compute safeguard).

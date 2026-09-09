@@ -29,12 +29,12 @@ work, not as a separate follow-up someone has to remember to ask for:
 - [`MARKETPLACE_LISTING.md`](MARKETPLACE_LISTING.md) — if the long
   description, what's-included list, or a release-notes-worthy change
   happened.
-- [`docs/guide/`](docs/guide/index.md) — if instructor-facing behavior,
+- [`docs/`](docs/index.md) — if instructor-facing behavior,
   installation steps, or a calculation/formula changed. See
-  `docs/guide/calculations.md` in particular for anything touching how a
+  `docs/calculations.md` in particular for anything touching how a
   statistic, indicator, or model is computed. **This folder is the source
   of truth for the published documentation site** (see
-  `docs/guide/index.md`'s own "Published site" section) — a scheduled
+  `docs/index.md`'s own "Published site" section) — a scheduled
   GitHub Action in the
   [`moodle-local_quizanalytics_documentation.github.io`](https://github.com/ernestwting/moodle-local_quizanalytics_documentation.github.io)
   repo pulls this folder's Markdown automatically every few hours and

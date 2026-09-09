@@ -75,4 +75,4 @@ only, pending a redesign of how they're surfaced in the navigation — see
 [Instructor Guide](instructor-guide.md) for exactly where to find them
 today.
 
-Full, phase-by-phase release history: [`CHANGELOG.md`](../../CHANGELOG.md).
+Full, phase-by-phase release history: [`CHANGELOG.md`](../CHANGELOG.md).

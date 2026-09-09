@@ -9,7 +9,7 @@ internet (see [Privacy & Security](privacy-and-security.md)).
 
 For the exhaustive version of everything on this page — full rationale,
 every setting's own docblock reference, and a longer troubleshooting
-table — see [`INSTALL.md`](../../INSTALL.md) at the repo root. This page
+table — see [`INSTALL.md`](../INSTALL.md) at the repo root. This page
 is the condensed walkthrough.
 
 ## Prerequisites
@@ -126,7 +126,7 @@ disabled by default. Before enabling either:
 Benchmarked against a real 38-quiz, 48,445-attempt production course, and
 a synthetic 50 quizzes × 1,000 students dataset. See
 [Getting Started § Tested at](getting-started.md#tested-at) and
-[`CHANGELOG.md`](../../CHANGELOG.md) for the specific numbers.
+[`CHANGELOG.md`](../CHANGELOG.md) for the specific numbers.
 
 ## Troubleshooting quick-reference
 
@@ -136,9 +136,9 @@ a synthetic 50 quizzes × 1,000 students dataset. See
 | "No attempts yet" | No `state = finished` attempts for the quiz |
 | A large course's view or PDF export times out | Raise **Computation time limit** (step 3) |
 | Page 524s / times out on a large course | A reverse proxy/CDN in front of the site is giving up first, not PHP — confirm cron is actually running so the cache stays warm ahead of real visitors |
-| "Generating in the background" never resolves | Cron isn't running, or the background task crashed/is stuck retrying — check the settings page's cron-status banner, then Task logs |
+| "Generating in the background" never resolves | Cron isn't running, or the background task crashed/is stuck retrying — check the settings page's cron-status banner, then Task logs. Also check Task logs for a *different*, unrelated task failing repeatedly (seen live: a `qtype_stack` bug crashing `quiz_statistics\task\recalculate` on a large quiz) — a repeatedly-failing task elsewhere can hog every cron run and starve this plugin's own background task even though nothing here is actually broken |
 | Charts blank / JS console errors | Check for a 404 on `js/vendor/plotly.min.js` or `js/vendor/katex/*` — the plugin folder wasn't copied completely |
 | Math renders as literal `\(...\)` text | `js/vendor/katex/fonts/` didn't come along — re-copy the whole `js/vendor/katex/` folder |
 | A model's Actions menu is missing Evaluate/Get predictions | `onlycli` analytics setting is on — see step 4 |
 
-Full table, with more rows: [`INSTALL.md`](../../INSTALL.md#troubleshooting-quick-reference).
+Full table, with more rows: [`INSTALL.md`](../INSTALL.md#troubleshooting-quick-reference).

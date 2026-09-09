@@ -110,11 +110,10 @@ course's "More" menu. Each section's
 computation logic is carried over essentially unchanged from its own
 plugin (only namespaces, the capability, and the navigation/entry points
 changed to make the merge coherent) — both had already been independently
-built and verified. The design rationale for Model & Diagnostics
-Analytics's targets/indicators — why each detection is a target, an
-indicator, or a diagnostic rather than shoehorned into the ML pipeline —
-lives in
-[`docs/moodle-stack-analytics-architecture.md`](docs/moodle-stack-analytics-architecture.md).
+built and verified. See `CHANGELOG.md` for the full history of that merge,
+including the renames along the way, and
+[`docs/architecture.md`](docs/architecture.md) for how the merged codebase
+fits together today.
 
 ## Status
 
@@ -163,11 +162,11 @@ See [INSTALL.md](INSTALL.md) for the full step-by-step setup. See
 ## Documentation
 
 Full instructor/administrator documentation lives in
-[`docs/guide/`](docs/guide/index.md) — start at
-[Getting Started](docs/guide/getting-started.md) if you're new, or go
-straight to [How Everything Is Calculated](docs/guide/calculations.md)
+[`docs/`](docs/index.md) — start at
+[Getting Started](docs/getting-started.md) if you're new, or go
+straight to [How Everything Is Calculated](docs/calculations.md)
 for the exact formula and data source behind every statistic, indicator,
-and model this plugin produces. [Privacy & Security](docs/guide/privacy-and-security.md)
+and model this plugin produces. [Privacy & Security](docs/privacy-and-security.md)
 covers what data this plugin touches and why none of it can leave the
 server. A polished, published version of the same documentation is also
 available at [ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io](https://ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io/).

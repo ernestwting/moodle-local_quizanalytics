@@ -291,10 +291,6 @@ or per question) has no hook for the batch step the fuller version needs:
   Moodle only stores an attempt's *current* response summary, not a
   per-step history a per-branch test would need.
 
-Full design rationale for every target/indicator/diagnostic split — why
-each is one or the other — lives in
-[`moodle-stack-analytics-architecture.md`](../moodle-stack-analytics-architecture.md).
-
 ## Diagnostics Analytics
 
 Statistical reports, not model predictions — no ground-truth label is
@@ -356,7 +352,7 @@ undiscoverable:
   (`classes/quiz/analytics/difficulty.php`, `question_charts.php`,
   `response_analysis::compute_response_outcomes()`) are fully implemented
   and correct, but the current simplified Question Analytics page (since
-  the 3.0.0 redesign — see [`CHANGELOG.md`](../../CHANGELOG.md)) shows only
+  the 3.0.0 redesign — see [`CHANGELOG.md`](../CHANGELOG.md)) shows only
   the Question Response Overview and Question Review sections. These
   functions have no on-screen caller today; they remain available for a
   future redesign or for direct use.
