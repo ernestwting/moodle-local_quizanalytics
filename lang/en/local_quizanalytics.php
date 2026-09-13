@@ -219,6 +219,7 @@ $string['questionneedsreviewthreshold_desc'] = 'A question is labeled "needs rev
 $string['task:warmanalyticscache'] = 'Warm STACK q-type Analytics result caches';
 $string['task:warmsingleview'] = 'Warm one Quiz/Question Analytics view (on-demand background compute)';
 $string['generatinginbackground'] = 'This may take a little time to load for a large course. It\'s being computed in the background. This page checks again automatically every 20 seconds. No need to reload it yourself.';
+$string['showingstale'] = 'Showing the last completed report while a newer calculation runs in the background.';
 $string['generatingstale'] = 'This has been queued for {$a} without finishing. That is longer than any real background compute has taken on this site, so this most likely means Moodle\'s cron isn\'t running, the background task crashed or ran out of memory, or cron is stuck behind a different, unrelated task that keeps failing and retrying. Ask your Moodle administrator to check Site administration → Server → Scheduled tasks (is cron running at all?) and Site administration → Server → Tasks → Task logs — for this task having failed, but also for a completely different task failing over and over, which can hog every cron run and starve this one even though nothing here is actually broken — rather than waiting longer.';
 $string['cronstatusheading'] = 'Cron status';
 $string['cronstatuswarning'] = 'This plugin depends on Moodle cron running regularly.';
