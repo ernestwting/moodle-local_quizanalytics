@@ -120,12 +120,23 @@ class question_charts {
                 : sprintf('%.2f (%d)', (float) $row['mean_mark'], (int) $row['mean_mark_count']);
             return $row['question'] . ' (average = ' . $mean . ')';
         }, $responseoutcomes);
+        // Fixed, semantic colors — not an arbitrary qualitative palette:
+        // green/red/orange/blue read as good/bad/caution/neutral regardless
+        // of which questions happen to have which outcome, matching the
+        // same fixed roles this plugin already uses elsewhere for
+        // pass/fail (chart_helpers.php's PASS_FAIL_SCALE_DEFAULT,
+        // prt_transitions.php's DEFAULT_TRAFFIC_SCALE). Colorblind mode
+        // swaps in the Okabe-Ito palette instead of dimmer variants of the
+        // same four hues: green and red are specifically the pair a
+        // red-green colorblind viewer confuses with each other, so
+        // "correct" and "incorrect" each need a hue with no red/green in it
+        // at all there, not just a different shade of red/green.
         $definitions = [
             'incorrect' => [
                 'label' => 'Incorrect',
                 'percent' => 'incorrect_percent',
                 'count' => 'incorrect_count',
-                'color' => $colorblindmode ? '#0072B2' : '#2878b5',
+                'color' => $colorblindmode ? '#D55E00' : '#d62728',
                 'negative' => true,
             ],
             'invalid' => [
@@ -139,14 +150,14 @@ class question_charts {
                 'label' => 'No response / not evaluated',
                 'percent' => 'no_response_percent',
                 'count' => 'no_response_count',
-                'color' => $colorblindmode ? '#D55E00' : '#d62728',
+                'color' => $colorblindmode ? '#CC79A7' : '#2878b5',
                 'negative' => true,
             ],
             'correct' => [
                 'label' => 'Correct',
                 'percent' => 'correct_percent',
                 'count' => 'correct_count',
-                'color' => $colorblindmode ? '#CC79A7' : '#9467bd',
+                'color' => $colorblindmode ? '#0072B2' : '#22c55e',
                 'negative' => false,
             ],
         ];

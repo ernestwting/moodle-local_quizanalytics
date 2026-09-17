@@ -14,6 +14,110 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.4] — Course-wide quiz selection, live progress bars, and cron-independent on-demand analytics
+
+Ports jumazevick's remaining `juma_test_branch_personal` work not already
+covered by [3.0.0]/[3.0.1]/[3.0.3] (that branch's other commits were
+either merged in as those releases, or are byte-identical patches already
+applied here), plus several fixes found while integrating it.
+
+- **Course-wide quiz selection**: Quiz Analytics gained a "Quizzes to
+  Include in Analytics" panel — checkboxes grouped by course section,
+  with Select All/Clear buttons, a live "showing N of M" count, and an
+  explicit "View Analytics" button — so a course-wide report can be
+  scoped to a chosen subset of a course's STACK quizzes instead of always
+  combining every one. The cache key and the progress-bar/background-task
+  plumbing below are all keyed on which quizzes are selected, not just
+  the course.
+- **Live, updating progress bars for both Quiz Analytics and Question
+  Analytics**, replacing the previous plain "this may take a while, check
+  back later" static notice. Whichever of the two computes a cold view —
+  right there on the same request (the common case now — see below) or a
+  background adhoc task for a genuinely large one — reports real
+  stage-by-stage progress (queued → preparing/analyzing → processing
+  item *N* of *M*, with the current bottleneck quiz/question surfaced —
+  → saving → complete/failed) into a shared `analyticsprogress` cache
+  that a small inline `<script>` polls and animates
+  (`classes/quiz/output/sections_output_helper.php`'s
+  `render_progress_bar()`, `warm_single_view_adhoc_task::set_progress()`).
+- **On-demand analytics no longer depend on the site's cron being
+  configured at all to eventually produce a result** — only to produce
+  it *fast*. A cold Quiz Analytics/Question Analytics view is now sized
+  up with a real, sampled per-attempt time estimate (no hardcoded
+  attempt-count cutoff) and computed inline whenever that estimate is
+  small enough, on this same request; only a genuinely large view still
+  hands off to a background task. If that background task then sits
+  queued/running longer than a healthy cron cycle ever should
+  (`warm_single_view_adhoc_task::INLINE_FALLBACK_SECONDS`, 60s — most
+  likely meaning cron isn't running on this site at all), the next
+  request for that same view computes it inline instead of dispatching
+  another doomed task, and the progress bar's own poll script reloads the
+  page on its own once it sees that same stuck duration — so a visitor
+  never has to notice or manually navigate away and back for this
+  fallback to kick in.
+  - Also hardened response delivery so the progress bar can actually
+    reach the browser while a fast inline compute is still running: a
+    reverse proxy's own buffering (nginx's proxy/fastcgi buffering, on by
+    default) or PHP's own `zlib.output_compression` can each silently
+    hold back this plugin's mid-request `flush()` calls, so the whole
+    response — bar and finished results together — only ever arrives in
+    one piece once everything is done
+    (`sections_output_helper::disable_response_buffering()`, called
+    before any output on both pages).
+- **Stale-while-revalidate**: on a cache miss, a course/quiz with a
+  previously-completed report now serves that last-good result
+  immediately (with a "showing the last completed report while a newer
+  calculation runs in the background" notice) while the current
+  fingerprint recomputes, rather than making every visitor wait through a
+  fresh compute.
+- **Anonymize student data is no longer a sticky preference**: previously
+  a `set_user_preference()` call remembered the last anonymize toggle
+  per-teacher across sessions, so once turned on it silently stayed on
+  until turned off again. It's now request-only (`anonymize=1` on the
+  current view) — every fresh page load defaults to real student names,
+  and an old stored preference can no longer cause a report to render
+  anonymized without that being explicit on the current request.
+- **Proactive Question Analytics preparation**: adds a durable
+  `local_quizanalytics_prepared` table (course- and quiz-scoped, tracking
+  a fingerprint/status/payload/last-success per row) and a
+  `warm_single_view_adhoc_task`/event-observer path so Question Analytics
+  for a quiz can be pre-computed in the background — independent of, and
+  ahead of, a teacher actually selecting that quiz — the same
+  stale-while-revalidate pattern as Quiz Analytics above, reused rather
+  than reimplemented (`classes/quiz/prepared_store.php`,
+  `classes/event_observer.php`, `db/events.php`).
+- **Question Review response-status summary**: each variant's card now
+  shows a correct/incorrect/invalid/no-response breakdown and a
+  "% not correct" figure derived from the same per-student status data
+  already computed for the wrong-response list, instead of only a
+  student count. A new `questionreview.php` AJAX endpoint lazily fetches
+  one variant's full detail (question text, expected answer, wrong-answer
+  list) on demand rather than inlining every variant's full payload into
+  the initial page load.
+- **Response-status colors follow one fixed, intuitive scheme
+  everywhere**: green = correct, red = incorrect, orange = invalid input,
+  blue = no response — in both the Question Analytics "Question Response
+  Overview" chart (`classes/quiz/analytics/question_charts.php`) and the
+  Question Review response-status bars (`sections-renderer.js`), which
+  previously assigned these somewhat arbitrarily (blue for incorrect, red
+  for no response, purple for correct). Colorblind mode swaps in the
+  Okabe-Ito palette instead of dimmer shades of the same four colors:
+  green and red are specifically the pair a red-green colorblind viewer
+  confuses with each other, so "correct" (blue, `#0072B2`) and
+  "incorrect" (vermillion, `#D55E00`) each get a hue with no red or green
+  in it at all there, not just a different shade of one.
+- **Title case for the "Anonymize Student Data", "Colorblind Mode",
+  "Quizzes to Include in Analytics", "View Analytics" and "Select All"**
+  labels, matching this plugin's other headings.
+- **Schema/upgrade fixes carried with the above**: the new
+  `local_quizanalytics_prepared` table's definition moved from an
+  install-time `CREATE TABLE` helper into `db/install.xml` (so a fresh
+  install and an upgrading site provision an identical schema through the
+  normal XMLDB path), its `fingerprint` column's default was corrected to
+  a valid 32-character value matching its `LENGTH="32"` definition, and
+  `db/upgrade.php`'s savepoints were reordered to run strictly
+  chronologically by version number.
+
 ## [3.0.3] — Fixed misclassified/garbled analytics for non-"ans"-prefixed STACK inputs
 
 - **Fixed a real, confirmed bug**: every regex in this plugin that parses a

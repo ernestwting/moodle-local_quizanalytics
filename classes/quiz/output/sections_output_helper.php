@@ -62,6 +62,49 @@ class sections_output_helper {
     const LOADING_NOTICE_ID = 'lqa-loading-notice';
 
     /**
+     * DOM id of the animated progress-bar container rendered by
+     * render_progress_bar() below — shared with index.php's own course-wide
+     * markup and render_generating_in_background_notice()'s inline script,
+     * all three of which build the exact same {bar, message, container}
+     * shape so render_hide_loading_notice() can remove whichever of them
+     * ended up on the page by this one id.
+     */
+    const PROGRESS_CONTAINER_ID = 'local-quizanalytics-progress';
+
+    /**
+     * Disables the response-buffering layers that would otherwise silently
+     * swallow flush_computing_notice()/render_progress_bar()'s mid-request
+     * flush() calls — the entire reason those exist. Must be called before
+     * any output at all (headers can't be sent once output has started),
+     * so call this once, unconditionally, near the very top of a page
+     * (before $OUTPUT->header()) — harmless on a request that turns out
+     * not to need either notice (e.g. a warm cache hit).
+     *
+     * A reverse proxy's own buffering (nginx's proxy_buffering/fastcgi_
+     * buffering, on by default) and PHP's own zlib.output_compression each
+     * independently hold back several KB of output before sending anything
+     * downstream, regardless of how many times this plugin calls flush() —
+     * invisible when testing PHP directly or through a simple dev server,
+     * but a very common piece of a real production stack. Confirmed
+     * directly: with either in front, a course-wide/per-quiz view fast
+     * enough to finish inline in only a few seconds never got to actually
+     * show its progress bar at all — the whole response (bar and finished
+     * results together) left the buffering layer in one piece once the
+     * request ended, so a visitor just saw their browser's own "loading"
+     * state on the *previous* page for the whole wait, then landed on the
+     * finished page directly.
+     */
+    public static function disable_response_buffering(): void {
+        if (headers_sent()) {
+            return;
+        }
+        header('X-Accel-Buffering: no'); // Tells nginx not to buffer this response.
+        @ini_set('zlib.output_compression', '0');
+        @ini_set('output_buffering', '0');
+        @ini_set('implicit_flush', '1');
+    }
+
+    /**
      * Echoes the empty container divs a payload gets rendered into.
      * Callers must use a unique $prefix per page when more than one
      * independent result is rendered on the same page.
@@ -99,6 +142,93 @@ class sections_output_helper {
             @ob_flush();
         }
         flush();
+    }
+
+    /**
+     * Echoes a real, animated progress bar polling $progressurl (a
+     * progress.php URL) and pushes it to the browser immediately — for a
+     * caller about to report real stage-by-stage progress into the same
+     * progress cache entry that URL reads, whether that work happens in a
+     * background adhoc task (index.php's course-wide "generating in the
+     * background" path) or right here, inline, on this same request (a
+     * view fast enough to skip the background task entirely, or falling
+     * back to inline because that task looked stuck — see
+     * warm_single_view_adhoc_task::is_stuck()). Call
+     * warm_single_view_adhoc_task::set_progress() before and during the
+     * real work so this bar actually moves rather than sitting frozen at
+     * 0% until render_hide_loading_notice() removes it afterward.
+     *
+     * A plain inline <script> (build_progress_poll_script() below), not
+     * $PAGE->requires->js_call_amd(): that queues into Moodle's own page
+     * requirements and only actually reaches the browser at $OUTPUT->
+     * footer() time. That's too late for the inline-compute case above —
+     * by the time footer() runs, the synchronous PHP work this bar is
+     * meant to narrate has already finished on this same request, so the
+     * bar would jump straight from 0% to gone with nothing in between. A
+     * raw <script> tag, flushed immediately like flush_computing_notice()
+     * already does, starts polling in the browser right away, while this
+     * same PHP request is still busy computing.
+     */
+    public static function render_progress_bar(string $progressurl): void {
+        echo \html_writer::div(
+            \html_writer::div(
+                \html_writer::div('', 'progress-bar', [
+                    'id' => 'local-quizanalytics-progress-bar', 'role' => 'progressbar',
+                    'style' => 'width: 0%', 'aria-valuenow' => 0,
+                    'aria-valuemin' => 0, 'aria-valuemax' => 100,
+                ]), 'progress mb-2'
+            ) . \html_writer::div('', '', [
+                'id' => 'local-quizanalytics-progress-message', 'aria-live' => 'polite',
+            ]),
+            'local-quizanalytics-progress mb-3',
+            ['id' => self::PROGRESS_CONTAINER_ID, 'data-progress-url' => $progressurl]
+        );
+        echo \html_writer::script(self::build_progress_poll_script($progressurl));
+        if (ob_get_level() > 0) {
+            @ob_flush();
+        }
+        flush();
+    }
+
+    /**
+     * The polling loop shared by render_progress_bar() above and
+     * render_generating_in_background_notice() below — kept in one place
+     * so both progress-bar call sites reload on the same stuck-detection
+     * rule (see warm_single_view_adhoc_task::INLINE_FALLBACK_SECONDS)
+     * instead of two copies drifting apart.
+     */
+    private static function build_progress_poll_script(string $progressurl): string {
+        $stuckafterseconds = \local_quizanalytics\task\warm_single_view_adhoc_task::INLINE_FALLBACK_SECONDS;
+        return '(function() {'
+            . 'var url = ' . json_encode($progressurl) . ';'
+            . 'var stuckafterseconds = ' . json_encode($stuckafterseconds) . ';'
+            . 'var poll = function() {'
+            . 'fetch(url, {credentials: "same-origin", cache: "no-store"})'
+            . '.then(function(response) { return response.json(); })'
+            . '.then(function(data) {'
+            . 'var bar = document.getElementById("local-quizanalytics-progress-bar");'
+            . 'var message = document.getElementById("local-quizanalytics-progress-message");'
+            . 'if (!bar || !message) { return; }'
+            . 'var percent = Math.max(0, Math.min(100, Number(data.percent) || 0));'
+            . 'bar.style.width = percent + "%";'
+            . 'bar.setAttribute("aria-valuenow", percent);'
+            . 'bar.textContent = percent + "%";'
+            . 'message.textContent = data.message || "";'
+            . 'if (data.completed && data.total) {'
+            . 'message.textContent += " (" + data.completed + "/" + data.total + ")";'
+            . '}'
+            . 'if (data.status === "complete") {'
+            . 'window.setTimeout(function() { window.location.reload(); }, 500);'
+            . '} else if (data.status === "failed") {'
+            . 'message.textContent = data.message || "Analytics preparation failed.";'
+            . '} else if (stuckafterseconds && Number(data.elapsed) > stuckafterseconds) {'
+            . 'window.location.reload();'
+            . '} else {'
+            . 'window.setTimeout(poll, 3000);'
+            . '}'
+            . '})'
+            . '.catch(function() { window.setTimeout(poll, 3000); });'
+            . '}; poll(); })();';
     }
 
     /**
@@ -185,54 +315,14 @@ class sections_output_helper {
             return;
         }
         if ($progressurl !== null) {
-            global $PAGE;
-
-            echo \html_writer::div(
-                \html_writer::div(
-                    \html_writer::div('', 'progress-bar', [
-                        'id' => 'local-quizanalytics-progress-bar',
-                        'role' => 'progressbar',
-                        'style' => 'width: 0%',
-                        'aria-valuenow' => 0,
-                        'aria-valuemin' => 0,
-                        'aria-valuemax' => 100,
-                    ]),
-                    'progress mb-2'
-                ) . \html_writer::div('', '', [
-                    'id' => 'local-quizanalytics-progress-message',
-                    'aria-live' => 'polite',
-                ]),
-                'local-quizanalytics-progress mb-3',
-                ['id' => 'local-quizanalytics-progress', 'data-progress-url' => $progressurl]
-            );
-            $progressscript = '(function() {'
-                . 'var url = ' . json_encode($progressurl) . ';'
-                . 'var poll = function() {'
-                . 'fetch(url, {credentials: "same-origin", cache: "no-store"})'
-                . '.then(function(response) { return response.json(); })'
-                . '.then(function(data) {'
-                . 'var bar = document.getElementById("local-quizanalytics-progress-bar");'
-                . 'var message = document.getElementById("local-quizanalytics-progress-message");'
-                . 'if (!bar || !message) { return; }'
-                . 'var percent = Math.max(0, Math.min(100, Number(data.percent) || 0));'
-                . 'bar.style.width = percent + "%";'
-                . 'bar.setAttribute("aria-valuenow", percent);'
-                . 'bar.textContent = percent + "%";'
-                . 'message.textContent = data.message || "";'
-                . 'if (data.completed && data.total) {'
-                . 'message.textContent += " (" + data.completed + "/" + data.total + ")";'
-                . '}'
-                . 'if (data.status === "complete") {'
-                . 'window.setTimeout(function() { window.location.reload(); }, 500);'
-                . '} else if (data.status === "failed") {'
-                . 'message.textContent = data.message || "Analytics preparation failed.";'
-                . '} else {'
-                . 'window.setTimeout(poll, 3000);'
-                . '}'
-                . '})'
-                . '.catch(function() { window.setTimeout(poll, 3000); });'
-                . '}; poll(); })();';
-            echo \html_writer::script($progressscript);
+            // Reloading once the task has been stuck longer than a healthy
+            // cron cycle ever should (see warm_single_view_adhoc_task::
+            // INLINE_FALLBACK_SECONDS, applied inside the shared poll script
+            // below) re-enters this page's own PHP, whose matching
+            // is_stuck() check then falls back to computing the view inline
+            // instead of dispatching yet another background task doomed to
+            // the same fate.
+            self::render_progress_bar($progressurl);
             echo \html_writer::div(
                 get_string('generatinginbackground', 'local_quizanalytics'),
                 'alert alert-info'
@@ -309,17 +399,19 @@ class sections_output_helper {
 
     /**
      * A tiny inline script removing the "may take a while" notice
-     * (LOADING_NOTICE_ID above) from the page — call this right after
+     * (LOADING_NOTICE_ID above) and the animated progress bar
+     * (PROGRESS_CONTAINER_ID above) from the page — call this right after
      * echoing the real results, never before. A <script> tag runs
      * synchronously the instant the browser's HTML parser reaches it, so by
-     * the time this one runs, everything printed before it — the notice,
-     * and whatever real results this call follows — is already sitting in
-     * the DOM. No event listener or load-state tracking needed for that:
-     * the notice exists to reassure a visitor mid-wait, not to linger once
-     * there's something to look at instead. Safe to call even when no
-     * notice was actually shown (a cache hit that skipped
-     * flush_computing_notice() entirely) — getElementById() then finds
-     * nothing and the optional chaining below is a no-op.
+     * the time this one runs, everything printed before it — either
+     * indicator, and whatever real results this call follows — is already
+     * sitting in the DOM. No event listener or load-state tracking needed
+     * for that: an indicator exists to reassure a visitor mid-wait, not to
+     * linger once there's something to look at instead. Safe to call even
+     * when neither was actually shown (a cache hit that skipped both
+     * flush_computing_notice() and render_progress_bar() entirely) —
+     * getElementById() then finds nothing and the optional chaining below
+     * is a no-op.
      *
      * @return string
      */
@@ -327,6 +419,7 @@ class sections_output_helper {
         return \html_writer::tag(
             'script',
             'document.getElementById(' . json_encode(self::LOADING_NOTICE_ID) . ')?.remove();'
+            . 'document.getElementById(' . json_encode(self::PROGRESS_CONTAINER_ID) . ')?.remove();'
         );
     }
 

@@ -103,6 +103,45 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
     const STALE_SECONDS = 900;
 
     /**
+     * How long a matching queued/running task can sit without finishing
+     * before index.php/questionanalytics.php should stop waiting on cron
+     * altogether and just compute the view inline on the current request
+     * instead — deliberately much shorter than STALE_SECONDS above (which
+     * only controls when the *message* changes to an explicit "check cron"
+     * warning for an admin to read). This plugin's on-demand pages must not
+     * depend on cron being configured at all: a site with no cron running
+     * (a fresh dev/staging box, or one where it was never set up) would
+     * otherwise leave a course-wide or per-quiz view permanently stuck
+     * showing "generating in the background" forever, since nothing would
+     * ever pick up the dispatched adhoc task. 60s is long enough that a
+     * site with a normal per-minute cron gets a real chance to pick the
+     * task up and finish a typical view before this kicks in, and short
+     * enough that a visitor revisiting the page (or the JS progress
+     * poller's own reload) sees real results well before STALE_SECONDS'
+     * own 15-minute "this looks stuck" cutoff. The background task itself
+     * is left queued either way — if cron does eventually run it, that
+     * work simply becomes a no-op cache refresh (see this class's own
+     * docblock on why that's always safe).
+     */
+    const INLINE_FALLBACK_SECONDS = 60;
+
+    /**
+     * Whether a background compute matching $customdata has been sitting
+     * queued/running longer than INLINE_FALLBACK_SECONDS without finishing
+     * — the signal on-demand pages use to stop waiting on cron and just
+     * compute the view themselves on this request. Returns false (not
+     * stuck) when no matching task is queued at all — nothing to wait on
+     * yet.
+     *
+     * @param array $customdata exact dispatch_for_*() payload for this view
+     * @return bool
+     */
+    public static function is_stuck(array $customdata): bool {
+        $age = self::get_queued_age_seconds($customdata);
+        return $age !== null && $age > self::INLINE_FALLBACK_SECONDS;
+    }
+
+    /**
      * Queues (or, if an identical request is already queued, reuses) a
      * background compute of one quiz's Question Analytics/Solution Process
      * view for the given display options.
@@ -301,8 +340,16 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
         return $cache->get(self::progress_key($courseid, $fingerprint, $gradetype, $colorblind, $anonymize, $selectionkey));
     }
 
-    /** Write one small progress snapshot; this never performs analytics work. */
-    private static function set_progress(
+    /**
+     * Write one small progress snapshot; this never performs analytics work.
+     * Public (not just called from this class's own execute() path) so an
+     * on-demand page computing a view inline on its own request — small/fast
+     * enough to skip the background task entirely, or falling back to inline
+     * because that task looked stuck (see is_stuck() above) — can report
+     * real progress into the exact same cache entry the progress bar UI
+     * already polls, instead of the bar sitting frozen at 0% the whole time.
+     */
+    public static function set_progress(
         int $courseid, string $fingerprint, string $gradetype, bool $colorblind, bool $anonymize,
         string $status, string $stage, int $completed, int $total, string $message, array $details = []
     ): void {

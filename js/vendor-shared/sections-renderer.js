@@ -654,10 +654,10 @@
     function renderVariantStatusBar(version) {
         var total = Number(version.students) || 0;
         var definitions = [
-            ['incorrect', 'Incorrect', '#2878b5'],
+            ['incorrect', 'Incorrect', '#d62728'],
             ['invalid', 'Invalid input', '#ff7f0e'],
-            ['noresponse', 'No response / not evaluated', '#d62728'],
-            ['correct', 'Correct', '#9467bd'],
+            ['noresponse', 'No response / not evaluated', '#2878b5'],
+            ['correct', 'Correct', '#22c55e'],
         ];
         var wrapper = document.createElement('div');
         wrapper.style.minWidth = '14rem';

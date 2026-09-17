@@ -13,7 +13,10 @@ directly to a quiz slot.
 - **From a course:** open the course, look for an **Analytics** entry in
   the secondary navigation bar (`Course | Settings | Participants |
   Grades | Reports | ...` — check inside **More** if the bar is full).
-  This lands you on Quiz Analytics.
+  This lands you on Quiz Analytics. This entry now appears on every
+  course regardless of whether it has any STACK content — checking that
+  on every course page load was itself a measurable cost at scale, so the
+  check was moved to Quiz Analytics's own page instead (see below).
 - **From a quiz:** open any STACK quiz directly and look in its own
   settings/administration menu for an **Analytics** entry — this jumps
   straight to that quiz's Question Analytics.
@@ -22,16 +25,26 @@ directly to a quiz slot.
   Analytics isn't in this switcher yet — see
   [§ Diagnostics Analytics](#diagnostics-analytics) below.)
 
-If nothing appears at all, the most common reasons are: no STACK question
-added directly to a slot in that course, or no finished attempts yet.
+If nothing appears once you're actually on a section's own page, the most
+common reasons are: no STACK question added directly to a slot in that
+course, or no finished attempts yet.
 
 ## Quiz Analytics
 
 The course-wide view — every STACK quiz in the course, compared side by
-side. Shows an attempts-vs-grades scatter plot and aggregated
+side by default. Shows an attempts-vs-grades scatter plot and aggregated
 difficulty/response distributions. Use the **Compare attempts against:**
 selector to switch which grade (average, highest, or minimum) the scatter
 plot compares attempt counts to.
+
+Use the **Quizzes to Include in Analytics** panel (checkboxes grouped by
+course section, with Select All/Clear) to scope the report to a chosen
+subset of the course's STACK quizzes instead of always combining every
+one, then press **View Analytics**. A cold report — the first time this
+exact course/quiz selection has been viewed, or after new attempts change
+its data — shows a progress bar while it computes; small/fast reports
+finish on the same page load, larger ones finish in the background and
+the page updates itself once ready.
 
 Two display toggles apply across this and Question Analytics:
 

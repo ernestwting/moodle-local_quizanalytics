@@ -48,13 +48,13 @@ $string['privacy:metadata'] = 'The STACK q-type Analytics plugin does not store 
 // that plugin's own lang file; only the two strings superseded by this
 // plugin's unified pluginname/capability (its own 'pluginname' and
 // 'quizanalytics:view') were dropped here.
-$string['anonymizemode'] = 'Anonymize student data';
+$string['anonymizemode'] = 'Anonymize Student Data';
 $string['anonymizedstudent'] = 'Student {$a}';
 $string['cachedef_questionanalysis'] = 'The Question Analytics result for one quiz.';
 $string['cachedef_quizanalysiscoursewide'] = 'The course-wide Quiz Analysis result for one course.';
 $string['cachedef_solutionprocess'] = 'The Solution Process Visualization result for one quiz/question/part/student selection.';
 $string['cachedef_solutionprocessmeta'] = 'The question/part/student lists used to populate the Solution Process Visualization selector form, for one quiz.';
-$string['colorblindmode'] = 'Colorblind mode';
+$string['colorblindmode'] = 'Colorblind Mode';
 $string['computetimelimit']      = 'Computation time limit (seconds)';
 $string['computetimelimit_desc'] = 'Raises PHP\'s own execution time limit before the heaviest analytics computations (course-wide analysis, and any PDF export). These run in-process rather than calling a separate service, so a course with many STACK quizzes/students may need longer than PHP\'s normal max_execution_time allows. 0 leaves PHP\'s own default in place.';
 $string['coursewideheading']    = 'Course-Wide Analytics';
@@ -70,11 +70,11 @@ $string['noattempts']           = 'No finished attempts yet for this quiz. Analy
 $string['nocourseattempts']     = 'None of this course\'s STACK quizzes have finished attempts yet.';
 $string['nostackquestions']     = 'This quiz has no STACK questions to visualize.';
 $string['nostackquizzes']       = 'This course has no STACK quizzes yet, or none have finished attempts.';
-$string['quizzesselection'] = 'Quizzes to include in analytics';
+$string['quizzesselection'] = 'Quizzes to Include in Analytics';
 $string['selectquizzes'] = 'Select quizzes';
-$string['selectall'] = 'Select all';
+$string['selectall'] = 'Select All';
 $string['clearall'] = 'Clear';
-$string['viewanalytics'] = 'View analytics';
+$string['viewanalytics'] = 'View Analytics';
 $string['refreshanalytics'] = 'Refresh analytics';
 $string['analyticsrefreshqueued'] = 'Analytics refresh requested. Existing results remain available while the update runs.';
 $string['analyticspreparing'] = 'Analytics are being prepared in the background. This page will show the results after preparation finishes.';
