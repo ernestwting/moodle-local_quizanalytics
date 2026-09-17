@@ -134,21 +134,29 @@ applied here), plus several fixes found while integrating it.
   Moodle attempt are suppressed while Anonymize Student Data is on
   (`question_review_links_allowed`) rather than potentially deanonymizing
   a student through a review link left active.
-- **Fixed two regressions from a since-superseded GitHub merge** that
-  briefly landed on `main`: `parallel_course_fetcher.php` lost the
-  `true ||` override keeping forking permanently disabled (see [3.0.2] —
-  forking can crash Moodle's entire cron.php process outright), and
-  `section_selector.php` lost the "hide Model Analytics from the
-  switcher" line — both silently reverted by that merge rather than
-  edited deliberately. Also removed a duplicated, superseded hardcoded
-  "defer to background if over 100 attempts" block in `index.php` that
-  the same merge reintroduced alongside the real fix from earlier in this
-  entry, which — having no `is_stuck()` check of its own, and sitting
-  ahead of the code that does — sent a course over that count into a
-  genuine infinite reload loop whenever its background task never
-  completed (no cron running at all, the same class of problem the
-  `is_stuck()` fallback above exists to solve, just unreachable behind
-  this leftover duplicate).
+- **Fixed the same two regressions twice**, from two different GitHub
+  merges that each briefly landed on `main`: `parallel_course_fetcher.php`
+  losing the `true ||` override keeping forking permanently disabled (see
+  [3.0.2] — forking can crash Moodle's entire cron.php process outright),
+  and `section_selector.php` losing the "hide Model Analytics from the
+  switcher" line — both silently reverted by ordinary `git merge`
+  3-way-merge resolution rather than any deliberate edit, and each time
+  because the fix and the merge shared a common ancestor *before* the fix
+  existed, so the merge saw one side as simply "unchanged" there and kept
+  the other side's stale content with no conflict to even flag. Also
+  removed a duplicated, superseded hardcoded "defer to background if over
+  100 attempts" block in `index.php` that each of those same merges
+  reintroduced alongside the real fix — having no `is_stuck()` check of
+  its own, and sitting ahead of the code that does, it sent a course over
+  that count into a genuine infinite reload loop whenever its background
+  task never completed (no cron running at all, the exact class of
+  problem the `is_stuck()` fallback exists to solve, just unreachable
+  behind this leftover duplicate). While fixing this the second time, the
+  same `is_stuck()` check was also added to the stale-report-serving path
+  above (previously only the defer-vs-inline decision had it) — that path
+  had the identical reload-loop exposure whenever a stale report already
+  existed to serve, which a merge conflict had masked from ever being
+  caught the first time around.
 - **Schema/upgrade fixes carried with the above**: the new
   `local_quizanalytics_prepared` table's definition moved from an
   install-time `CREATE TABLE` helper into `db/install.xml` (so a fresh
