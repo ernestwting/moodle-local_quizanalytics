@@ -92,22 +92,26 @@ Requires `qtype_stack` (the STACK question type) to have anything to show.
 Copy-paste source for the "Plugin versions" tab (Edit plugin page →
 Versions) when uploading this release.
 
-Quiz Analytics can now be scoped to a chosen subset of a course's STACK
-quizzes instead of always combining every one, and both Quiz Analytics
-and Question Analytics show a live, updating progress bar while a cold
-view computes instead of a static "this may take a while" notice. That
-computation no longer depends on the site's cron being configured at all
-to eventually finish — a small/fast view now computes immediately on the
-same request, and even a larger one that's handed to a background task
-falls back to computing directly if that task sits stuck longer than a
-healthy cron cycle ever should. Response-status colors (correct/
-incorrect/invalid/no-response) now follow one fixed, intuitive scheme —
-green/red/orange/blue — everywhere they appear, with a colorblind-safe
-palette swapped in for colorblind mode. The "Anonymize student data"
-toggle is no longer a sticky per-teacher preference: every fresh page
-load now defaults to real student names, only anonymizing when the
-current view explicitly requests it. See CHANGELOG.md's `[3.0.4]` entry
-for the full technical account.
+- **Quiz selection for Quiz Analytics** — scope the course-wide report to
+  a chosen subset of STACK quizzes instead of always combining every one.
+- **Live progress bars** on both Quiz Analytics and Question Analytics
+  while a cold view computes, replacing the old static "this may take a
+  while" notice.
+- **No more dependency on cron to actually finish** — a small/fast view
+  now computes immediately; a larger one handed to a background task
+  falls back to computing directly if that task ever sits stuck longer
+  than a healthy cron cycle should.
+- **Consistent response-status colors** — correct/incorrect/invalid/no
+  response now follow one fixed green/red/orange/blue scheme everywhere,
+  with a colorblind-safe palette swapped in for colorblind mode.
+- **Question Review redesign** — a broader response-pattern breakdown per
+  variant, and direct Moodle attempt links are suppressed while Anonymize
+  Student Data is on.
+- **"Anonymize student data" is no longer sticky** — every fresh page
+  load defaults to real student names, only anonymizing when the current
+  view explicitly asks for it.
+
+See CHANGELOG.md's `[3.0.4]` entry for the full technical account.
 
 ## Release notes (v3.0.3)
 
