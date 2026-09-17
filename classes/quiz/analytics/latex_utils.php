@@ -548,29 +548,39 @@ class latex_utils {
     }
 
     /**
-     * Extract just the `ansN: <expression>` parts from a raw STACK response/right-
-     * answer dump (which also carries `Seed: ...` and `prtN: ...` diagnostic noise
-     * a teacher doesn't need), converting each expression to rendered LaTeX math
-     * wrapped in `$...$`.
+     * Extract just the `<name>: <expression>` answer parts from a raw STACK
+     * response/right-answer dump (which also carries `Seed: ...` and PRT
+     * diagnostic noise a teacher doesn't need), converting each expression to
+     * rendered LaTeX math wrapped in `$...$`.
      *
-     * Falls back to clean_moodle_latex() on the whole string when no `ansN:`
-     * pattern is found, e.g. a plain (non-STACK) right-answer value.
+     * Matched by value shape (`: ... [score|valid|invalid]`), not a literal
+     * "ans" name prefix — an input can be author-renamed to anything (e.g.
+     * "R"), and requiring "ans" left that case falling through to the
+     * clean_moodle_latex() fallback below, which doesn't strip the "Seed: ...";
+     * PRT trace noise — the fallback's whole raw, mostly-uncleaned dump ends
+     * up on screen where a clean rendered expression belongs. Falls back to
+     * clean_moodle_latex() on the whole string only when no field matches
+     * this shape at all, e.g. a plain (non-STACK) right-answer value.
      */
     public static function extract_stack_answer_latex(string $rawtext): string {
         if ($rawtext === '') {
             return $rawtext;
         }
 
-        $pattern = '/ans(\w+):\s*(.*?)\s*\[(score|valid|invalid)\]/';
+        // [^;]*? (not a bare .*?) keeps this field's lazy expression capture
+        // from spanning across an earlier field's own semicolon boundary to
+        // reach a later "[tag]" — see parser.php's parse_response_cell() for
+        // the same fix, hit by the same underlying bug.
+        $pattern = '/(\w+):\s*([^;]*?)\s*\[(score|valid|invalid)\]/';
         if (!preg_match_all($pattern, $rawtext, $matches, PREG_SET_ORDER)) {
             return self::clean_moodle_latex($rawtext);
         }
 
         $parts = [];
         foreach ($matches as $m) {
-            $idx = $m[1];
+            $name = $m[1];
             $expr = $m[2];
-            $parts[] = "ans{$idx}: $" . self::maxima_expr_to_latex($expr) . '$';
+            $parts[] = "{$name}: $" . self::maxima_expr_to_latex($expr) . '$';
         }
         // One answer per line rather than a single "; "-joined run — a
         // multi-part question can have a dozen-plus ansN values, and

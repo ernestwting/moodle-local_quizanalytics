@@ -1,10 +1,6 @@
 # STACK q-type Analytics for Moodle
 
-[![Moodle Plugin CI](https://github.com/ernestwting/moodle-local_stackanalytics/actions/workflows/moodle-ci.yml/badge.svg)](https://github.com/ernestwting/moodle-local_stackanalytics/actions/workflows/moodle-ci.yml)
-<!-- Repo is still named moodle-local_stackanalytics on GitHub even though the plugin's own
-     frankenstyle component is now local_quizanalytics (see CHANGELOG.md) — moodle-local_quizanalytics
-     is already taken by the original, separate standalone plugin this one replaces the listing of,
-     so this repo can't be renamed to match without first resolving that collision. -->
+[![Moodle Plugin CI](https://github.com/ernestwting/moodle-local_quizanalytics/actions/workflows/moodle-ci.yml/badge.svg)](https://github.com/ernestwting/moodle-local_quizanalytics/actions/workflows/moodle-ci.yml)
 
 One installable Moodle plugin covering four sections of analytics for STACK
 (Maxima CAS) quizzes, in two families: course-wide/per-quiz STACK response
@@ -31,7 +27,7 @@ server itself. Installing `local_quizanalytics` is the only step.
 
 | Section | Reached via | What it does |
 |---|---|---|
-| **Quiz Analytics** (`index.php`) | The course's "Analytics" nav entry (lands here first) | Course-wide cross-quiz comparison: attempts-vs-grades scatter, difficulty/response distributions aggregated across every STACK quiz in the course. |
+| **Quiz Analytics** (`index.php`) | The course's "Analytics" nav entry (lands here first) | Course-wide cross-quiz comparison: attempts-vs-grades scatter, difficulty/response distributions aggregated across every STACK quiz in the course (or a chosen subset, via the "Quizzes to Include in Analytics" selector). A cold report shows a live progress bar while computing — inline for a small/fast one, in the background for a larger one. |
 | **Question Analytics** (`questionanalytics.php`) | The "Section:" switcher, or an "Analytics" link this plugin adds to each STACK quiz's own settings menu | Drill into any one quiz: a compact "Quiz snapshot" (attempt counts, overall average), a "Question Response Overview" chart per question sized to Moodle's own Facility Index/mean mark, and a "Question Review" drill-down grouping each question's responses by instantiated variant, with the question text rendered as real HTML rather than flattened plain text. **Solution Process Visualization** (PRT transition graphs, network features, PRT/TED 3D distance charts, cross-attempt comparison) is still fully implemented but temporarily hidden from the view selector pending a redesign — the underlying code remains reachable by direct URL. |
 | **Model Analytics** (`modelanalytics.php`) | The "Section:" switcher | **Model 1 — Student risk**: a Moodle Analytics API target on the course/enrolment analyser, fed by five behavioral indicators (grade trajectory, response-latency anomaly, disengagement entropy, help-seeking gap, feedback-revision distance); each student's name links to their Moodle profile (skipped when anonymized). **Model 2 — Question/PRT review**: a target on each STACK question-in-a-quiz, fed by four indicators (IRT-inspired difficulty, syntax-error rate, unreached-node ratio, feedback-ineffectiveness). |
 | **Diagnostics Analytics** (`diagnosticsanalytics.php`) | Direct URL only — not currently offered in the "Section:" switcher, pending a redesign | **Diagnostics Dashboard**: seed-bias (one-way ANOVA) and PRT branch-coverage reports, deliberately kept outside the ML pipeline since they have no natural ground-truth label — direct calculations, not model predictions. |
@@ -114,11 +110,10 @@ course's "More" menu. Each section's
 computation logic is carried over essentially unchanged from its own
 plugin (only namespaces, the capability, and the navigation/entry points
 changed to make the merge coherent) — both had already been independently
-built and verified. The design rationale for Model & Diagnostics
-Analytics's targets/indicators — why each detection is a target, an
-indicator, or a diagnostic rather than shoehorned into the ML pipeline —
-lives in
-[`docs/moodle-stack-analytics-architecture.md`](docs/moodle-stack-analytics-architecture.md).
+built and verified. See `CHANGELOG.md` for the full history of that merge,
+including the renames along the way, and
+[`docs/architecture.md`](docs/architecture.md) for how the merged codebase
+fits together today.
 
 ## Status
 
@@ -163,6 +158,18 @@ still work, just without a direct benchmark backing it.
 
 See [INSTALL.md](INSTALL.md) for the full step-by-step setup. See
 [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## Documentation
+
+Full instructor/administrator documentation lives in
+[`docs/`](docs/index.md) — start at
+[Getting Started](docs/getting-started.md) if you're new, or go
+straight to [How Everything Is Calculated](docs/calculations.md)
+for the exact formula and data source behind every statistic, indicator,
+and model this plugin produces. [Privacy & Security](docs/privacy-and-security.md)
+covers what data this plugin touches and why none of it can leave the
+server. A polished, published version of the same documentation is also
+available at [ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io](https://ernestwting.github.io/moodle-local_quizanalytics_documentation.github.io/).
 
 ## Reference
 

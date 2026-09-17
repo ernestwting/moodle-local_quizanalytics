@@ -14,6 +14,201 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.4] — Course-wide quiz selection, live progress bars, and cron-independent on-demand analytics
+
+Ports jumazevick's remaining `juma_test_branch_personal` work not already
+covered by [3.0.0]/[3.0.1]/[3.0.3] (that branch's other commits were
+either merged in as those releases, or are byte-identical patches already
+applied here), plus several fixes found while integrating it.
+
+- **Course-wide quiz selection**: Quiz Analytics gained a "Quizzes to
+  Include in Analytics" panel — checkboxes grouped by course section,
+  with Select All/Clear buttons, a live "showing N of M" count, and an
+  explicit "View Analytics" button — so a course-wide report can be
+  scoped to a chosen subset of a course's STACK quizzes instead of always
+  combining every one. The cache key and the progress-bar/background-task
+  plumbing below are all keyed on which quizzes are selected, not just
+  the course.
+- **Live, updating progress bars for both Quiz Analytics and Question
+  Analytics**, replacing the previous plain "this may take a while, check
+  back later" static notice. Whichever of the two computes a cold view —
+  right there on the same request (the common case now — see below) or a
+  background adhoc task for a genuinely large one — reports real
+  stage-by-stage progress (queued → preparing/analyzing → processing
+  item *N* of *M*, with the current bottleneck quiz/question surfaced —
+  → saving → complete/failed) into a shared `analyticsprogress` cache
+  that a small inline `<script>` polls and animates
+  (`classes/quiz/output/sections_output_helper.php`'s
+  `render_progress_bar()`, `warm_single_view_adhoc_task::set_progress()`).
+- **On-demand analytics no longer depend on the site's cron being
+  configured at all to eventually produce a result** — only to produce
+  it *fast*. A cold Quiz Analytics/Question Analytics view is now sized
+  up with a real, sampled per-attempt time estimate (no hardcoded
+  attempt-count cutoff) and computed inline whenever that estimate is
+  small enough, on this same request; only a genuinely large view still
+  hands off to a background task. If that background task then sits
+  queued/running longer than a healthy cron cycle ever should
+  (`warm_single_view_adhoc_task::INLINE_FALLBACK_SECONDS`, 60s — most
+  likely meaning cron isn't running on this site at all), the next
+  request for that same view computes it inline instead of dispatching
+  another doomed task, and the progress bar's own poll script reloads the
+  page on its own once it sees that same stuck duration — so a visitor
+  never has to notice or manually navigate away and back for this
+  fallback to kick in.
+  - Also hardened response delivery so the progress bar can actually
+    reach the browser while a fast inline compute is still running: a
+    reverse proxy's own buffering (nginx's proxy/fastcgi buffering, on by
+    default) or PHP's own `zlib.output_compression` can each silently
+    hold back this plugin's mid-request `flush()` calls, so the whole
+    response — bar and finished results together — only ever arrives in
+    one piece once everything is done
+    (`sections_output_helper::disable_response_buffering()`, called
+    before any output on both pages).
+- **Stale-while-revalidate**: on a cache miss, a course/quiz with a
+  previously-completed report now serves that last-good result
+  immediately (with a "showing the last completed report while a newer
+  calculation runs in the background" notice) while the current
+  fingerprint recomputes, rather than making every visitor wait through a
+  fresh compute.
+- **Anonymize student data is no longer a sticky preference**: previously
+  a `set_user_preference()` call remembered the last anonymize toggle
+  per-teacher across sessions, so once turned on it silently stayed on
+  until turned off again. It's now request-only (`anonymize=1` on the
+  current view) — every fresh page load defaults to real student names,
+  and an old stored preference can no longer cause a report to render
+  anonymized without that being explicit on the current request.
+- **Proactive Question Analytics preparation**: adds a durable
+  `local_quizanalytics_prepared` table (course- and quiz-scoped, tracking
+  a fingerprint/status/payload/last-success per row) and a
+  `warm_single_view_adhoc_task`/event-observer path so Question Analytics
+  for a quiz can be pre-computed in the background — independent of, and
+  ahead of, a teacher actually selecting that quiz — the same
+  stale-while-revalidate pattern as Quiz Analytics above, reused rather
+  than reimplemented (`classes/quiz/prepared_store.php`,
+  `classes/event_observer.php`, `db/events.php`).
+- **Fixed a PHPUnit CI failure** (`Class
+  "local_quizanalytics\task\warm_single_view_adhoc_task" not found`, on an
+  otherwise-unrelated later test): `event_observer.php`'s
+  `attempt_submitted()` handler manually `require_once()`'d that
+  namespaced (PSR-4-autoloaded) class file by path from inside a method.
+  Its own top-level `require_once($CFG->dirroot . ...)` lines then ran in
+  *that method's* local scope, where `$CFG` was never declared `global`,
+  throwing an "Undefined variable $CFG" warning partway through the file
+  — fatal under PHPUnit's `--fail-on-warning`, and since PHP's own
+  `require_once` bookkeeping still marks that path "already included"
+  even on an aborted require, the class silently never loaded on any
+  later occurrence of the same event either. Removed the manual require;
+  Moodle's autoloader loads the file correctly on its own the moment the
+  namespaced call actually runs, with `$CFG` already available.
+- **Question Review response-status summary**: each variant's card now
+  shows a correct/incorrect/invalid/no-response breakdown and a
+  "% not correct" figure derived from the same per-student status data
+  already computed for the wrong-response list, instead of only a
+  student count. A new `questionreview.php` AJAX endpoint lazily fetches
+  one variant's full detail (question text, expected answer, wrong-answer
+  list) on demand rather than inlining every variant's full payload into
+  the initial page load.
+- **Response-status colors follow one fixed, intuitive scheme
+  everywhere**: green = correct, red = incorrect, orange = invalid input,
+  blue = no response — in both the Question Analytics "Question Response
+  Overview" chart (`classes/quiz/analytics/question_charts.php`) and the
+  Question Review response-status bars (`sections-renderer.js`), which
+  previously assigned these somewhat arbitrarily (blue for incorrect, red
+  for no response, purple for correct). Colorblind mode swaps in the
+  Okabe-Ito palette instead of dimmer shades of the same four colors:
+  green and red are specifically the pair a red-green colorblind viewer
+  confuses with each other, so "correct" (blue, `#0072B2`) and
+  "incorrect" (vermillion, `#D55E00`) each get a hue with no red or green
+  in it at all there, not just a different shade of one.
+- **Title case for the "Anonymize Student Data", "Colorblind Mode",
+  "Quizzes to Include in Analytics", "View Analytics" and "Select All"**
+  labels, matching this plugin's other headings.
+- **Schema/upgrade fixes carried with the above**: the new
+  `local_quizanalytics_prepared` table's definition moved from an
+  install-time `CREATE TABLE` helper into `db/install.xml` (so a fresh
+  install and an upgrading site provision an identical schema through the
+  normal XMLDB path), its `fingerprint` column's default was corrected to
+  a valid 32-character value matching its `LENGTH="32"` definition, and
+  `db/upgrade.php`'s savepoints were reordered to run strictly
+  chronologically by version number.
+
+## [3.0.3] — Fixed misclassified/garbled analytics for non-"ans"-prefixed STACK inputs
+
+- **Fixed a real, confirmed bug**: every regex in this plugin that parses a
+  STACK input field out of a raw response/right-answer summary (`parser.php`'s
+  `parse_response_cell()`, `latex_utils.php`'s `extract_stack_answer_latex()`,
+  `solution_distance.php`'s TED-distance expression matcher, and
+  `prt_analysis.php`'s ans-field exclusion check) required the field's name to
+  literally start with `ans`. A prior fix (see the `parser_named_ans_test.php`
+  history) widened that to tolerate an arbitrary suffix after `ans`
+  (`ans_mcq`, `ans_1fx`, bare `ans`), but a STACK author can rename an input
+  to something with **no `ans` in it at all** — e.g. `R`. Reported live as
+  `Seed: 1585855368; R: 3*x^2 [score]; Result: # = 1 | ATDiff_true. |
+  Result-0-T` rendering as that raw, unparsed dump instead of a clean result
+  in Question Analytics.
+  - **Question Analytics rendering a raw response dump instead of a parsed
+    result**: with the input's `ans` entry never matching, `ans_list` came
+    back empty, so `parser.php` misclassified a genuinely-answered (and
+    correctly graded) response as `'blank'`. `latex_utils.php`'s
+    `extract_stack_answer_latex()` hit the same "must start with ans" gap on
+    the *display* side and fell back to lightly-cleaned raw text — the
+    `Seed: ...; ...` dump the user saw — instead of extracting and rendering
+    the actual answer expression as LaTeX.
+  - **Question Review's "Common Incorrect Responses" only showing some
+    students' answers**: the same misclassification made
+    `question_details.php`'s per-version wrong-response list substitute a
+    generic "(No response)" placeholder for any misclassified-as-blank
+    response with a real submitted answer, so multiple students' genuinely
+    different wrong answers all collapsed into one shared placeholder bucket
+    instead of showing as their own distinct entries — reading as though most
+    students' responses were missing from the version's breakdown.
+  - Every occurrence of this regex was generalized to match by **value
+    shape** (`<name>: <expression> [score|valid|invalid]`) rather than any
+    literal name prefix, with the expression capture constrained to
+    `[^;]*?` so it can't lazily span across an earlier field's own semicolon
+    boundary (e.g. the leading `Seed: ...;`) to reach a later field's
+    `[tag]` instead of failing its own match.
+  - `ans_list`'s `'index'` field (previously the digit suffix after `ans`,
+    or `null`) is now assigned by **order of appearance** — the same scheme
+    `prt_list` already used — since a field's name is no longer guaranteed
+    to carry a meaningful digit at all. `solution_distance.php`'s TED-distance
+    part-matching was updated to match on this same order-of-appearance
+    basis.
+
+## [3.0.2] — Disabled parallel cache-warming: could silently crash the entire Moodle cron process
+
+- **Fixed a real, confirmed-in-production bug**: `parallel_course_fetcher`'s
+  forked-worker cache-warming path, when it disposed and reconnected the
+  database connection after `fork()`, could leave `\core\task\manager`'s
+  own lock (acquired before this task's `execute()` ever runs, holding a
+  direct reference to the pre-fork connection object) pointing at a dead
+  connection. Its later `release()` call then failed inside a PHP shutdown
+  function — a point where nothing can catch the exception — which killed
+  the *entire* `admin/cli/cron.php` process outright, not just this one
+  task, on every course large enough to trigger it. Confirmed directly
+  against a real course (25 quizzes, 32,000+ attempts): a Quiz Analytics
+  page stuck on "generating in the background... queued for a full day"
+  turned out to be caused by cron dying on this exact crash before it ever
+  reached the queued background task — silently, on every single cron run,
+  for as long as that course stayed that large. This affected every task
+  queued after it too, not just this plugin's own.
+- Investigated reconnecting the *same* database object in place instead of
+  a new one (to keep the lock's reference valid) — rejected, since
+  Moodle's own `moodle_database::dispose()` docblock says outright "Do NOT
+  use connect() again, create a new instance if needed," and testing this
+  directly confirmed why: it trades the crash above for a different,
+  worse one (`Call to a member function is_temptable() on null`,
+  surfacing even inside core's own failure-logging path).
+- Given no safe fix was available within this session's testing,
+  **parallel cache-warming is disabled site-wide** — `parallel_course_fetcher::fetch()`
+  always takes its sequential fallback now, regardless of the "Cache-warming
+  parallel workers" setting, which is left in place (its description
+  updated to say so honestly) rather than removed, in case this is picked
+  up again later with the underlying fork-safety issue actually resolved.
+  Cache warming still runs and still warms every course, just always one
+  quiz at a time — slower on a very large course, never silently dangerous
+  to the rest of the site again.
+
 ## [3.0.1] — German, Italian, and Spanish translations
 
 - Added full `lang/de/`, `lang/it/`, and `lang/es/local_quizanalytics.php`

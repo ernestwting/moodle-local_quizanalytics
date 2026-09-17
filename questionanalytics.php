@@ -62,6 +62,9 @@ $PAGE->set_heading($course->fullname);
 
 $stackquizzes = local_quizanalytics_quiz_data_fetcher::get_course_stack_quizzes($course->id);
 
+// Must run before any output — see this method's own docblock for why.
+sections_output_helper::disable_response_buffering();
+
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('pagemaintitle', 'local_quizanalytics'));
 echo local_quizanalytics_section_selector::render($courseid, 'question');
@@ -204,7 +207,17 @@ if ($view === 'question') {
         // complexity or host speed the way an actual measured rate does.
         $samplerate = local_quizanalytics_quiz_data_fetcher::estimate_seconds_per_attempt($selectedquiz, $course);
         $estimatedseconds = $samplerate !== null ? $samplerate * $stats->count : 0.0;
-        if (sections_output_helper::should_defer_to_background($estimatedseconds)) {
+        $quiztaskcustomdata = [
+            'type' => 'quiz', 'id' => $selectedquiz->id, 'colorblind' => $colorblind, 'anonymize' => $anonymize,
+        ];
+        // A background dispatch for this exact quiz view stuck longer than
+        // a healthy cron cycle ever should most likely means cron isn't
+        // running on this site at all — compute it here instead of leaving
+        // the visitor stuck on this notice every time they revisit. See
+        // index.php's own identical check and
+        // warm_single_view_adhoc_task::INLINE_FALLBACK_SECONDS.
+        $cronlikelystuck = \local_quizanalytics\task\warm_single_view_adhoc_task::is_stuck($quiztaskcustomdata);
+        if (sections_output_helper::should_defer_to_background($estimatedseconds) && !$cronlikelystuck) {
             // This quiz is large enough that a cold compute risks outliving
             // a reverse proxy's own timeout before ignore_user_abort(true)
             // below would even get a chance to help — see
@@ -212,9 +225,7 @@ if ($view === 'question') {
             // background task and let the visitor come back to a warm
             // cache instead of blocking this request on it.
             \local_quizanalytics\task\warm_single_view_adhoc_task::dispatch_for_quiz($selectedquiz->id, $colorblind, $anonymize);
-            $age = \local_quizanalytics\task\warm_single_view_adhoc_task::get_queued_age_seconds([
-                'type' => 'quiz', 'id' => $selectedquiz->id, 'colorblind' => $colorblind, 'anonymize' => $anonymize,
-            ]);
+            $age = \local_quizanalytics\task\warm_single_view_adhoc_task::get_queued_age_seconds($quiztaskcustomdata);
             sections_output_helper::render_generating_in_background_notice($age, $progressurl);
             echo $OUTPUT->footer();
             exit;
@@ -222,12 +233,42 @@ if ($view === 'question') {
         // See index.php's own comment on this same pattern: finish the
         // compute even if the browser/reverse proxy gives up first, so the
         // cache actually ends up warm for the next viewer instead of every
-        // request redoing the same expensive work from scratch.
-        sections_output_helper::flush_computing_notice();
+        // request redoing the same expensive work from scratch. A real,
+        // updating progress bar rather than flush_computing_notice()'s
+        // static notice: this is now the common case (small/fast quizzes
+        // no longer defer to the background task at all — see
+        // should_defer_to_background() above), so a visitor who used to
+        // only ever see the background-task version of this bar would
+        // otherwise see nothing but a blank wait here.
+        sections_output_helper::render_progress_bar($progressurl);
+        \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+            (int) $selectedquiz->course, $stats->fingerprint, 'Question Analytics', $colorblind, $anonymize,
+            'running', 'analyzing', 0, 0, get_string('progressanalyzing', 'local_quizanalytics')
+        );
+        $progresscallback = function (int $completed, int $total, string $question) use (
+            $selectedquiz, $stats, $colorblind, $anonymize
+        ): void {
+            \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+                (int) $selectedquiz->course, $stats->fingerprint, 'Question Analytics', $colorblind, $anonymize,
+                'running', 'processing', $completed, $total,
+                'Preparing question analytics: processing ' . ($question !== '' ? $question : 'questions') .
+                    ($total > 0 ? ' (' . $completed . '/' . $total . ')' : ''),
+                ['currentquestion' => $question]
+            );
+        };
         $previousabort = ignore_user_abort(true);
-        $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind, $anonymize, $snapshot);
+        $result = $client->analyze($selectedquiz->name, $fetchrecords(), $colorblind, $anonymize, $snapshot, $progresscallback);
         if ($result !== null) {
             $qacache->set($qakey, $result);
+            \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+                (int) $selectedquiz->course, $stats->fingerprint, 'Question Analytics', $colorblind, $anonymize,
+                'complete', 'complete', 1, 1, get_string('progresscomplete', 'local_quizanalytics')
+            );
+        } else {
+            \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+                (int) $selectedquiz->course, $stats->fingerprint, 'Question Analytics', $colorblind, $anonymize,
+                'failed', 'failed', 0, 1, get_string('progressfailed', 'local_quizanalytics')
+            );
         }
         ignore_user_abort($previousabort);
     }
@@ -279,11 +320,11 @@ if ($view === 'question') {
     if ($meta === false) {
         $samplerate = local_quizanalytics_quiz_data_fetcher::estimate_seconds_per_attempt($selectedquiz, $course);
         $estimatedseconds = $samplerate !== null ? $samplerate * $stats->count : 0.0;
-        if (sections_output_helper::should_defer_to_background($estimatedseconds)) {
+        $metataskcustomdata = ['type' => 'quizmeta', 'id' => $selectedquiz->id, 'anonymize' => $anonymize];
+        $cronlikelystuck = \local_quizanalytics\task\warm_single_view_adhoc_task::is_stuck($metataskcustomdata);
+        if (sections_output_helper::should_defer_to_background($estimatedseconds) && !$cronlikelystuck) {
             \local_quizanalytics\task\warm_single_view_adhoc_task::dispatch_for_quiz_meta($selectedquiz->id, $anonymize);
-            $age = \local_quizanalytics\task\warm_single_view_adhoc_task::get_queued_age_seconds([
-                'type' => 'quizmeta', 'id' => $selectedquiz->id, 'anonymize' => $anonymize,
-            ]);
+            $age = \local_quizanalytics\task\warm_single_view_adhoc_task::get_queued_age_seconds($metataskcustomdata);
             sections_output_helper::render_generating_in_background_notice($age);
             echo $OUTPUT->footer();
             exit;

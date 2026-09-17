@@ -116,29 +116,39 @@ class parser {
             return ['ans_list' => [], 'prt_list' => []];
         }
 
-        // 1. Parse ans fields: ansK: expression [tag]. STACK input names are
-        // author-defined too (default "ans1"/"ans2", but a multi-part
-        // question commonly renames them to something descriptive like
-        // "ans_mcq"/"ans_fx", or — a single-input question, confirmed on
-        // real production data — leaves off any suffix at all: just "ans")
-        // — matched on the "ans...: ... [tag]" shape rather than a literal
-        // numeric suffix, same reasoning as the PRT matching below. The
-        // suffix group is `\w*` (zero or more), not `\w+`: a `+` here
-        // silently failed to match a bare "ans:" field at all, so a
-        // genuinely answered, correctly graded response (e.g. "ans:
-        // sin(2*x) [score]") had an empty parsed ans_list and was
-        // misclassified as 'blank' — a real bug, not a hypothetical one.
-        // 'index' stays an int (and is used for numeric part-lookups
-        // elsewhere) only when the suffix genuinely is one; a named suffix
-        // or no suffix at all leaves it null rather than colliding on 0.
-        preg_match_all('/ans(\w*):\s*(.*?)\s*\[(score|valid|invalid)\]/', $celltext, $ansmatches, PREG_SET_ORDER);
+        // 1. Parse ans fields: <name>: expression [tag]. STACK input names
+        // are author-defined, same as PRT names below — default "ans1"/
+        // "ans2", but a multi-part question commonly renames them to
+        // something descriptive like "ans_mcq"/"ans_fx", and an author can
+        // rename an input to something with no "ans" in it at all (e.g.
+        // "R") — matched purely on the "<name>: ... [tag]" *value shape*,
+        // not on any literal "ans" prefix, same reasoning as the PRT
+        // matching below. An earlier version of this regex required a
+        // literal "ans" prefix, which silently failed to match a
+        // differently-named input at all — a genuinely answered, correctly
+        // graded response was left with an empty parsed ans_list and
+        // misclassified as 'blank' (real bug, seen live: "R: 3*x^2
+        // [score]" never matched "ans(\w*):").
+        // The expression capture is `[^;]*?` (excluding the field
+        // separator), not a bare `.*?` — an unconstrained lazy capture can
+        // span across an earlier field's own semicolon boundary (e.g. the
+        // "Seed: 123456; ..." prefix) to reach a later "[tag]" instead of
+        // failing to match its own field, silently attaching the wrong
+        // name/expression pair.
+        // 'index' is assigned by order of appearance (1, 2, 3, ...), not
+        // parsed from the name — the same sequential scheme prt_list below
+        // already uses, since a name is no longer guaranteed to carry a
+        // meaningful digit at all.
+        preg_match_all('/(\w+):\s*([^;]*?)\s*\[(score|valid|invalid)\]/', $celltext, $ansmatches, PREG_SET_ORDER);
         $anslist = [];
+        $ansidx = 1;
         foreach ($ansmatches as $m) {
             $anslist[] = [
-                'index' => ctype_digit($m[1]) ? (int) $m[1] : null,
+                'index' => $ansidx,
                 'expression' => trim($m[2]),
                 'tag' => $m[3],
             ];
+            $ansidx++;
         }
 
         // 2. Parse PRT fields: <name>: ! OR <name>: # = fraction | note1 | note2...

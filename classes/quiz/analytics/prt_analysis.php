@@ -33,20 +33,23 @@ class prt_analysis {
      * exports commonly show custom names like "Result"/"Result2" instead), so
      * a segment is recognized as a PRT field by process of elimination rather
      * than a literal "prt" prefix: exclude the "Seed: ..." metadata field and
-     * "ansK: ... [tag]" fields, and treat anything else shaped like
-     * "<name>: value" as a PRT.
+     * ans fields, and treat anything else shaped like "<name>: value" as a
+     * PRT.
      */
-    // \w* (zero or more), not \w+: a single-input question can genuinely
-    // name its own STACK input bare "ans" with no numeric/named suffix at
-    // all (confirmed on real production data) — a `+` here failed to
-    // recognize that field as an ans field, so it fell through to the
-    // generic "<name>: value" PRT-detection check below (line 59) instead,
+    // Matched by value shape (ends in "[score|valid|invalid]"), not a
+    // literal "ans" name prefix — a STACK input can be author-renamed to
+    // anything, including something with no "ans" in it at all (e.g. "R").
+    // An earlier version of this regex required "ans" (or "ans" + a bare
+    // suffix) at the start, so a differently-named ans field fell through
+    // to the generic "<name>: value" PRT-detection check below instead,
     // getting misread as a bogus PRT that then hit the "unrecognized value
-    // shape" catch-all and was recorded as a hard-failed PRT node for
-    // every single response to that question — see parser.php's identical
+    // shape" catch-all and was recorded as a hard-failed PRT node for every
+    // single response to that question — see parser.php's identical
     // ans-field regex for the matching fix on the response-classification
-    // side of this same bug.
-    const ANS_FIELD_RE = '/^\s*ans\w*\s*:\s*.*\[(?:score|valid|invalid)\]\s*$/i';
+    // side of this same bug. Operates on one already ";"-split $part, so no
+    // [^;]*?-style boundary guard is needed here the way the multi-field
+    // raw-text regexes elsewhere need one.
+    const ANS_FIELD_RE = '/^\s*\w+\s*:\s*.*\[(?:score|valid|invalid)\]\s*$/i';
 
     /** @var string Matches the "Seed: ..." metadata line so it's excluded from PRT-field detection. */
     const SEED_FIELD_RE = '/^\s*seed\s*:/i';

@@ -28,8 +28,16 @@ namespace local_quizanalytics\quiz\analytics;
  * PRT-distance and tree-edit-distance computations and their 3D/cross-attempt charts.
  */
 class solution_distance {
-    /** @var string Matches one "ansK: ... [tag]" PRT answer-note segment. */
-    const ANS_PATTERN = '/ans(\w+):\s*(.*?)\s*\[(score|valid|invalid)\]/';
+    /**
+     * Matches one "<name>: <expression> [tag]" answer segment, by value
+     * shape rather than a literal "ans" name prefix — an author-renamed
+     * input (e.g. "R") doesn't start with "ans" at all. [^;]*? (not a bare
+     * .*?) keeps the expression capture from spanning across an earlier
+     * field's own semicolon boundary to reach a later "[tag]" — see
+     * parser.php's parse_response_cell() for the same fix, hit by the same
+     * underlying bug.
+     */
+    const ANS_PATTERN = '/(\w+):\s*([^;]*?)\s*\[(score|valid|invalid)\]/';
 
     /** @var int Cap on distinct tree-edit-distance values shown before bucketing the rest into "other". */
     const MAX_TED_DISPLAY = 20;
@@ -132,18 +140,23 @@ class solution_distance {
     }
 
     /**
-     * First ansN: <expr> [tag] expression from a raw response/right-answer
-     * dump.
+     * The $ansindex'th (1-based, by order of appearance) "<name>: <expr>
+     * [tag]" expression from a raw response/right-answer dump — matches
+     * ans_list's own order-of-appearance 'index' scheme (see parser.php's
+     * parse_response_cell()) rather than parsing a digit out of the name,
+     * since a name isn't guaranteed to carry one.
      */
     private static function extract_expression(string $text, int $ansindex = 1): ?string {
         if ($text === '') {
             return null;
         }
         if (preg_match_all(self::ANS_PATTERN, $text, $matches, PREG_SET_ORDER)) {
+            $position = 1;
             foreach ($matches as $m) {
-                if ((int) $m[1] === $ansindex) {
+                if ($position === $ansindex) {
                     return trim($m[2]);
                 }
+                $position++;
             }
         }
         return null;
