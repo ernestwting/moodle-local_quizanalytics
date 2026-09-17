@@ -148,7 +148,7 @@ class question_analysis {
         // mix their expected answers/wrong-response lists together.
         $questions = [];
         foreach ($questionorder as $questionindex => $q) {
-            $versions = question_details::build_versioned_review($poolb, $q);
+            $versions = question_details::build_versioned_review($poolb, $q, $anonymize);
             foreach ($versions as &$version) {
                 // Debug-dump detection stays on the raw (pre-format_text) HTML,
                 // matching where this check always ran — format_text()'s HTML
@@ -182,6 +182,7 @@ class question_analysis {
             'snapshot' => $snapshot,
             'sections' => $sections,
             'questions' => $questions,
+            'question_review_links_allowed' => !$anonymize,
             'audit' => null,
         ];
     }
