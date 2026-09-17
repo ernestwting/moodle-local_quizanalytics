@@ -121,8 +121,34 @@ applied here), plus several fixes found while integrating it.
   "incorrect" (vermillion, `#D55E00`) each get a hue with no red or green
   in it at all there, not just a different shade of one.
 - **Title case for the "Anonymize Student Data", "Colorblind Mode",
-  "Quizzes to Include in Analytics", "View Analytics" and "Select All"**
-  labels, matching this plugin's other headings.
+  "Quizzes to Include in Analytics", "View Analytics", "Select All" and
+  "Select Quizzes"** labels, matching this plugin's other headings. The
+  "Select Quizzes" panel also now starts collapsed rather than expanded,
+  since the checkbox list itself is rarely needed until a teacher actually
+  wants to change the default (every quiz included).
+- **Question Review detail redesign**: each variant's wrong-response list
+  is now a broader response-*pattern* breakdown (`patterns`, replacing
+  `wrong`) keyed by response status *and* text together, so an invalid
+  input and a genuinely incorrect one with the same text no longer
+  collapse into a single entry, and direct links to a student's own
+  Moodle attempt are suppressed while Anonymize Student Data is on
+  (`question_review_links_allowed`) rather than potentially deanonymizing
+  a student through a review link left active.
+- **Fixed two regressions from a since-superseded GitHub merge** that
+  briefly landed on `main`: `parallel_course_fetcher.php` lost the
+  `true ||` override keeping forking permanently disabled (see [3.0.2] —
+  forking can crash Moodle's entire cron.php process outright), and
+  `section_selector.php` lost the "hide Model Analytics from the
+  switcher" line — both silently reverted by that merge rather than
+  edited deliberately. Also removed a duplicated, superseded hardcoded
+  "defer to background if over 100 attempts" block in `index.php` that
+  the same merge reintroduced alongside the real fix from earlier in this
+  entry, which — having no `is_stuck()` check of its own, and sitting
+  ahead of the code that does — sent a course over that count into a
+  genuine infinite reload loop whenever its background task never
+  completed (no cron running at all, the same class of problem the
+  `is_stuck()` fallback above exists to solve, just unreachable behind
+  this leftover duplicate).
 - **Schema/upgrade fixes carried with the above**: the new
   `local_quizanalytics_prepared` table's definition moved from an
   install-time `CREATE TABLE` helper into `db/install.xml` (so a fresh
