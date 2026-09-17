@@ -118,7 +118,7 @@ class parallel_course_fetcher {
      *
      * @param \stdClass $course
      * @param \stdClass[] $stackquizzes quiz records to fetch, keyed by quiz id
-     * @param int $workers maximum number of concurrent forked processes — currently ignored, see above
+     * @param int $workers maximum number of concurrent forked processes
      * @param callable|null $progresscallback optional callback receiving
      *        ($completed, $total, $details) in the parent process
      * @return array [quiz_name => records[]]
@@ -127,7 +127,7 @@ class parallel_course_fetcher {
      *         partial/incomplete result.
      */
     public static function fetch(\stdClass $course, array $stackquizzes, int $workers, ?callable $progresscallback = null): array {
-        if (true || $workers <= 1 || count($stackquizzes) <= 1 || !function_exists('pcntl_fork')) {
+        if ($workers <= 1 || count($stackquizzes) <= 1 || !function_exists('pcntl_fork')) {
             return \local_quizanalytics_quiz_data_fetcher::get_course_response_records(
                 $course, $stackquizzes, $progresscallback
             );

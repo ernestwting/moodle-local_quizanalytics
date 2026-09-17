@@ -654,10 +654,10 @@
     function renderVariantStatusBar(version) {
         var total = Number(version.students) || 0;
         var definitions = [
+            ['correct', 'Correct', '#22c55e'],
             ['incorrect', 'Incorrect', '#d62728'],
             ['invalid', 'Invalid input', '#ff7f0e'],
             ['noresponse', 'No response / not evaluated', '#2878b5'],
-            ['correct', 'Correct', '#22c55e'],
         ];
         var wrapper = document.createElement('div');
         wrapper.style.minWidth = '14rem';
@@ -669,6 +669,22 @@
         bar.style.borderRadius = '0.25rem';
         bar.style.overflow = 'hidden';
         bar.style.backgroundColor = '#e9ecef';
+        var hasAllCounts = definitions.every(function (definition) {
+            return Object.prototype.hasOwnProperty.call(version, definition[0]);
+        });
+        var countsTotal = definitions.reduce(function (sum, definition) {
+            return sum + (Number(version[definition[0]]) || 0);
+        }, 0);
+        if (total > 0 && (!hasAllCounts || countsTotal !== total)) {
+            bar.setAttribute('aria-label', 'Response status data unavailable or inconsistent');
+            wrapper.appendChild(bar);
+            var warning = document.createElement('small');
+            warning.style.display = 'block';
+            warning.style.marginTop = '0.25rem';
+            warning.textContent = 'Response status data unavailable (' + countsTotal + '/' + total + ' students classified).';
+            wrapper.appendChild(warning);
+            return wrapper;
+        }
         definitions.forEach(function (definition) {
             var count = Number(version[definition[0]]) || 0;
             if (!count || !total) return;
@@ -683,18 +699,35 @@
         var summary = document.createElement('small');
         summary.style.display = 'block';
         summary.style.marginTop = '0.25rem';
-        summary.textContent = (Number(version.incorrect) || 0) + ' incorrect · ' +
+        summary.textContent = (Number(version.correct) || 0) + ' correct · ' +
+            (Number(version.incorrect) || 0) + ' incorrect · ' +
             (Number(version.invalid) || 0) + ' invalid · ' +
             (Number(version.noresponse) || 0) + ' no response';
         wrapper.appendChild(summary);
         return wrapper;
     }
 
-    function renderVariantReviewCard(block, question, version, index, reviewUrl) {
+    function renderVariantStatusSummary(version) {
+        return (Number(version.correct) || 0) + ' correct · ' +
+            (Number(version.incorrect) || 0) + ' incorrect · ' +
+            (Number(version.invalid) || 0) + ' invalid · ' +
+            (Number(version.noresponse) || 0) + ' no response';
+    }
+
+    function renderVariantReviewCard(block, question, version, index, reviewUrl, linksAllowed, snapshot, actionButton) {
         var old = block.querySelector('.qa-variant-detail');
+        if (old && old.getAttribute('data-variant-index') === String(index)) {
+            old.remove();
+            if (actionButton) actionButton.textContent = 'View details';
+            return;
+        }
         if (old) old.remove();
+        Array.prototype.forEach.call(block.querySelectorAll('.qa-variant-action'), function (button) {
+            button.textContent = 'View details';
+        });
         var card = document.createElement('div');
         card.className = 'qa-variant-detail';
+        card.setAttribute('data-variant-index', String(index));
         card.style.marginTop = '1rem';
         card.style.padding = '1rem 1.25rem';
         card.style.border = '1px solid #d3d9e0';
@@ -702,46 +735,25 @@
         var heading = document.createElement('h5');
         heading.textContent = version.label.replace(/^Version\b/, 'Variant');
         card.appendChild(heading);
-        card.appendChild(document.createTextNode('Students receiving variant: ' + formatCellValue(version.students)));
-        var statusGrid = document.createElement('div');
-        statusGrid.style.display = 'grid';
-        statusGrid.style.gridTemplateColumns = 'minmax(8rem, 0.35fr) minmax(14rem, 1fr)';
-        statusGrid.style.gap = '0.75rem';
-        statusGrid.style.alignItems = 'center';
-        statusGrid.style.marginTop = '0.75rem';
-        var notCorrect = document.createElement('div');
-        var percent = Number(version.not_correct_percent) || 0;
-        notCorrect.textContent = 'Not correct: ' + (Number(version.not_correct) || 0) + '/' +
-            (Number(version.students) || 0) + ' (' + Math.round(percent) + '%)';
-        statusGrid.appendChild(notCorrect);
-        statusGrid.appendChild(renderVariantStatusBar(version));
-        card.appendChild(statusGrid);
-        var answer = document.createElement('p');
-        answer.innerHTML = '<strong>Expected answer:</strong> ' + (version.right_answer_html || '');
-        card.appendChild(answer);
-        var questionBox = document.createElement('div');
-        var responseBox = document.createElement('div');
-        var questionButton = document.createElement('button');
-        questionButton.type = 'button';
-        questionButton.className = 'btn btn-secondary btn-sm mr-2';
-        questionButton.textContent = 'View full question';
-        questionButton.addEventListener('click', function () { loadVariantReview(questionBox, reviewUrl, question, index, 'question'); });
-        var responseButton = document.createElement('button');
-        responseButton.type = 'button';
-        responseButton.className = 'btn btn-secondary btn-sm';
-        responseButton.textContent = 'View responses';
-        responseButton.addEventListener('click', function () { loadVariantReview(responseBox, reviewUrl, question, index, 'responses'); });
-        card.appendChild(questionButton);
-        card.appendChild(responseButton);
-        card.appendChild(questionBox);
-        card.appendChild(responseBox);
+        var students = document.createElement('p');
+        students.textContent = formatCellValue(version.students) + ' students';
+        students.style.marginBottom = '0.25rem';
+        card.appendChild(students);
+        var summary = document.createElement('p');
+        summary.textContent = renderVariantStatusSummary(version);
+        summary.style.marginBottom = '1rem';
+        card.appendChild(summary);
+        card.appendChild(document.createElement('hr'));
+        var loading = document.createElement('p');
+        loading.textContent = 'Loading prepared variant details…';
+        card.appendChild(loading);
         block.appendChild(card);
+        if (actionButton) actionButton.textContent = 'Hide details';
+        loadVariantReview(loading, reviewUrl, question, index, linksAllowed, snapshot);
         typesetMath(card);
     }
 
-    function loadVariantReview(target, reviewUrl, question, index, mode) {
-        if (target.dataset.loaded === mode) return;
-        target.textContent = 'Loading…';
+    function loadVariantReview(target, reviewUrl, question, index, linksAllowed, snapshot) {
         var url = new URL(reviewUrl, global.location.href);
         url.searchParams.set('question', question);
         url.searchParams.set('variant', index);
@@ -749,56 +761,117 @@
             .then(function (response) { return response.json(); })
             .then(function (version) {
                 target.textContent = '';
-                target.dataset.loaded = mode;
-                if (mode === 'question') {
-                    var heading = document.createElement('h6');
-                    heading.textContent = 'Full question';
-                    target.appendChild(heading);
-                    var text = document.createElement('div');
-                    text.innerHTML = version.question_text_html || '';
-                    target.appendChild(text);
-                } else {
-                    renderVariantResponses(target, version.common_responses || [], version.students);
-                }
+                renderVariantDetails(target, version, linksAllowed, snapshot);
                 typesetMath(target);
             })
             .catch(function () { target.textContent = 'Unable to load this prepared variant.'; });
     }
 
-    function renderVariantResponses(target, responses, denominator) {
-        var heading = document.createElement('h6');
-        heading.textContent = 'Most common incorrect responses';
-        target.appendChild(heading);
-        if (!responses.length) {
-            target.appendChild(document.createTextNode('No incorrect response patterns were found.'));
-            return;
+    function renderVariantDetails(target, version, linksAllowed, snapshot) {
+        function heading(text) {
+            var el = document.createElement('h6');
+            el.textContent = text;
+            el.style.marginTop = '1.1rem';
+            el.style.marginBottom = '0.4rem';
+            target.appendChild(el);
         }
-        var visible = 5;
+        heading('Full question');
+        var question = document.createElement('div');
+        question.innerHTML = version.question_text_html || '';
+        target.appendChild(question);
+        heading('Expected answer');
+        var answer = document.createElement('div');
+        answer.innerHTML = version.right_answer_html || '';
+        target.appendChild(answer);
+        var analysisPlaceholder = document.createElement('div');
+        analysisPlaceholder.className = 'alert alert-info';
+        var analysisHeading = document.createElement('h6');
+        analysisHeading.className = 'text-info';
+        analysisHeading.textContent = 'Response analysis';
+        analysisHeading.style.marginTop = '0';
+        analysisPlaceholder.appendChild(analysisHeading);
+        var placeholder = document.createElement('p');
+        placeholder.className = 'text-muted';
+        placeholder.style.marginBottom = '0';
+        placeholder.textContent = 'Further response-level analysis will be added in a future development.';
+        analysisPlaceholder.appendChild(placeholder);
+        target.appendChild(analysisPlaceholder);
+        if (linksAllowed && snapshot && snapshot.quiz_responses_url) {
+            var reportLink = document.createElement('a');
+            reportLink.href = snapshot.quiz_responses_url;
+            reportLink.target = '_blank';
+            reportLink.rel = 'noopener noreferrer';
+            reportLink.textContent = 'View all responses in Moodle ↗';
+            reportLink.style.display = 'inline-block';
+            reportLink.style.marginTop = '1rem';
+            target.appendChild(reportLink);
+        } else if (!linksAllowed) {
+            var privacy = document.createElement('p');
+            privacy.textContent = 'Example links unavailable in anonymized mode.';
+            target.appendChild(privacy);
+        }
+    }
+
+    function formatVariantPercent(count, denominator) {
+        return denominator ? (Number(count) / Number(denominator) * 100).toFixed(1) : 'N/A';
+    }
+
+    function renderVariantResponseGroup(target, status, title, responses, denominator, linksAllowed) {
+        var matching = responses.filter(function (item) {
+            return item.response_status === status;
+        });
+        if (!matching.length) return;
+        var group = document.createElement('div');
+        var heading = document.createElement('h6');
+        heading.textContent = title;
+        heading.style.marginTop = '1rem';
+        group.appendChild(heading);
+        var table = document.createElement('table');
+        table.className = 'generaltable';
+        var head = table.createTHead().insertRow();
+        ['Response', 'Students', '% of variant', 'Example'].forEach(function (label) {
+            var cell = document.createElement('th');
+            cell.textContent = label;
+            head.appendChild(cell);
+        });
+        var body = table.createTBody();
+        var visible = Math.min(5, matching.length);
         function draw() {
-            var old = target.querySelector('table');
-            if (old) old.remove();
-            renderDataTable(target, {
-                columns: ['Response', 'Students', '% of variant'],
-                rows: responses.slice(0, visible).map(function (item) {
-                    var percent = denominator ? (Number(item.students) / Number(denominator) * 100).toFixed(1) + '%' : 'N/A';
-                    return [item.response, item.students, percent];
-                }),
+            body.textContent = '';
+            matching.slice(0, visible).forEach(function (item) {
+                var row = body.insertRow();
+                row.insertCell().innerHTML = formatCellValue(item.response);
+                row.insertCell().textContent = formatCellValue(item.students);
+                row.insertCell().textContent = formatVariantPercent(item.students, denominator) + '%';
+                var example = row.insertCell();
+                if (linksAllowed && item.review_url) {
+                    var link = document.createElement('a');
+                    link.href = item.review_url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = 'View in Moodle ↗';
+                    example.appendChild(link);
+                } else {
+                    example.textContent = 'Example link unavailable in anonymized mode';
+                }
             });
-            var more = target.querySelector('.qa-show-more');
+            var more = group.querySelector('.qa-show-more');
             if (more) more.remove();
-            if (visible < responses.length) {
+            if (visible < matching.length) {
                 more = document.createElement('button');
                 more.type = 'button';
                 more.className = 'btn btn-link qa-show-more';
                 more.textContent = 'Show more responses';
-                more.addEventListener('click', function () { visible = responses.length; draw(); });
-                target.appendChild(more);
+                more.addEventListener('click', function () { visible = matching.length; draw(); });
+                group.appendChild(more);
             }
         }
+        group.appendChild(wrapScrollable(table, matching.length));
         draw();
+        target.appendChild(group);
     }
 
-    function renderQuestionDetailsLazy(root, prefix, questions, snapshot, reviewUrl) {
+    function renderQuestionDetailsLazy(root, prefix, questions, snapshot, reviewUrl, linksAllowed) {
         var names = Object.keys(questions || {});
         if (!names.length) return;
         var wrapper = document.createElement('div');
@@ -836,35 +909,29 @@
             block.style.display = i === 0 ? 'block' : 'none';
             block.style.marginTop = '1rem';
             var versions = questions[name].versions || [];
-            if (versions.length === 1) {
-                renderVariantReviewCard(block, name, versions[0], 0, reviewUrl);
-            } else {
-                var table = document.createElement('table');
-                table.className = 'generaltable';
-                table.innerHTML = '<thead><tr><th>Variant</th><th>Students</th><th>Not correct</th>' +
-                    '<th>Response status</th><th>Expected answer</th><th>Action</th></tr></thead>';
-                var tbody = table.createTBody();
-                versions.forEach(function (version, index) {
-                    var row = tbody.insertRow();
-                    row.insertCell().textContent = version.label.replace(/^Version\b/, 'Variant');
-                    row.insertCell().textContent = formatCellValue(version.students);
-                    var notCorrect = Number(version.not_correct) || 0;
-                    var studentCount = Number(version.students) || 0;
-                    var notCorrectPercent = Number(version.not_correct_percent) || 0;
-                    row.insertCell().textContent = notCorrect + '/' + studentCount +
-                        ' (' + Math.round(notCorrectPercent) + '%)';
-                    row.insertCell().appendChild(renderVariantStatusBar(version));
-                    row.insertCell().innerHTML = version.right_answer_html || '';
-                    var action = row.insertCell();
-                    var button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = 'btn btn-secondary btn-sm';
-                    button.textContent = 'View details';
-                    button.addEventListener('click', function () { renderVariantReviewCard(block, name, version, index, reviewUrl); });
-                    action.appendChild(button);
+            var table = document.createElement('table');
+            table.className = 'generaltable';
+            table.innerHTML = '<thead><tr><th>Variant</th><th>Students</th>' +
+                '<th>Response status</th><th>Expected answer</th><th>Action</th></tr></thead>';
+            var tbody = table.createTBody();
+            versions.forEach(function (version, index) {
+                var row = tbody.insertRow();
+                row.insertCell().textContent = version.label.replace(/^Version\b/, 'Variant');
+                row.insertCell().textContent = formatCellValue(version.students);
+                row.insertCell().appendChild(renderVariantStatusBar(version));
+                row.insertCell().innerHTML = version.right_answer_html || '';
+                var action = row.insertCell();
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn-secondary btn-sm';
+                button.className += ' qa-variant-action';
+                button.textContent = 'View details';
+                button.addEventListener('click', function () {
+                    renderVariantReviewCard(block, name, version, index, reviewUrl, linksAllowed, snapshot, button);
                 });
-                block.appendChild(wrapScrollable(table, versions.length));
-            }
+                action.appendChild(button);
+            });
+            block.appendChild(wrapScrollable(table, versions.length));
             blocksRoot.appendChild(block);
         });
         wrapper.appendChild(blocksRoot);
@@ -873,7 +940,7 @@
                 block.style.display = block.getAttribute('data-question') === select.value ? 'block' : 'none';
             });
         });
-        if (snapshot && snapshot.quiz_responses_url) {
+        if (linksAllowed && snapshot && snapshot.quiz_responses_url) {
             var reportLink = document.createElement('a');
             reportLink.href = snapshot.quiz_responses_url;
             reportLink.target = '_blank';
@@ -882,6 +949,10 @@
             reportLink.style.display = 'inline-block';
             reportLink.style.marginTop = '1rem';
             wrapper.appendChild(reportLink);
+        } else if (!linksAllowed) {
+            var privacy = document.createElement('p');
+            privacy.textContent = 'Example links unavailable in anonymized mode.';
+            wrapper.appendChild(privacy);
         }
         root.appendChild(wrapper);
         typesetMath(wrapper);
@@ -1003,7 +1074,8 @@
             result.sections.forEach(function (section) {
                 renderSection(sectionsRoot, section, prefix);
                 if (section.id === 'question-response-overview') {
-                    renderQuestionDetailsLazy(sectionsRoot, prefix, result.questions, result.snapshot, result.question_review_url);
+                    renderQuestionDetailsLazy(sectionsRoot, prefix, result.questions, result.snapshot, result.question_review_url,
+                        result.question_review_links_allowed !== false);
                 }
             });
             renderAudit(sectionsRoot, prefix, result.audit);

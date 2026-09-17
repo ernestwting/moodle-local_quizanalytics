@@ -76,13 +76,6 @@ class local_quizanalytics_section_selector {
         unset($options['models']);
         unset($options['diagnostics']);
 
-        // Temporarily hidden at the user's request (2026-09-09) — not a
-        // redesign like the Diagnostics omission above, just pulled off the
-        // front end for now. modelanalytics.php itself is untouched and
-        // still fully reachable by a direct URL; delete this line to bring
-        // the button back.
-        unset($options['models']);
-
         // Rendered as plain links rather than a form+select — there's no
         // per-section state to carry across the switch (unlike the quiz/view
         // selectors nested inside each section, which do need a GET form to
