@@ -86,6 +86,20 @@ applied here), plus several fixes found while integrating it.
   stale-while-revalidate pattern as Quiz Analytics above, reused rather
   than reimplemented (`classes/quiz/prepared_store.php`,
   `classes/event_observer.php`, `db/events.php`).
+- **Fixed a PHPUnit CI failure** (`Class
+  "local_quizanalytics\task\warm_single_view_adhoc_task" not found`, on an
+  otherwise-unrelated later test): `event_observer.php`'s
+  `attempt_submitted()` handler manually `require_once()`'d that
+  namespaced (PSR-4-autoloaded) class file by path from inside a method.
+  Its own top-level `require_once($CFG->dirroot . ...)` lines then ran in
+  *that method's* local scope, where `$CFG` was never declared `global`,
+  throwing an "Undefined variable $CFG" warning partway through the file
+  — fatal under PHPUnit's `--fail-on-warning`, and since PHP's own
+  `require_once` bookkeeping still marks that path "already included"
+  even on an aborted require, the class silently never loaded on any
+  later occurrence of the same event either. Removed the manual require;
+  Moodle's autoloader loads the file correctly on its own the moment the
+  namespaced call actually runs, with `$CFG` already available.
 - **Question Review response-status summary**: each variant's card now
   shows a correct/incorrect/invalid/no-response breakdown and a
   "% not correct" figure derived from the same per-student status data
