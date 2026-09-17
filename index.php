@@ -139,7 +139,7 @@ $selectionform .= ' ' . html_writer::tag('button', get_string('clearall', 'local
 $selectionform .= ' ' . html_writer::tag('button', get_string('viewanalytics', 'local_quizanalytics'), [
     'type' => 'submit', 'class' => 'btn btn-primary btn-sm',
 ]);
-$selectionform .= html_writer::start_tag('details', ['class' => 'mt-2', 'open' => 'open']);
+$selectionform .= html_writer::start_tag('details', ['class' => 'mt-2']);
 $selectionform .= html_writer::tag('summary', get_string('selectquizzes', 'local_quizanalytics'));
 $lastsection = null;
 foreach ($allstackquizzes as $quizid => $quiz) {
