@@ -25,7 +25,7 @@
 namespace local_quizanalytics\quiz\analytics;
 
 /**
- * Per-question drill-down: question text, right answer, and wrong-response breakdown.
+ * Per-question drill-down: question text, right answer, and response-pattern breakdown.
  */
 class question_details {
     /** @var string Placeholder shown when a field wasn't captured for a given attempt. */
@@ -40,9 +40,10 @@ class question_details {
      *
      * @param array[] $poolbrows
      * @param string $question
+     * @param bool $anonymize Whether direct Moodle attempt links must be suppressed.
      * @return array[]
      */
-    public static function build_versioned_review(array $poolbrows, string $question): array {
+    public static function build_versioned_review(array $poolbrows, string $question, bool $anonymize = false): array {
         $groups = [];
         foreach ($poolbrows as $row) {
             if ($row['question'] !== $question) {
@@ -61,7 +62,7 @@ class question_details {
                     'student_statuses' => [],
                     'sample_attempt_id' => (int) ($row['attempt_id'] ?? 0),
                     'cmid' => (int) ($row['cmid'] ?? 0),
-                    'wrong' => [],
+                    'patterns' => [],
                     'status_counts' => [
                         'correct' => 0,
                         'incorrect' => 0,
@@ -77,16 +78,16 @@ class question_details {
             // Keep a second guard here so each student's status contributes
             // once per displayed variant even if an upstream export contains
             // duplicate rows.
+            $status = (string) ($row['response_status'] ?? '');
+            if (!in_array($status, ['correct', 'incorrect', 'invalid'], true)) {
+                $status = 'noresponse';
+            }
             if (!isset($groups[$key]['student_statuses'][$studentid])) {
-                $status = (string) ($row['response_status'] ?? '');
-                if (!in_array($status, ['correct', 'incorrect', 'invalid'], true)) {
-                    $status = 'noresponse';
-                }
                 $groups[$key]['student_statuses'][$studentid] = $status;
                 $groups[$key]['status_counts'][$status]++;
             }
 
-            if (($row['grade'] ?? null) !== null && (float) $row['grade'] < 1.0) {
+            if (in_array($status, ['incorrect', 'invalid'], true)) {
                 // A genuinely blank response (no ansN: field at all, so
                 // parser::build_response_rows() never had an expression to
                 // parse) still carries Moodle's own raw response summary in
@@ -96,18 +97,19 @@ class question_details {
                 // swapped for a plain, honest placeholder instead. A
                 // response_status of 'invalid' is left alone here — that's
                 // real (if malformed) student input, worth showing.
-                $response = ($row['response_status'] ?? '') === 'blank'
-                    ? self::NO_RESPONSE
-                    : trim((string) ($row['response_text'] ?? ''));
+                $response = trim((string) ($row['response_text'] ?? ''));
                 if ($response !== '') {
-                    if (!isset($groups[$key]['wrong'][$response])) {
-                        $groups[$key]['wrong'][$response] = [
+                    $patternkey = $status . "\0" . $response;
+                    if (!isset($groups[$key]['patterns'][$patternkey])) {
+                        $groups[$key]['patterns'][$patternkey] = [
+                            'response' => $response,
+                            'response_status' => $status,
                             'students' => 0,
                             'sample_attempt_id' => (int) ($row['attempt_id'] ?? 0),
                             'cmid' => (int) ($row['cmid'] ?? 0),
                         ];
                     }
-                    $groups[$key]['wrong'][$response]['students']++;
+                    $groups[$key]['patterns'][$patternkey]['students']++;
                 }
             }
         }
@@ -115,20 +117,23 @@ class question_details {
         $versions = [];
         $versionnumber = 1;
         foreach ($groups as $group) {
-            uasort($group['wrong'], static function (array $a, array $b): int {
+            uasort($group['patterns'], static function (array $a, array $b): int {
                 return $b['students'] <=> $a['students'];
             });
             $common = [];
-            foreach ($group['wrong'] as $response => $data) {
-                $reviewurl = (new \moodle_url('/mod/quiz/review.php', [
-                    'attempt' => $data['sample_attempt_id'],
-                    'cmid' => $data['cmid'],
-                ]))->out(false);
-                $common[] = [
-                    'response' => $response,
+            foreach ($group['patterns'] as $data) {
+                $pattern = [
+                    'response' => $data['response'],
+                    'response_status' => $data['response_status'],
                     'students' => (int) $data['students'],
-                    'review_url' => $reviewurl,
                 ];
+                if (!$anonymize) {
+                    $pattern['review_url'] = (new \moodle_url('/mod/quiz/review.php', [
+                        'attempt' => $data['sample_attempt_id'],
+                        'cmid' => $data['cmid'],
+                    ]))->out(false);
+                }
+                $common[] = $pattern;
             }
             $students = count($group['students']);
             $statuscounts = $group['status_counts'];
@@ -150,7 +155,7 @@ class question_details {
                 'question_text_raw' => $group['question_text_raw'],
                 'right_answer_text' => $group['right_answer_text'],
                 'common_responses' => $common,
-                'review_url' => (new \moodle_url('/mod/quiz/review.php', [
+                'review_url' => $anonymize ? '' : (new \moodle_url('/mod/quiz/review.php', [
                     'attempt' => $group['sample_attempt_id'],
                     'cmid' => $group['cmid'],
                 ]))->out(false),
