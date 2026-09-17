@@ -654,10 +654,10 @@
     function renderVariantStatusBar(version) {
         var total = Number(version.students) || 0;
         var definitions = [
+            ['correct', 'Correct', '#22c55e'],
             ['incorrect', 'Incorrect', '#d62728'],
             ['invalid', 'Invalid input', '#ff7f0e'],
             ['noresponse', 'No response / not evaluated', '#2878b5'],
-            ['correct', 'Correct', '#22c55e'],
         ];
         var wrapper = document.createElement('div');
         wrapper.style.minWidth = '14rem';
@@ -669,6 +669,22 @@
         bar.style.borderRadius = '0.25rem';
         bar.style.overflow = 'hidden';
         bar.style.backgroundColor = '#e9ecef';
+        var hasAllCounts = definitions.every(function (definition) {
+            return Object.prototype.hasOwnProperty.call(version, definition[0]);
+        });
+        var countsTotal = definitions.reduce(function (sum, definition) {
+            return sum + (Number(version[definition[0]]) || 0);
+        }, 0);
+        if (total > 0 && (!hasAllCounts || countsTotal !== total)) {
+            bar.setAttribute('aria-label', 'Response status data unavailable or inconsistent');
+            wrapper.appendChild(bar);
+            var warning = document.createElement('small');
+            warning.style.display = 'block';
+            warning.style.marginTop = '0.25rem';
+            warning.textContent = 'Response status data unavailable (' + countsTotal + '/' + total + ' students classified).';
+            wrapper.appendChild(warning);
+            return wrapper;
+        }
         definitions.forEach(function (definition) {
             var count = Number(version[definition[0]]) || 0;
             if (!count || !total) return;
@@ -683,7 +699,8 @@
         var summary = document.createElement('small');
         summary.style.display = 'block';
         summary.style.marginTop = '0.25rem';
-        summary.textContent = (Number(version.incorrect) || 0) + ' incorrect · ' +
+        summary.textContent = (Number(version.correct) || 0) + ' correct · ' +
+            (Number(version.incorrect) || 0) + ' incorrect · ' +
             (Number(version.invalid) || 0) + ' invalid · ' +
             (Number(version.noresponse) || 0) + ' no response';
         wrapper.appendChild(summary);
@@ -705,15 +722,10 @@
         card.appendChild(document.createTextNode('Students receiving variant: ' + formatCellValue(version.students)));
         var statusGrid = document.createElement('div');
         statusGrid.style.display = 'grid';
-        statusGrid.style.gridTemplateColumns = 'minmax(8rem, 0.35fr) minmax(14rem, 1fr)';
+        statusGrid.style.gridTemplateColumns = 'minmax(14rem, 1fr)';
         statusGrid.style.gap = '0.75rem';
         statusGrid.style.alignItems = 'center';
         statusGrid.style.marginTop = '0.75rem';
-        var notCorrect = document.createElement('div');
-        var percent = Number(version.not_correct_percent) || 0;
-        notCorrect.textContent = 'Not correct: ' + (Number(version.not_correct) || 0) + '/' +
-            (Number(version.students) || 0) + ' (' + Math.round(percent) + '%)';
-        statusGrid.appendChild(notCorrect);
         statusGrid.appendChild(renderVariantStatusBar(version));
         card.appendChild(statusGrid);
         var answer = document.createElement('p');
@@ -841,18 +853,13 @@
             } else {
                 var table = document.createElement('table');
                 table.className = 'generaltable';
-                table.innerHTML = '<thead><tr><th>Variant</th><th>Students</th><th>Not correct</th>' +
+                table.innerHTML = '<thead><tr><th>Variant</th><th>Students</th>' +
                     '<th>Response status</th><th>Expected answer</th><th>Action</th></tr></thead>';
                 var tbody = table.createTBody();
                 versions.forEach(function (version, index) {
                     var row = tbody.insertRow();
                     row.insertCell().textContent = version.label.replace(/^Version\b/, 'Variant');
                     row.insertCell().textContent = formatCellValue(version.students);
-                    var notCorrect = Number(version.not_correct) || 0;
-                    var studentCount = Number(version.students) || 0;
-                    var notCorrectPercent = Number(version.not_correct_percent) || 0;
-                    row.insertCell().textContent = notCorrect + '/' + studentCount +
-                        ' (' + Math.round(notCorrectPercent) + '%)';
                     row.insertCell().appendChild(renderVariantStatusBar(version));
                     row.insertCell().innerHTML = version.right_answer_html || '';
                     var action = row.insertCell();
