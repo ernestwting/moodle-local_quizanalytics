@@ -783,10 +783,19 @@
         var answer = document.createElement('div');
         answer.innerHTML = version.right_answer_html || '';
         target.appendChild(answer);
-        heading('Response analysis');
+        var analysisPlaceholder = document.createElement('div');
+        analysisPlaceholder.className = 'alert alert-info';
+        var analysisHeading = document.createElement('h6');
+        analysisHeading.className = 'text-info';
+        analysisHeading.textContent = 'Response analysis';
+        analysisHeading.style.marginTop = '0';
+        analysisPlaceholder.appendChild(analysisHeading);
         var placeholder = document.createElement('p');
+        placeholder.className = 'text-muted';
+        placeholder.style.marginBottom = '0';
         placeholder.textContent = 'Further response-level analysis will be added in a future development.';
-        target.appendChild(placeholder);
+        analysisPlaceholder.appendChild(placeholder);
+        target.appendChild(analysisPlaceholder);
         if (linksAllowed && snapshot && snapshot.quiz_responses_url) {
             var reportLink = document.createElement('a');
             reportLink.href = snapshot.quiz_responses_url;
