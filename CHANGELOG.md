@@ -157,6 +157,24 @@ applied here), plus several fixes found while integrating it.
   had the identical reload-loop exposure whenever a stale report already
   existed to serve, which a merge conflict had masked from ever being
   caught the first time around.
+- **Fixed `is_stuck()` treating a genuinely large, still-actively-running
+  background compute the same as an abandoned one.** It previously judged
+  "stuck" purely by how long a task had existed in the queue — but a real
+  ~55,000-attempt, 38-quiz course legitimately takes several minutes once
+  a worker is actually grinding through it (confirmed directly against
+  this session's own test data), well past the 60-second cutoff meant to
+  catch "cron never picked this up at all." Revisiting the page during
+  that window triggered a second, redundant inline compute of the exact
+  same view — confirmed directly to be actively harmful, not just
+  wasteful: competing with the already-running worker for the same
+  Maxima/CPU/memory budget got the redundant attempt itself killed under
+  the resulting resource pressure. `is_stuck()` now checks the adhoc
+  task's own `timestarted` column: a task a worker has never claimed
+  still falls back after 60 seconds (cron isn't running at all), but one
+  a worker has actually started gets the same 15-minute grace period
+  (`STALE_SECONDS`) the admin-facing "this looks stuck" warning already
+  uses, before being treated as abandoned (crashed or OOM-killed
+  mid-run) rather than merely slow.
 - **Schema/upgrade fixes carried with the above**: the new
   `local_quizanalytics_prepared` table's definition moved from an
   install-time `CREATE TABLE` helper into `db/install.xml` (so a fresh

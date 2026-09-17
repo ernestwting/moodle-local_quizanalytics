@@ -126,19 +126,60 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
     const INLINE_FALLBACK_SECONDS = 60;
 
     /**
-     * Whether a background compute matching $customdata has been sitting
-     * queued/running longer than INLINE_FALLBACK_SECONDS without finishing
-     * — the signal on-demand pages use to stop waiting on cron and just
-     * compute the view themselves on this request. Returns false (not
-     * stuck) when no matching task is queued at all — nothing to wait on
-     * yet.
+     * Whether a background compute matching $customdata looks abandoned
+     * rather than merely slow — the signal on-demand pages use to stop
+     * waiting on cron and just compute the view themselves on this
+     * request. Returns false (not stuck) when no matching task is queued
+     * at all — nothing to wait on yet.
+     *
+     * Distinguishes "still sitting in the queue, untouched" from "a worker
+     * has actually claimed and is actively running it" via the adhoc
+     * task's own timestarted column, rather than a single age cutoff for
+     * both: confirmed directly that treating a genuinely-running task the
+     * same as an unclaimed one is actively harmful, not just wasteful — a
+     * second request computing the same view inline in parallel on a
+     * large course (~55,000 attempts, 38 quizzes, in this session's own
+     * testing) competed with the already-running worker for the same
+     * Maxima/CPU/memory budget, and the redundant inline attempt was
+     * itself killed under the resulting resource pressure. A task cron
+     * never even picked up within INLINE_FALLBACK_SECONDS (60s) most
+     * likely means cron isn't running on this site at all — falling back
+     * immediately is correct there. A task a worker has already claimed
+     * gets the same, much longer grace period STALE_SECONDS (15 minutes)
+     * grants the admin-facing "this looks stuck" warning before this
+     * class treats *that* as abandoned too (the worker most likely
+     * crashed or was OOM-killed mid-run) — not the short one, since
+     * genuinely large courses can legitimately take several minutes once
+     * a worker is actively grinding through them.
      *
      * @param array $customdata exact dispatch_for_*() payload for this view
      * @return bool
      */
     public static function is_stuck(array $customdata): bool {
-        $age = self::get_queued_age_seconds($customdata);
-        return $age !== null && $age > self::INLINE_FALLBACK_SECONDS;
+        global $DB;
+
+        $task = new self();
+        $task->set_custom_data((object) $customdata);
+        $encoded = $task->get_custom_data_as_string();
+
+        $sql = 'classname = ? AND component = ? AND '
+            . $DB->sql_compare_text('customdata', \core_text::strlen($encoded) + 1) . ' = ?';
+        $record = $DB->get_record_select(
+            'task_adhoc',
+            $sql,
+            [\core\task\manager::get_canonical_class_name($task), $task->get_component(), $encoded],
+            'timecreated, timestarted'
+        );
+
+        if (!$record) {
+            return false;
+        }
+
+        $age = time() - (int) $record->timecreated;
+        if (!empty($record->timestarted)) {
+            return $age > self::STALE_SECONDS;
+        }
+        return $age > self::INLINE_FALLBACK_SECONDS;
     }
 
     /**
