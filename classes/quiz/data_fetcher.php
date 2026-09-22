@@ -345,7 +345,10 @@ class local_quizanalytics_quiz_data_fetcher {
      */
     public static function get_response_records_for_quiz_cached(stdClass $quiz, stdClass $course, string $fingerprint): array {
         $cache = \cache::make('local_quizanalytics', 'rawrecords');
-        $key = \local_quizanalytics_quiz_cache_helper::build_key($quiz->id, $fingerprint);
+        // The raw record shape includes question IDs used by Question Review
+        // navigation. Version the key so records cached before that metadata
+        // existed are fetched once through the normal path.
+        $key = \local_quizanalytics_quiz_cache_helper::build_key('question-links-v1', $quiz->id, $fingerprint);
         $records = $cache->get($key);
         if ($records === false) {
             $records = self::get_response_records_for_quiz($quiz, $course);
@@ -607,6 +610,7 @@ class local_quizanalytics_quiz_data_fetcher {
 
             $qnum = 1;
             foreach ($quba->get_slots() as $slot) {
+                $qa = $quba->get_question_attempt($slot);
                 // $quba->get_question($slot) is the single most expensive
                 // call in this whole method — 4.2ms/call measured directly
                 // (vs. under 0.03ms combined for the three calls below),
@@ -642,6 +646,7 @@ class local_quizanalytics_quiz_data_fetcher {
                     $questiontextbyslot[$qnum][$variant] = self::render_stack_question_text($quba->get_question($slot));
                 }
                 $row["question_{$qnum}_text"] = $questiontextbyslot[$qnum][$variant];
+                $row["question_{$qnum}_id"] = $qa->get_question_id();
 
                 // Get_response_summary() is the same method the core "Responses"
                 // report calls to build its "Response N" column — for STACK
@@ -657,7 +662,7 @@ class local_quizanalytics_quiz_data_fetcher {
                 // earlier, since-superseded validation — see parser.php's
                 // own use of this field. Cheap: reads off the already-loaded
                 // $quba, no extra query.
-                $row["question_{$qnum}_state"]   = (string) $quba->get_question_attempt($slot)->get_state();
+                $row["question_{$qnum}_state"]   = (string) $qa->get_state();
 
                 $qnum++;
             }

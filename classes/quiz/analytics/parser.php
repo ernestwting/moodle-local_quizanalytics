@@ -358,6 +358,7 @@ class parser {
                     'attempt_id' => $rec['attempt_id'] ?? null,
                     'attempt_number' => $rec['attempt_number'] ?? null,
                     'cmid' => $rec['cmid'] ?? null,
+                    'question_id' => $rec["question_{$n}_id"] ?? null,
                     'student_id' => $studentid,
                     'student_name' => $studentname,
                     'question' => $questionlabel,

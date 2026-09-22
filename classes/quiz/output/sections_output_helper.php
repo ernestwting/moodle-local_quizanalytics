@@ -375,11 +375,14 @@ class sections_output_helper {
         $html = '';
 
         if ($includevendor) {
+            global $CFG;
             $plotlyurl = new \moodle_url('/local/quizanalytics/js/vendor/plotly.min.js');
             $katexcssurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/katex.min.css');
             $katexjsurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/katex.min.js');
             $katexautorenderurl = new \moodle_url('/local/quizanalytics/js/vendor/katex/contrib/auto-render.min.js');
-            $sectionsrendererurl = new \moodle_url('/local/quizanalytics/js/vendor-shared/sections-renderer.js');
+            $sectionsrendererurl = new \moodle_url('/local/quizanalytics/js/vendor-shared/sections-renderer.js', [
+                'v' => filemtime($CFG->dirroot . '/local/quizanalytics/js/vendor-shared/sections-renderer.js'),
+            ]);
 
             $html .= \html_writer::empty_tag('link', ['rel' => 'stylesheet', 'href' => $katexcssurl->out(false)]);
             $html .= \html_writer::tag('script', '', ['src' => $plotlyurl->out(false)]);

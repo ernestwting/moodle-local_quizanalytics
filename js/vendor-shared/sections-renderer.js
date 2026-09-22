@@ -796,12 +796,12 @@
         placeholder.textContent = 'Further response-level analysis will be added in a future development.';
         analysisPlaceholder.appendChild(placeholder);
         target.appendChild(analysisPlaceholder);
-        if (linksAllowed && snapshot && snapshot.quiz_responses_url) {
+        if (linksAllowed && version.stack_response_analysis_url) {
             var reportLink = document.createElement('a');
-            reportLink.href = snapshot.quiz_responses_url;
+            reportLink.href = version.stack_response_analysis_url;
             reportLink.target = '_blank';
             reportLink.rel = 'noopener noreferrer';
-            reportLink.textContent = 'View all responses in Moodle ↗';
+            reportLink.textContent = 'Analyze responses in STACK \u2197';
             reportLink.style.display = 'inline-block';
             reportLink.style.marginTop = '1rem';
             target.appendChild(reportLink);
@@ -901,6 +901,28 @@
             select.appendChild(option);
         });
         wrapper.appendChild(select);
+
+        var questionLink = document.createElement('a');
+        questionLink.target = '_blank';
+        questionLink.rel = 'noopener noreferrer';
+        questionLink.textContent = 'Open STACK question dashboard \u2197';
+        questionLink.style.display = 'inline-block';
+        questionLink.style.marginLeft = '1rem';
+        questionLink.style.marginTop = '0.5rem';
+        questionLink.style.marginBottom = '0.5rem';
+        wrapper.appendChild(questionLink);
+
+        function updateQuestionLink() {
+            var selected = questions[select.value] || {};
+            if (selected.question_dashboard_url) {
+                questionLink.href = selected.question_dashboard_url;
+                questionLink.style.display = 'inline-block';
+            } else {
+                questionLink.removeAttribute('href');
+                questionLink.style.display = 'none';
+            }
+        }
+        updateQuestionLink();
         var blocksRoot = document.createElement('div');
         names.forEach(function (name, i) {
             var block = document.createElement('div');
@@ -939,6 +961,7 @@
             Array.prototype.forEach.call(blocksRoot.children, function (block) {
                 block.style.display = block.getAttribute('data-question') === select.value ? 'block' : 'none';
             });
+            updateQuestionLink();
         });
         if (linksAllowed && snapshot && snapshot.quiz_responses_url) {
             var reportLink = document.createElement('a');

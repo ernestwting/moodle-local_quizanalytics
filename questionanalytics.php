@@ -39,6 +39,7 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/api_client.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/cache_helper.php');
+require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/analytics/question_details.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/prepared_store.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/section_selector.php');
 
@@ -185,11 +186,16 @@ if ($view === 'question') {
         $anonymize
     );
     $result = $qacache->get($qakey);
+    if ($result !== false &&
+            !\local_quizanalytics\quiz\analytics\question_analysis::has_current_question_review_metadata($result)) {
+        $result = false;
+    }
     $showingstale = false;
     if ($result === false) {
         $prepared = \local_quizanalytics_prepared_store::get($courseid, $quizid, 'question');
         $preparedpayload = \local_quizanalytics_prepared_store::decode($prepared);
-        if ($preparedpayload !== null) {
+        if ($preparedpayload !== null &&
+                \local_quizanalytics\quiz\analytics\question_analysis::has_current_question_review_metadata($preparedpayload)) {
             if (\local_quizanalytics_prepared_store::is_fresh($prepared, $stats->fingerprint)) {
                 $result = $preparedpayload;
                 $qacache->set($qakey, $result);
@@ -274,6 +280,14 @@ if ($view === 'question') {
     }
 
     if (is_array($result)) {
+        foreach ($result['questions'] ?? [] as &$questiondetail) {
+            $links = \local_quizanalytics\quiz\analytics\question_details::build_stack_links(
+                (int) ($questiondetail['question_id'] ?? 0),
+                (int) ($questiondetail['cmid'] ?? 0)
+            );
+            $questiondetail['question_dashboard_url'] = $links['question_dashboard_url'];
+        }
+        unset($questiondetail);
         $reviewurl = (new moodle_url('/local/quizanalytics/questionreview.php', [
             'id' => $courseid,
             'quizid' => $quizid,

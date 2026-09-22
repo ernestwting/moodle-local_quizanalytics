@@ -3,6 +3,7 @@ define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/data_fetcher.php');
 require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/cache_helper.php');
+require_once($CFG->dirroot . '/local/quizanalytics/classes/quiz/analytics/question_details.php');
 
 $courseid = required_param('id', PARAM_INT);
 $quizid = required_param('quizid', PARAM_INT);
@@ -33,6 +34,14 @@ if (!is_array($version)) {
     http_response_code(404);
     echo json_encode(['error' => 'Question variant is not available.']);
     exit;
+}
+
+if (!$anonymize) {
+    $links = \local_quizanalytics\quiz\analytics\question_details::build_stack_links(
+        (int) ($version['question_id'] ?? 0),
+        (int) ($version['cmid'] ?? 0)
+    );
+    $version['stack_response_analysis_url'] = $links['stack_response_analysis_url'];
 }
 
 header('Content-Type: application/json; charset=utf-8');

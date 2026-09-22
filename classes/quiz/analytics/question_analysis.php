@@ -33,6 +33,21 @@ namespace local_quizanalytics\quiz\analytics;
  * Assembles the simplified Question Analytics {summary, snapshot, sections, questions, audit} payload for one quiz.
  */
 class question_analysis {
+    /** Current shape version for prepared Question Review payloads. */
+    public const QUESTION_REVIEW_PAYLOAD_VERSION = 2;
+
+    /**
+     * Return whether a prepared payload contains the current navigation
+     * metadata. Older durable payloads are rebuilt through the normal path.
+     *
+     * @param array|null $payload
+     * @return bool
+     */
+    public static function has_current_question_review_metadata(?array $payload): bool {
+        return is_array($payload)
+            && ($payload['question_review_payload_version'] ?? null) === self::QUESTION_REVIEW_PAYLOAD_VERSION;
+    }
+
     /**
      * Remove the expensive per-variant detail from the lecturer-facing
      * payload. The complete result remains in the questionanalysis MUC cache
@@ -149,6 +164,10 @@ class question_analysis {
         $questions = [];
         foreach ($questionorder as $questionindex => $q) {
             $versions = question_details::build_versioned_review($poolb, $q, $anonymize);
+            $metadata = [
+                'question_id' => (int) ($versions[0]['question_id'] ?? 0),
+                'cmid' => (int) ($versions[0]['cmid'] ?? 0),
+            ];
             foreach ($versions as &$version) {
                 // Debug-dump detection stays on the raw (pre-format_text) HTML,
                 // matching where this check always ran — format_text()'s HTML
@@ -169,6 +188,8 @@ class question_analysis {
             }
             unset($version);
             $questions[$q] = [
+                'question_id' => $metadata['question_id'],
+                'cmid' => $metadata['cmid'],
                 'versions' => $versions,
             ];
             if ($progresscallback !== null) {
@@ -183,6 +204,7 @@ class question_analysis {
             'sections' => $sections,
             'questions' => $questions,
             'question_review_links_allowed' => !$anonymize,
+            'question_review_payload_version' => self::QUESTION_REVIEW_PAYLOAD_VERSION,
             'audit' => null,
         ];
     }

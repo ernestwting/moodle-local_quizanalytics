@@ -200,7 +200,9 @@ class warm_analytics_cache extends \core\task\scheduled_task {
             }
             $qacache = \cache::make('local_quizanalytics', 'questionanalysis');
             $qakey = \local_quizanalytics_quiz_cache_helper::build_key($quiz->id, $stats->fingerprint, false, false);
-            if ($qacache->get($qakey) === false) {
+            $cached = $qacache->get($qakey);
+            if ($cached === false ||
+                    !\local_quizanalytics\quiz\analytics\question_analysis::has_current_question_review_metadata($cached)) {
                 $coldquizzes[$quiz->id] = $quiz;
             }
         }
