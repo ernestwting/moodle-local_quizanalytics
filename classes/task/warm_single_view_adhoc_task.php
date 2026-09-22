@@ -250,7 +250,9 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
                 continue;
             }
             $row = \local_quizanalytics_prepared_store::get($courseid, (int) $quiz->id, 'question');
-            if (\local_quizanalytics_prepared_store::is_fresh($row, $stats->fingerprint)) {
+            $payload = \local_quizanalytics_prepared_store::decode($row);
+            if (\local_quizanalytics_prepared_store::is_fresh($row, $stats->fingerprint)
+                    && \local_quizanalytics\quiz\analytics\question_analysis::has_current_question_review_metadata($payload)) {
                 continue;
             }
             self::set_progress(
@@ -743,6 +745,10 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
             $quiz->id, $stats->fingerprint, $snapshotkey, $colorblind, $anonymize
         );
         $cached = $cache->get($key);
+        if ($cached !== false &&
+                !\local_quizanalytics\quiz\analytics\question_analysis::has_current_question_review_metadata($cached)) {
+            $cached = false;
+        }
         if ($cached !== false) {
             self::set_progress(
                 (int) $quiz->course,
@@ -764,7 +770,7 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
         if (!$colorblind && !$anonymize &&
                 \local_quizanalytics_prepared_store::is_fresh($prepared, $stats->fingerprint)) {
             $preparedpayload = \local_quizanalytics_prepared_store::decode($prepared);
-            if ($preparedpayload !== null) {
+            if (\local_quizanalytics\quiz\analytics\question_analysis::has_current_question_review_metadata($preparedpayload)) {
                 $cache->set($key, $preparedpayload);
                 self::set_progress(
                     (int) $quiz->course, $stats->fingerprint, 'Question Analytics',

@@ -24,6 +24,8 @@
 
 namespace local_quizanalytics\quiz\analytics;
 
+require_once($CFG->dirroot . '/question/engine/lib.php');
+
 /**
  * Per-question drill-down: question text, right answer, and response-pattern breakdown.
  */
@@ -45,10 +47,14 @@ class question_details {
      */
     public static function build_versioned_review(array $poolbrows, string $question, bool $anonymize = false): array {
         $groups = [];
+        $questionid = 0;
+        $cmid = 0;
         foreach ($poolbrows as $row) {
             if ($row['question'] !== $question) {
                 continue;
             }
+            $questionid = $questionid ?: (int) ($row['question_id'] ?? 0);
+            $cmid = $cmid ?: (int) ($row['cmid'] ?? 0);
             $questiontext = (string) ($row['question_text'] ?? '');
             $questiontextraw = (string) ($row['question_text_raw'] ?? '');
             $rightanswer = (string) ($row['right_answer_text'] ?? '');
@@ -159,9 +165,55 @@ class question_details {
                     'attempt' => $group['sample_attempt_id'],
                     'cmid' => $group['cmid'],
                 ]))->out(false),
+                'question_id' => $questionid,
+                'cmid' => $cmid,
             ];
         }
         return $versions;
+    }
+
+    /**
+     * Build native STACK investigation links without instantiating the
+     * question. STACK derives the module context from cmid itself.
+     *
+     * @param int $questionid
+     * @param int $cmid
+     * @return array{question_dashboard_url: string, stack_response_analysis_url: string}
+     */
+    public static function build_stack_links(int $questionid, int $cmid): array {
+        if ($questionid <= 0 || $cmid <= 0 || !self::can_view_question($questionid)) {
+            return [
+                'question_dashboard_url' => '',
+                'stack_response_analysis_url' => '',
+            ];
+        }
+
+        return [
+            'question_dashboard_url' => (new \moodle_url(
+                '/question/type/stack/questiontestrun.php',
+                ['questionid' => $questionid, 'cmid' => $cmid]
+            ))->out(false),
+            'stack_response_analysis_url' => (new \moodle_url(
+                '/question/type/stack/questiontestreport.php',
+                ['questionid' => $questionid, 'cmid' => $cmid]
+            ))->out(false),
+        ];
+    }
+
+    /**
+     * Check the native question-bank view capability without instantiating the
+     * STACK question or doing CAS work.
+     *
+     * @param int $questionid
+     * @return bool
+     */
+    private static function can_view_question(int $questionid): bool {
+        try {
+            $questiondata = \question_bank::load_question_data($questionid);
+            return $questiondata && \question_has_capability_on($questiondata, 'view');
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
