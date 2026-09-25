@@ -242,23 +242,52 @@ class parser {
         sort($questionnumbers);
 
         // Determine M (number of PRT parts) for each question, scanning every
-        // record's response cell first — mirrors build_response_rows()'s M_dict.
+        // record's response cell first — mirrors build_response_rows()'s M_dict,
+        // but takes the *mode* (most common per-record count) rather than the
+        // max seen anywhere across every record.
+        //
+        // The Python original's max-based M_dict made sense for its own data
+        // source (a raw Moodle CSV export, where a genuinely blank cell can
+        // hide the true PRT count entirely, so scanning every row for the
+        // largest index seen was the only way to recover it). That risk
+        // doesn't apply to this plugin's actual data source: data_fetcher.php
+        // always populates response_N via Moodle's own $quba::
+        // get_response_summary(), and STACK's summarise_response()
+        // unconditionally emits one "name: ..." entry per authored PRT for
+        // every response, blank or not (see qtype_stack's question.php) — so
+        // each record's own prt_list count already IS the true total.
+        // Taking the max instead left this exposed to a real, confirmed
+        // failure mode: a single response whose text happens to produce one
+        // spurious extra regex match (e.g. a stray "word: value"-shaped
+        // fragment inside an answer note) silently inflates the PRT count
+        // for *every* student on that question — diluting everyone else's
+        // qscore average with a phantom missing PRT and misclassifying
+        // genuinely correct responses (Moodle's own recorded grade was 1.0)
+        // as incorrect. The mode reflects what the overwhelming majority of
+        // real responses actually show and is immune to that one outlier;
+        // a record with a true, legitimately different PRT count would only
+        // affect that record's own scoring (see the per-record $prtbyindex
+        // lookup below, which the scoring loop bounds to $m regardless).
         $mbyquestion = [];
         foreach ($questionnumbers as $n) {
-            $maxk = 1;
+            $countfrequency = [];
             foreach ($records as $rec) {
                 $cell = $rec["response_{$n}"] ?? null;
                 if ($cell === null || $cell === '') {
                     continue;
                 }
                 $parsed = self::parse_response_cell((string) $cell);
-                foreach ($parsed['prt_list'] as $prt) {
-                    if ($prt['index'] > $maxk) {
-                        $maxk = $prt['index'];
-                    }
+                $count = count($parsed['prt_list']);
+                if ($count > 0) {
+                    $countfrequency[$count] = ($countfrequency[$count] ?? 0) + 1;
                 }
             }
-            $mbyquestion[$n] = $maxk;
+            if (empty($countfrequency)) {
+                $mbyquestion[$n] = 1;
+            } else {
+                arsort($countfrequency);
+                $mbyquestion[$n] = (int) array_key_first($countfrequency);
+            }
         }
 
         $rows = [];
@@ -326,21 +355,51 @@ class parser {
                     $isungraded = true;
                 }
 
-                // Score computation: mean over all PRTs K of (prtK.fraction or 0.0).
-                $m = $mbyquestion[$n];
-                $prtbyindex = [];
-                foreach ($prtlist as $prt) {
-                    $prtbyindex[$prt['index']] = $prt;
-                }
-                $prtfractions = [];
-                for ($k = 1; $k <= $m; $k++) {
-                    if (isset($prtbyindex[$k]) && $prtbyindex[$k]['fraction'] !== null) {
-                        $prtfractions[] = $prtbyindex[$k]['fraction'];
-                    } else {
-                        $prtfractions[] = 0.0;
+                // Score: prefer Moodle's own authoritative per-question mark
+                // (question_{n}_mark/_maxmark — read once directly off the
+                // live question engine via get_question_mark()/
+                // get_question_max_mark() in data_fetcher.php) over
+                // re-deriving it from the PRT fraction embedded in the
+                // response-summary text below. That text's exact shape is
+                // qtype/version-dependent — confirmed directly against a
+                // real course's own older attempts: this exact STACK
+                // question's summarise_response() used to omit the
+                // "# = <score> |" prefix entirely (just "prt1: <note>", no
+                // leading score — see qtype_stack's question.php) before a
+                // later STACK release started including it. Every attempt
+                // made under the older format silently parsed to a phantom
+                // 0 fraction here (the "# = ([0-9.]+)" match below never
+                // fires) and was misclassified 'incorrect' regardless of
+                // the real awarded mark. Moodle's own mark/maxmark are
+                // immune to that: they're read straight off the question
+                // engine, never re-parsed from a human-readable summary
+                // string whose exact format is free to change release to
+                // release. Text-parsing stays the fallback for a caller
+                // without mark data, and is still what blank/invalid
+                // detection above and the "most common responses" display
+                // elsewhere use — just no longer the source of truth for
+                // correctness.
+                $mark = $rec["question_{$n}_mark"] ?? null;
+                $maxmark = $rec["question_{$n}_maxmark"] ?? null;
+                if ($mark !== null && $maxmark !== null && (float) $maxmark > 0) {
+                    $qscore = max(0.0, min(1.0, (float) $mark / (float) $maxmark));
+                } else {
+                    // Score computation: mean over all PRTs K of (prtK.fraction or 0.0).
+                    $m = $mbyquestion[$n];
+                    $prtbyindex = [];
+                    foreach ($prtlist as $prt) {
+                        $prtbyindex[$prt['index']] = $prt;
                     }
+                    $prtfractions = [];
+                    for ($k = 1; $k <= $m; $k++) {
+                        if (isset($prtbyindex[$k]) && $prtbyindex[$k]['fraction'] !== null) {
+                            $prtfractions[] = $prtbyindex[$k]['fraction'];
+                        } else {
+                            $prtfractions[] = 0.0;
+                        }
+                    }
+                    $qscore = $m > 0 ? array_sum($prtfractions) / $m : 0.0;
                 }
-                $qscore = $m > 0 ? array_sum($prtfractions) / $m : 0.0;
 
                 if ($isblank) {
                     $responsestatus = 'blank';

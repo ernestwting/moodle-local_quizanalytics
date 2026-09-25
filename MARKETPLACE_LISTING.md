@@ -39,10 +39,13 @@ subset of the course's quizzes via a checkbox selector. A cold report
 shows a live, updating progress bar while it computes.
 
 **Question Analytics** — per quiz: a compact quiz snapshot (attempt
-counts, overall average), a Question Response Overview chart per question
-sized to Moodle's own Facility Index and mean mark, and a Question Review
-drill-down grouping each question's responses by instantiated variant,
-showing exactly what students submitted next to the correct answer, with
+counts, plus a per-attempt average matching Quiz Overview and a
+per-student average matching the Grades page), a Question Response
+Overview chart per question sized to Moodle's own Facility Index and mean
+mark, and a Question Review drill-down grouping each question's responses
+by instantiated variant, showing exactly what students submitted next to
+the correct answer, a table of the most common incorrect responses per
+variant, and a dynamic link to that question's own STACK dashboard — with
 the question text rendered as real HTML (lists, code, tables) rather than
 flattened plain text. Also includes **Solution Process Visualization**:
 class-wide answer transition graphs showing how students moved through a
@@ -86,6 +89,33 @@ computation runs in-process in plain PHP, and nothing ever leaves the
 Moodle server.
 
 Requires `qtype_stack` (the STACK question type) to have anything to show.
+
+## Release notes (v3.0.5)
+
+Copy-paste source for the "Plugin versions" tab (Edit plugin page →
+Versions) when uploading this release.
+
+- **Important grading fix**: some responses were being shown as incorrect
+  in Question/Quiz Analytics even though Moodle graded them correct —
+  traced to two issues in how a response's score gets re-derived from its
+  STACK PRT text, one of them specific to older STACK releases whose
+  response-summary text omits the score entirely. Score is now read from
+  Moodle's own authoritative per-question mark instead. Confirmed directly
+  against a real course's own data.
+- **Question Review's "Response analysis" now actually shows the
+  most-common-incorrect-responses table** for each variant, instead of a
+  permanent "coming in a future development" placeholder.
+- **Dynamic STACK dashboard link** in Question Review — follows whichever
+  question is currently selected instead of always pointing at one fixed
+  question.
+- **Live progress bar for Quiz Analytics' course-wide view** on a fast
+  cold compute, matching what Question Analytics already had.
+- **A second "Overall average"** on the Quiz Snapshot, matching what the
+  Grades page shows (one grade per student via the quiz's own Grading
+  method), shown alongside the existing per-attempt average rather than
+  replacing it.
+
+See CHANGELOG.md's `[3.0.5]` entry for the full technical account.
 
 ## Release notes (v3.0.4)
 

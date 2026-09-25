@@ -417,6 +417,40 @@ class local_quizanalytics_quiz_data_fetcher {
             ? null
             : (float) quiz_rescale_grade((float) $averagerecord->averagegrade, $quiz, false);
 
+        // A second, deliberately different average: the one shown on
+        // Moodle's own Grades page. That page averages one *finalgrade* per
+        // *student* — already collapsed from however many attempts they
+        // made via this quiz's own "Grading method" setting (highest/
+        // average/first/last attempt) — whereas quiz_average above averages
+        // every finished *attempt* as its own row (Quiz Overview's own
+        // definition). The two are both legitimate, Moodle-native numbers
+        // that only coincide when every student has exactly one attempt;
+        // showing both avoids a lecturer comparing this page's single
+        // average against the Grades page and reading the mismatch as a
+        // bug. Read straight from grade_grades (already computed by
+        // Moodle's own grade_item::update(), not re-derived here) so this
+        // is guaranteed to agree with the Grades page exactly, including
+        // any grade adjustments Moodle applies on top of the raw attempt
+        // aggregation.
+        $gradebookaverage = null;
+        $gradebookaveragecount = 0;
+        $quizgradeitem = \grade_item::fetch([
+            'itemtype' => 'mod', 'itemmodule' => 'quiz',
+            'iteminstance' => $quiz->id, 'courseid' => $course->id,
+        ]);
+        if ($quizgradeitem) {
+            $gradebookrecord = $DB->get_record_sql(
+                "SELECT AVG(finalgrade) AS averagegrade, COUNT(finalgrade) AS gradedcount
+                   FROM {grade_grades}
+                  WHERE itemid = :itemid AND finalgrade IS NOT NULL",
+                ['itemid' => $quizgradeitem->id]
+            );
+            if ($gradebookrecord->averagegrade !== null) {
+                $gradebookaverage = (float) $gradebookrecord->averagegrade;
+                $gradebookaveragecount = (int) $gradebookrecord->gradedcount;
+            }
+        }
+
         $studentcounts = $DB->get_records_sql(
             "SELECT slot.slot,
                     COUNT(DISTINCT CASE WHEN questionattempt.id IS NOT NULL THEN attempt.userid END) AS studentcount
@@ -459,6 +493,8 @@ class local_quizanalytics_quiz_data_fetcher {
             'attempts_other' => $attempts['other'],
             'quiz_average' => $quizaverage,
             'quiz_average_finished' => (int) $averagerecord->gradedcount,
+            'quiz_average_gradebook' => $gradebookaverage,
+            'quiz_average_gradebook_count' => $gradebookaveragecount,
             'students_per_question' => $studentsbyquestion,
             'question_means' => $questionmeans,
             'question_mean_counts' => $questionmeancounts,

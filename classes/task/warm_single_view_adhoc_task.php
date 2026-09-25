@@ -920,14 +920,14 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
         $cache = \cache::make('local_quizanalytics', 'quizanalysiscoursewide');
         $fingerprint = $coursestats->fingerprint;
         $key = \local_quizanalytics_quiz_cache_helper::build_key(
-            'course-ui-v5', $courseid, $coursestats->fingerprint, $selectionkey, $gradetype, $colorblind, $anonymize
+            'course-ui-v7', $courseid, $coursestats->fingerprint, $selectionkey, $gradetype, $colorblind, $anonymize
         );
         $existing = $cache->get($key);
         if ($existing !== false) {
             // Keep the stable fallback populated even when this exact
             // fingerprint was already warmed by another path.
             $latestkey = \local_quizanalytics_quiz_cache_helper::build_key(
-                'course-ui-latest-v2', $courseid, $selectionkey, $gradetype, $colorblind, $anonymize
+                'course-ui-latest-v4', $courseid, $selectionkey, $gradetype, $colorblind, $anonymize
             );
             $cache->set($latestkey, $existing);
             self::set_progress($courseid, $fingerprint, $gradetype, $colorblind, $anonymize,
@@ -1014,7 +1014,7 @@ class warm_single_view_adhoc_task extends \core\task\adhoc_task {
                 get_string('progresssaving', 'local_quizanalytics'));
             $cache->set($key, $result);
             $latestkey = \local_quizanalytics_quiz_cache_helper::build_key(
-                'course-ui-latest-v2', $courseid, $selectionkey, $gradetype, $colorblind, $anonymize
+                'course-ui-latest-v4', $courseid, $selectionkey, $gradetype, $colorblind, $anonymize
             );
             $cache->set($latestkey, $result);
             self::set_progress($courseid, $fingerprint, $gradetype, $colorblind, $anonymize,

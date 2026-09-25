@@ -55,13 +55,27 @@ terminal result (`<prtname>: ! ` for a syntax error, or `<prtname>: # =
 4. **`correct`** — score (see below) equals exactly `1.0`.
 5. **`incorrect`** — anything else.
 
-**Score for a question with `M` parts** = the mean of each part's PRT
-fraction, treating a missing/null PRT part as `0` credit — not excluded
-from the average:
+**Score for a question** comes from Moodle's own authoritative
+per-question mark — `question_usage_by_activity::get_question_mark()` /
+`get_question_max_mark()`, read straight off the live question engine, the
+same number the Grades page and `mod/quiz/review.php` show:
 
 $$
-\text{score} = \frac{1}{M}\sum_{i=1}^{M}\text{fraction}_i
+\text{score} = \frac{\text{mark}}{\text{max mark}}
 $$
+
+The PRT-fraction text above is still parsed (and used as a fallback score
+source when a mark genuinely isn't available), but is no longer the
+primary source: its exact shape turned out to be STACK-version-dependent
+— confirmed directly against a real course, some of whose older attempts
+predate a STACK release that started including the `# = <fraction>`
+prefix at all, so the fallback's own read of those PRT fields would
+silently land on `0` regardless of the real awarded mark. When the
+fallback path *is* used, a question's `M` (its number of PRT parts) is
+taken as the **mode** — the most common per-response PRT count — rather
+than the max seen across every response for that question, so one
+response whose text happens to produce a spurious extra match can no
+longer inflate `M` and dilute every other student's score.
 
 **Only `correct`/`incorrect` responses count as "graded"** for facility,
 percent-correct, and average-score calculations everywhere in this
@@ -124,9 +138,23 @@ Nearly every Quiz/Question Analytics calculation uses one of two
 
 ### Question Analytics (per quiz)
 
-- **Quiz snapshot** — attempt counts and the overall average, read from
-  Moodle's own attempt data (`AVG(sumgrades)`, rescaled the same way
-  Moodle's own Quiz Overview page does it) — not self-computed.
+- **Quiz snapshot** — attempt counts and two overall averages, both read
+  from Moodle's own data, not self-computed:
+  - **"Overall average (per attempt)"** — `AVG(sumgrades)` over finished
+    attempts, rescaled the same way Moodle's own Quiz Overview page does
+    it. Averages every finished *attempt* as its own row.
+  - **"Overall average (per student, Gradebook)"** — `AVG(finalgrade)`
+    from `grade_grades` for this quiz's own gradebook item — the same
+    number the Grades page shows. Averages one already-aggregated grade
+    per *student*, collapsed from however many attempts they made via the
+    quiz's own Grading method setting (highest/average/first/last
+    attempt).
+
+  Shown side by side rather than one replacing the other: they only agree
+  when every student has exactly one attempt, and otherwise answer
+  genuinely different questions — a lecturer comparing this page against
+  the Grades page would otherwise read a mismatch between the two as a
+  bug.
 - **Question Response Overview** — one bar per question showing the split
   of `correct` / `incorrect` / `invalid` / `no_response` (one row per
   student, their most-recent reached attempt). **The mean mark shown is

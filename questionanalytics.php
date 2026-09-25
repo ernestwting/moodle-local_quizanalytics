@@ -280,10 +280,20 @@ if ($view === 'question') {
     }
 
     if (is_array($result)) {
-        foreach ($result['questions'] ?? [] as &$questiondetail) {
+        $quizcm = get_coursemodule_from_instance('quiz', $selectedquiz->id, $courseid, false, MUST_EXIST);
+        foreach ($result['questions'] ?? [] as $questionlabel => &$questiondetail) {
+            $questionid = 0;
+            $cmid = (int) $quizcm->id;
+            $slotquestionid = \local_quizanalytics\quiz\analytics\question_details::get_question_id_for_quiz_label(
+                $cmid,
+                (string) $questionlabel
+            );
+            if ($slotquestionid > 0) {
+                $questionid = $slotquestionid;
+            }
             $links = \local_quizanalytics\quiz\analytics\question_details::build_stack_links(
-                (int) ($questiondetail['question_id'] ?? 0),
-                (int) ($questiondetail['cmid'] ?? 0)
+                $questionid,
+                $cmid
             );
             $questiondetail['question_dashboard_url'] = $links['question_dashboard_url'];
         }

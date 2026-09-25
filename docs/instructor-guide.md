@@ -64,14 +64,18 @@ Two display toggles apply across this and Question Analytics:
 Pick a quiz from the dropdown (defaults to the course's first STACK quiz)
 to see:
 
-- **Quiz snapshot** — attempt counts (finished/in-progress/other) and the
-  overall average, read straight from Moodle's own attempt data.
+- **Quiz snapshot** — attempt counts (finished/in-progress/other) and two
+  overall averages, both read straight from Moodle's own data: one
+  matching Quiz → Results → Overview (per attempt), one matching the
+  Grades page (per student, via this quiz's own Grading method).
 - **Question Response Overview** — one chart per question, sized to
   Moodle's own Facility Index and mean mark (the same numbers Quiz →
   Results → Statistics shows), not a separately-computed figure.
-- **Question Review** — click into a question to see its expected answer
-  and common response patterns grouped by instantiated variant, with the
-  question text rendered as real HTML.
+- **Question Review** — click into a question to see its expected answer,
+  a "Response analysis" table of the most common incorrect responses for
+  that variant, and a dynamic link to that question's own STACK dashboard
+  (follows whichever question is currently selected), with the question
+  text rendered as real HTML.
 
 **Solution Process Visualization** (PRT transition graphs, network
 features, response-tree distance charts, cross-attempt comparison) is

@@ -279,8 +279,16 @@ $gradetype = \local_quizanalytics\quiz\analytics\course_analysis::DEFAULT_GRADE_
 $selectionkey = local_quizanalytics_quiz_cache_helper::selection_key(array_keys($stackquizzes));
 
 $qwcache = cache::make('local_quizanalytics', 'quizanalysiscoursewide');
+// 'course-ui-v7' (was v5, then v6): bumped each time for a same-shape
+// correctness fix in parser.php's scoring — see question_analysis::
+// QUESTION_REVIEW_PAYLOAD_VERSION's own docblock for the full story of
+// each one. This cache has no value-based freshness check the way that one
+// does, so its version has to live in the key itself to force every cached
+// course-wide result (this key and its 'course-ui-latest-v4' stale-serving
+// fallback below) to recompute with the fix rather than keep serving stale
+// values.
 $qwkey = local_quizanalytics_quiz_cache_helper::build_key(
-    'course-ui-v5',
+    'course-ui-v7',
     $courseid,
     $coursestats->fingerprint,
     $selectionkey,
@@ -354,7 +362,7 @@ if ($result === false) {
     // completes — no cron running at all — did before this check existed).
     // Skip straight to computing a fresh result inline below instead.
     $latestkey = local_quizanalytics_quiz_cache_helper::build_key(
-        'course-ui-latest-v2', $courseid, $selectionkey, $gradetype, $colorblind, $anonymize
+        'course-ui-latest-v4', $courseid, $selectionkey, $gradetype, $colorblind, $anonymize
     );
     $latestresult = $qwcache->get($latestkey);
     if ($latestresult !== false && !$cronlikelystuck) {
@@ -413,9 +421,19 @@ if ($result === false) {
     // $qwcache->set() below — wasting the work and leaving every following
     // viewer to redo the exact same expensive computation from scratch.
     // Finishing anyway means the cache is warm for the very next request,
-    // even though this one's own visitor already saw an error page. The
-    // "may take a while" notice itself was already flushed unconditionally
-    // above, before this cache check.
+    // even though this one's own visitor already saw an error page.
+    //
+    // This is now the common case (a course small/fast enough to skip the
+    // background-task branch above entirely never shows any progress
+    // indicator otherwise) — see questionanalytics.php's own identical
+    // comment on this same pattern. Without this, a visitor here used to
+    // see nothing but a blank wait between the quiz selector above and the
+    // finished report.
+    $renderprogress();
+    \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+        $courseid, $coursestats->fingerprint, $gradetype, $colorblind, $anonymize,
+        'running', 'analyzing', 0, 0, get_string('progressanalyzing', 'local_quizanalytics')
+    );
     $previousabort = ignore_user_abort(true);
     $facilityrows = local_quizanalytics_quiz_data_fetcher::get_course_question_facility_data($course, $stackquizzes);
     $facilitytotals = [];
@@ -440,17 +458,41 @@ if ($result === false) {
     foreach ($facilitytotals as $quizname => $facilitytotal) {
         $quizmetadata[$quizname]['facility_index'] = round($facilitytotal['sum'] / $facilitytotal['count'], 2);
     }
+    // Same {metric, seconds} narration warm_single_view_adhoc_task's own
+    // background run of this exact computation reports — see that class's
+    // warm_course_view() for the identical callback shape.
+    $analysiscallback = function (string $metric, float $seconds) use (
+        $courseid, $coursestats, $gradetype, $colorblind, $anonymize
+    ): void {
+        \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+            $courseid, $coursestats->fingerprint, $gradetype, $colorblind, $anonymize,
+            'running', 'analyzing', 0, 0, get_string('progressanalyzing', 'local_quizanalytics'), [
+                'current_metric' => $metric,
+                'current_metric_seconds' => round($seconds, 2),
+            ]
+        );
+    };
     $result = $client->analyze_course(
         $course->fullname,
         $fetchbyquiz(),
         $colorblind,
         $gradetype,
         $anonymize,
-        $quizmetadata
+        $quizmetadata,
+        $analysiscallback
     );
     if ($result !== null) {
         $qwcache->set($qwkey, $result);
         $qwcache->set($latestkey, $result);
+        \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+            $courseid, $coursestats->fingerprint, $gradetype, $colorblind, $anonymize,
+            'complete', 'complete', 1, 1, get_string('progresscomplete', 'local_quizanalytics')
+        );
+    } else {
+        \local_quizanalytics\task\warm_single_view_adhoc_task::set_progress(
+            $courseid, $coursestats->fingerprint, $gradetype, $colorblind, $anonymize,
+            'failed', 'failed', 0, 1, get_string('progressfailed', 'local_quizanalytics')
+        );
     }
     ignore_user_abort($previousabort);
 }

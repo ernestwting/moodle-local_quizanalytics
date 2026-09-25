@@ -216,7 +216,7 @@ class warm_analytics_cache extends \core\task\scheduled_task {
                 array_map(fn($quiz) => (int) $quiz->id, $stackquizzes)
             );
             $qwkey = \local_quizanalytics_quiz_cache_helper::build_key(
-                'course-ui-v5', $course->id,
+                'course-ui-v7', $course->id,
                 $coursestats->fingerprint,
                 $selectionkey,
                 course_analysis::DEFAULT_GRADE_TYPE,

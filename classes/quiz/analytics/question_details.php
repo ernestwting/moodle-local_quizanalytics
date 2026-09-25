@@ -37,6 +37,60 @@ class question_details {
     const NO_RESPONSE = '(No response)';
 
     /**
+     * Resolve a displayed quiz question label to its current STACK question.
+     * This covers questions with no attempt row carrying question metadata.
+     *
+     * @param int $cmid
+     * @param string $questionlabel
+     * @return int
+     */
+    public static function get_question_id_for_quiz_label(int $cmid, string $questionlabel): int {
+        global $DB;
+
+        if ($cmid <= 0 || !preg_match('/^Q([1-9][0-9]*)$/', $questionlabel, $matches)) {
+            return 0;
+        }
+
+        $records = $DB->get_records_sql(
+            "SELECT slot.slot, q.id
+               FROM {course_modules} cm
+               JOIN {quiz} quiz ON quiz.id = cm.instance
+               JOIN {context} ctx ON ctx.contextlevel = :contextmodule
+                                  AND ctx.instanceid = cm.id
+               JOIN {quiz_slots} slot ON slot.quizid = quiz.id AND slot.slot > 0
+               JOIN {question_references} qr ON qr.usingcontextid = ctx.id
+                                             AND qr.component = 'mod_quiz'
+                                             AND qr.questionarea = 'slot'
+                                             AND qr.itemid = slot.id
+               JOIN {question_bank_entries} qbe ON qbe.id = qr.questionbankentryid
+               JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
+                                            AND qv.version = COALESCE(qr.version, (
+                                                SELECT MAX(latest.version)
+                                                  FROM {question_versions} latest
+                                                 WHERE latest.questionbankentryid = qbe.id
+                                                   AND latest.status <> 'draft'
+                                            ))
+               JOIN {question} q ON q.id = qv.questionid AND q.qtype = 'stack'
+              WHERE cm.id = :cmid
+                AND q.qtype = 'stack'
+           ORDER BY slot.slot",
+            [
+                'contextmodule' => CONTEXT_MODULE,
+                'cmid' => $cmid,
+            ]
+        );
+
+        $stackquestionnumber = 1;
+        foreach ($records as $record) {
+            if ($stackquestionnumber++ === (int) $matches[1]) {
+                return (int) $record->id;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
      * Group best-attempt rows by the instantiated STACK question and expected
      * answer, so randomized values are never mixed into one error list.
      *
@@ -174,14 +228,20 @@ class question_details {
 
     /**
      * Build native STACK investigation links without instantiating the
-     * question. STACK derives the module context from cmid itself.
+     * question. STACK derives the module context from cmid itself and applies
+     * its own access checks when the link is opened.
      *
      * @param int $questionid
      * @param int $cmid
      * @return array{question_dashboard_url: string, stack_response_analysis_url: string}
      */
     public static function build_stack_links(int $questionid, int $cmid): array {
-        if ($questionid <= 0 || $cmid <= 0 || !self::can_view_question($questionid)) {
+        global $DB;
+
+        if ($questionid <= 0 || $cmid <= 0 || !$DB->record_exists('question', [
+            'id' => $questionid,
+            'qtype' => 'stack',
+        ])) {
             return [
                 'question_dashboard_url' => '',
                 'stack_response_analysis_url' => '',
@@ -198,22 +258,6 @@ class question_details {
                 ['questionid' => $questionid, 'cmid' => $cmid]
             ))->out(false),
         ];
-    }
-
-    /**
-     * Check the native question-bank view capability without instantiating the
-     * STACK question or doing CAS work.
-     *
-     * @param int $questionid
-     * @return bool
-     */
-    private static function can_view_question(int $questionid): bool {
-        try {
-            $questiondata = \question_bank::load_question_data($questionid);
-            return $questiondata && \question_has_capability_on($questiondata, 'view');
-        } catch (\Throwable $e) {
-            return false;
-        }
     }
 
     /**

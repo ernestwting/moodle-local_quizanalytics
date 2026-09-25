@@ -170,13 +170,26 @@
         root.appendChild(heading);
 
         var overviewRows = [
-            ['Overall average', (snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2)) +
+            ['Overall average (per attempt)', (snapshot.quiz_average === null ? 'N/A' : Number(snapshot.quiz_average).toFixed(2)) +
                 (snapshot.quiz_average_finished ? ' (Finished: ' + formatCellValue(snapshot.quiz_average_finished) + ')' : '')],
+        ];
+        // Only shown once a gradebook grade item actually exists with at
+        // least one graded student — distinct from quiz_average above (see
+        // data_fetcher.php's own comment on why the two can legitimately
+        // differ): this one matches what Moodle's Grades page shows,
+        // averaging one already-aggregated grade per student rather than
+        // every finished attempt as its own row.
+        if (snapshot.quiz_average_gradebook !== null && snapshot.quiz_average_gradebook !== undefined) {
+            overviewRows.push(['Overall average (per student, Gradebook)',
+                Number(snapshot.quiz_average_gradebook).toFixed(2) +
+                (snapshot.quiz_average_gradebook_count ? ' (Students: ' + formatCellValue(snapshot.quiz_average_gradebook_count) + ')' : '')]);
+        }
+        overviewRows.push(
             ['Students with attempts', snapshot.students_with_attempts],
             ['Total attempts', snapshot.attempts_total],
             ['Finished', snapshot.attempts_finished],
-            ['In progress', snapshot.attempts_inprogress],
-        ];
+            ['In progress', snapshot.attempts_inprogress]
+        );
         if (snapshot.attempts_other) {
             overviewRows.push(['Other', snapshot.attempts_other]);
         }
@@ -736,10 +749,12 @@
         heading.textContent = version.label.replace(/^Version\b/, 'Variant');
         card.appendChild(heading);
         var students = document.createElement('p');
+        students.className = 'qa-variant-students';
         students.textContent = formatCellValue(version.students) + ' students';
         students.style.marginBottom = '0.25rem';
         card.appendChild(students);
         var summary = document.createElement('p');
+        summary.className = 'qa-variant-summary';
         summary.textContent = renderVariantStatusSummary(version);
         summary.style.marginBottom = '1rem';
         card.appendChild(summary);
@@ -749,17 +764,34 @@
         card.appendChild(loading);
         block.appendChild(card);
         if (actionButton) actionButton.textContent = 'Hide details';
-        loadVariantReview(loading, reviewUrl, question, index, linksAllowed, snapshot);
+        loadVariantReview(card, loading, reviewUrl, question, index, linksAllowed, snapshot);
         typesetMath(card);
     }
 
-    function loadVariantReview(target, reviewUrl, question, index, linksAllowed, snapshot) {
+    function loadVariantReview(card, target, reviewUrl, question, index, linksAllowed, snapshot) {
         var url = new URL(reviewUrl, global.location.href);
         url.searchParams.set('question', question);
         url.searchParams.set('variant', index);
         fetch(url.toString(), {credentials: 'same-origin', cache: 'no-store'})
             .then(function (response) { return response.json(); })
             .then(function (version) {
+                // Keep the counts shown above in sync with whatever this
+                // same fetch's own data backs the Response analysis table
+                // below — the counts were first drawn from the lightweight
+                // payload embedded in the initial page load, which can be
+                // an older cache generation than this on-demand fetch (a
+                // background regeneration can complete in between); without
+                // this, a lecturer could see a stale "188 incorrect" count
+                // sitting next to a freshly-correct, now much shorter
+                // response-analysis table and read the mismatch as a bug.
+                var studentsEl = card.querySelector('.qa-variant-students');
+                var summaryEl = card.querySelector('.qa-variant-summary');
+                if (studentsEl && typeof version.students !== 'undefined') {
+                    studentsEl.textContent = formatCellValue(version.students) + ' students';
+                }
+                if (summaryEl && typeof version.correct !== 'undefined') {
+                    summaryEl.textContent = renderVariantStatusSummary(version);
+                }
                 target.textContent = '';
                 renderVariantDetails(target, version, linksAllowed, snapshot);
                 typesetMath(target);
@@ -790,11 +822,25 @@
         analysisHeading.textContent = 'Response analysis';
         analysisHeading.style.marginTop = '0';
         analysisPlaceholder.appendChild(analysisHeading);
-        var placeholder = document.createElement('p');
-        placeholder.className = 'text-muted';
-        placeholder.style.marginBottom = '0';
-        placeholder.textContent = 'Further response-level analysis will be added in a future development.';
-        analysisPlaceholder.appendChild(placeholder);
+        var commonResponses = version.common_responses || [];
+        if (commonResponses.length) {
+            var analysisIntro = document.createElement('p');
+            analysisIntro.textContent = 'Most common incorrect responses for this variant:';
+            analysisIntro.style.marginBottom = '0.5rem';
+            analysisPlaceholder.appendChild(analysisIntro);
+            renderDataTable(analysisPlaceholder, {
+                columns: ['Response', 'Students'],
+                rows: commonResponses.map(function (item) {
+                    return [item.response, item.students];
+                }),
+            });
+        } else {
+            var placeholder = document.createElement('p');
+            placeholder.className = 'text-muted';
+            placeholder.style.marginBottom = '0';
+            placeholder.textContent = 'No incorrect response patterns were found for this variant.';
+            analysisPlaceholder.appendChild(placeholder);
+        }
         target.appendChild(analysisPlaceholder);
         if (linksAllowed && version.stack_response_analysis_url) {
             var reportLink = document.createElement('a');
@@ -908,14 +954,14 @@
         questionLink.textContent = 'Open STACK question dashboard \u2197';
         questionLink.style.display = 'inline-block';
         questionLink.style.marginLeft = '1rem';
-        questionLink.style.marginTop = '0.5rem';
-        questionLink.style.marginBottom = '0.5rem';
+        questionLink.style.marginBottom = '0.75rem';
         wrapper.appendChild(questionLink);
 
         function updateQuestionLink() {
             var selected = questions[select.value] || {};
-            if (selected.question_dashboard_url) {
-                questionLink.href = selected.question_dashboard_url;
+            var dashboardUrl = selected.question_dashboard_url;
+            if (dashboardUrl) {
+                questionLink.href = dashboardUrl;
                 questionLink.style.display = 'inline-block';
             } else {
                 questionLink.removeAttribute('href');

@@ -14,6 +14,76 @@ plugin by its merge-time component name, `local_stackquizanalytics`, and
 time; see [2.3.0] for why and when that settled on the current
 `local_quizanalytics`.
 
+## [3.0.5] — Fixed a real-world grading misclassification, a dynamic STACK dashboard link, and a second Gradebook-matching average
+
+- **Fixed responses being misclassified `incorrect` despite Moodle grading
+  them correct**, confirmed directly against a real course's own exported
+  data. Two independent, compounding causes in how a response's score gets
+  re-derived from its PRT-fraction text (`<prtname>: # = <fraction> |
+  <notes>`), both in `classes/quiz/analytics/parser.php`:
+  - **`M` (a question's PRT count) was taken as the max seen across every
+    response**, not just the current one — a single response elsewhere
+    whose text happened to produce one spurious extra regex match (e.g. an
+    answer-note token shaped like `word: value`) silently inflated `M` for
+    *every other student on that question*, diluting everyone's score
+    average with a phantom missing PRT part. Now taken as the **mode**
+    (most common per-response count) instead — immune to one outlier,
+    while a response with a genuinely different real PRT count still only
+    affects its own scoring.
+  - **The PRT-fraction text itself is STACK-version-dependent.** A real
+    course's older attempts (STACK's `summarise_response()` before some
+    later release) omit the `# = <fraction>` prefix entirely — just
+    `<prtname>: <note>`, no score — which the fraction-parsing regex
+    silently read as `0` regardless of the real awarded mark. Every
+    response made under that older format was misclassified `incorrect`
+    project-wide for as long as this plugin has existed. Score is now read
+    from Moodle's own authoritative `question_usage_by_activity::
+    get_question_mark()`/`get_question_max_mark()` — the same number the
+    Grades page and `mod/quiz/review.php` show, read straight off the live
+    question engine rather than re-parsed from a human-readable summary
+    string — falling back to the PRT-fraction text only when that mark
+    genuinely isn't available. `blank`/`invalid`/`ungraded` detection and
+    the "most common incorrect responses" display still use the
+    text-parsed `ansN`/PRT data, which this doesn't affect.
+  - Bumped `question_analysis::QUESTION_REVIEW_PAYLOAD_VERSION` (4, then 5)
+    and the course-wide `quizanalysiscoursewide` cache's own key version
+    (`course-ui-v7`, `course-ui-latest-v4`) so every previously-cached
+    payload — whose *values*, not just shape, were affected — gets rebuilt
+    with the fix rather than keep serving stale numbers.
+- **Question Review's "Response analysis" now shows the actual
+  most-common-incorrect-responses table** instead of a permanent "further
+  response-level analysis will be added in a future development"
+  placeholder — the data (`common_responses`, grouped by exact response
+  text within each instantiated variant) was already computed for this
+  exact purpose and shown elsewhere on the page; this just wires it into
+  the one place that was still a placeholder.
+  - The counts shown just above that table ("N students · X correct ·
+    Y incorrect · ...") now refresh from the same on-demand fetch that
+    populates the table below, instead of staying frozen at whatever was
+    embedded in the initial page load — the two could previously disagree
+    if a background regeneration completed in the gap between page load
+    and clicking "View details", most visibly right after an update like
+    this one lands.
+- **The "Open STACK question dashboard" link in Question Review is now
+  dynamic** — it follows whichever question the "Select Question" dropdown
+  currently has selected (resolving that quiz-label to its actual STACK
+  question id via `question_details::get_question_id_for_quiz_label()`,
+  covering questions with no attempt-row metadata of their own) instead of
+  pointing at one fixed question regardless of selection.
+- **Quiz Analytics course-wide view now shows a live progress bar for its
+  own inline (non-backgrounded) cold compute**, matching the fix Question
+  Analytics already had — previously a course small/fast enough to skip
+  the background-task path (the common case) showed nothing at all between
+  the quiz selector and the finished report.
+- **A second "Overall average" on the Quiz Snapshot**, read straight from
+  this quiz's own Gradebook item (`grade_grades.finalgrade`) — the number
+  the Grades page shows, one already-aggregated grade per student via the
+  quiz's own Grading method setting. Shown alongside the existing
+  per-*attempt* average (matching Moodle's Quiz Overview report) rather
+  than replacing it, since the two only agree when every student has
+  exactly one attempt and are otherwise both legitimate, differently-scoped
+  numbers.
+
 ## [3.0.4] — Course-wide quiz selection, live progress bars, and cron-independent on-demand analytics
 
 Ports jumazevick's remaining `juma_test_branch_personal` work not already
